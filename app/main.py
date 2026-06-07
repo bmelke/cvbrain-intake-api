@@ -1,5 +1,6 @@
 import os
 import re
+import secrets
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Header, HTTPException
@@ -304,7 +305,8 @@ def require_api_key(api_key: Optional[str]) -> None:
     if not expected:
         return
 
-    if not api_key or api_key != expected:
+    provided = (api_key or "").strip()
+    if not provided or not secrets.compare_digest(provided, expected):
         raise HTTPException(status_code=401, detail="invalid_api_key")
 
 
