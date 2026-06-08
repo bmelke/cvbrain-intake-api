@@ -34,6 +34,27 @@ def unique(items: List[str]) -> List[str]:
     return output
 
 
+def strip_requirement_clauses(value: str) -> str:
+    clean = re.sub(r"\s+", " ", value.strip(" -•\t\r\n"))
+    if not clean:
+        return ""
+
+    clause_patterns = [
+        r"\s+(?:-|–|—)\s+(?:dispositivos\s+m[eé]dicos|equipos\s+m[eé]dicos|medical\s+devices|salud|healthcare)\b.*$",
+        r"\s+con\s+(?:experiencia|conocimiento|conocimientos|manejo|dominio)\s+(?:en|de)\b.*$",
+        r"\s+para\s+.+$",
+        r"\s+m[ií]nim[ao]\b.*$",
+        r"\s+deseable\b.*$",
+        r"\s+ubicaci[oó]n\b.*$",
+        r"\s+modalidad\b.*$",
+    ]
+
+    for pattern in clause_patterns:
+        clean = re.sub(pattern, "", clean, flags=re.I)
+
+    return clean.strip(" -•\t\r\n")[:120].strip()
+
+
 def sentences(text: str) -> List[str]:
     chunks = re.split(r"[\n.;]+", text)
     return unique([chunk.strip(" -•\t") for chunk in chunks if len(chunk.strip()) > 3])
@@ -51,7 +72,7 @@ def extract_role_title(text: str) -> str:
         first,
         flags=re.I,
     )
-    return first[:120].strip()
+    return strip_requirement_clauses(first)
 
 
 def extract_years(text: str) -> Optional[int]:
@@ -191,7 +212,11 @@ def extract_search_terms(text: str, role_title: str) -> List[str]:
         "comercial",
         "dispositivos medicos",
         "dispositivos médicos",
+        "equipos medicos",
+        "equipos médicos",
+        "medical devices",
         "salud",
+        "healthcare",
         "crm",
         "administrativo",
         "administrativa",

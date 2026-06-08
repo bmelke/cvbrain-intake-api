@@ -100,6 +100,30 @@ def test_analyze_allowed_without_api_key_env(monkeypatch):
     assert "search_terms" in data
 
 
+def test_account_manager_medical_devices_montevideo_contract(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload(
+            "Account Manager Semi Senior con experiencia en dispositivos médicos.\n"
+            "Mínima de 3 años.\n"
+            "Deseable CRM.\n"
+            "Ubicación Montevideo, híbrido."
+        ),
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["ok"] is True
+    assert data["role_title"] == "Account Manager Semi Senior"
+    assert "dispositivos médicos" in data["search_terms"]
+    assert data["location"]["normalized"] == "Montevideo"
+    assert data["location"]["hybrid_allowed"] is True
+    assert data["experience"]["minimum_years"] == 3
+
+
 def test_analyze_requires_api_key_when_env_set(monkeypatch):
     monkeypatch.setenv("CVBRAIN_INTAKE_API_KEY", "test-key")
 
