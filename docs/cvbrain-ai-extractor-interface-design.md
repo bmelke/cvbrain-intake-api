@@ -188,7 +188,192 @@ Future AI system instructions must include:
 
 AI output should be conservative: uncertainty becomes a warning, missing-information item, or recruiter question, not a fabricated requirement.
 
-## 8. AI Output Target
+## 8. Search Readiness Policy
+
+CVBrain should not block ambiguous searches by default. It should explain what is missing for a complete or precise search, classify the search readiness, and allow the recruiter to continue when the issue is ambiguity rather than safety or technical failure.
+
+Allowed `search_readiness.status` values:
+
+| Status | Meaning | Proceed allowed? |
+|---|---|---:|
+| `ready` | Enough information for a precise search. | Yes |
+| `usable_with_warnings` | Search can run, but some useful details are missing. | Yes |
+| `exploratory` | Search can run, but it is likely broad. | Yes |
+| `insufficient_for_precise_search` | Search should be refined, but the recruiter can continue anyway. | Yes |
+| `blocked_for_safety_or_technical_reason` | Search cannot run due to empty input, security, unsafe request, permission, or technical failure. | No |
+
+Rules:
+
+- `ready`: role, core requirements, and any explicit constraints are clear enough for a precise search.
+- `usable_with_warnings`: search can run, but useful details such as location, industry, tools, seniority, or modality are missing.
+- `exploratory`: search can run, but broad role language or sparse requirements will likely produce broad results.
+- `insufficient_for_precise_search`: search should be refined for quality, but the recruiter may continue anyway.
+- `blocked_for_safety_or_technical_reason`: search cannot proceed because the request is empty, unsafe, prohibited, unauthorized, or technically failed.
+
+Suggested object:
+
+```json
+{
+  "status": "exploratory",
+  "proceed_allowed": true,
+  "recommended_action": "answer_clarifying_questions",
+  "recruiter_decision_required": true,
+  "continued_with_missing_information": false,
+  "recruiter_override_reason": null,
+  "decision_options": [
+    "continue_anyway",
+    "answer_clarifying_questions",
+    "ask_company",
+    "use_manual_search",
+    "cancel"
+  ],
+  "company_clarification_questions": [],
+  "missing_information": []
+}
+```
+
+Company clarification questions remain advisory unless the missing item creates a safety or technical block.
+
+Do not block merely because:
+
+- industry is missing
+- location is missing
+- compensation is missing
+- requirements are vague
+- role title is broad
+- employer has not answered clarification questions
+
+Only block when:
+
+- `source_text` is empty
+- request is unsafe or prohibited
+- request asks for discriminatory/protected filtering
+- API/security/permission failure occurs
+- technical extraction failure occurs and fallback is unavailable
+
+When the recruiter continues despite missing information, future UI/API layers should set `continued_with_missing_information=true` and optionally capture `recruiter_override_reason`. That choice is a review/control signal, not candidate ranking logic.
+
+## 9. Recruiter Decision Policy
+
+Future Job Intelligence v1 should expose recruiter decision metadata without forcing a block for ordinary ambiguity.
+
+Fields:
+
+| Field | Type | Rule |
+|---|---|---|
+| `proceed_allowed` | bool | False only for safety, permission, empty input, or unrecoverable technical failure. |
+| `recommended_action` | string | Suggested next action. Must not override recruiter choice unless blocked. |
+| `recruiter_decision_required` | bool | True when the search is broad or incomplete enough to deserve explicit recruiter awareness. |
+| `continued_with_missing_information` | bool | True when recruiter explicitly continues after warnings/questions. |
+| `recruiter_override_reason` | string/null | Optional recruiter-provided reason for continuing. Must be sanitized. |
+| `decision_options` | array | Allowed next actions. |
+
+Decision options:
+
+- `continue_anyway`
+- `answer_clarifying_questions`
+- `ask_company`
+- `use_manual_search`
+- `cancel`
+
+Recommended action examples:
+
+- `continue_anyway`: acceptable when role title and broad intent are clear enough for exploratory search.
+- `answer_clarifying_questions`: useful when location, industry, seniority, tools, or must-have requirements are missing.
+- `ask_company`: useful when employer-specific details are required but not available.
+- `use_manual_search`: useful when recruiter wants full control or CVBrain confidence is low.
+- `cancel`: useful for accidental or irrelevant input.
+
+### Example: Ambiguous Clerk Search
+
+Input:
+
+```text
+Find all clerk applications.
+```
+
+Expected behavior:
+
+- `search_readiness.status` is `exploratory` or `insufficient_for_precise_search`.
+- `proceed_allowed=true`.
+- `company_clarification_questions` list what would improve the search.
+- `missing_information` explains the gaps.
+- `search_strategy` uses broad clerk titles/terms.
+- Do not invent industry, location, salary, tools, or hard filters.
+- Recruiter can continue anyway.
+
+Example projection:
+
+```json
+{
+  "job_profile": {
+    "normalized_role_title": "Clerk"
+  },
+  "search_readiness": {
+    "status": "exploratory",
+    "proceed_allowed": true,
+    "recommended_action": "answer_clarifying_questions",
+    "recruiter_decision_required": true,
+    "continued_with_missing_information": false,
+    "decision_options": ["continue_anyway", "answer_clarifying_questions", "ask_company", "use_manual_search", "cancel"]
+  },
+  "company_clarification_questions": [
+    "What type of clerk role is this?",
+    "What location or candidate market should be used?",
+    "Are any tools, industry experience, or must-have requirements required?"
+  ],
+  "missing_information": ["role specificity", "location", "industry", "must-have requirements"],
+  "search_strategy": {
+    "target_titles": ["Clerk", "Office Clerk", "Administrative Clerk"],
+    "target_keywords": ["clerk"]
+  }
+}
+```
+
+### Example: Vague Sales Manager With Negotiation
+
+Input:
+
+```text
+Sales Manager. Must be good at negotiation.
+```
+
+Expected behavior:
+
+- negotiation is captured as a soft/interview-verifiable competency.
+- no invented industry, B2B/B2C, CRM, team size, compensation, travel, or location.
+- `company_clarification_questions` are generated.
+- `proceed_allowed=true`.
+- `search_readiness.status` is `exploratory` or `usable_with_warnings`.
+- `continue_anyway` option is available.
+- negotiation-only evidence is not a hard resume filter by default.
+
+Example projection:
+
+```json
+{
+  "job_profile": {
+    "normalized_role_title": "Sales Manager"
+  },
+  "soft_competencies": [
+    {
+      "competency": "negotiation",
+      "importance": "must_have",
+      "evidence_expected": "interview"
+    }
+  ],
+  "requirements": [],
+  "search_readiness": {
+    "status": "exploratory",
+    "proceed_allowed": true,
+    "recommended_action": "answer_clarifying_questions",
+    "decision_options": ["continue_anyway", "answer_clarifying_questions", "ask_company", "use_manual_search", "cancel"]
+  },
+  "missing_information": ["industry", "location", "sales model", "team size", "must-have experience"]
+}
+```
+
+## 10. AI Output Target
 
 The target output is CVBrain Job Intelligence v1, not only the old flat API contract.
 
@@ -216,7 +401,7 @@ The endpoint must still return current flat fields at top level for WordPress co
 
 Flat compatibility fields remain the WordPress-safe contract. `job_intelligence` is additive and must be feature-gated until validated.
 
-## 9. Fallback Policy
+## 11. Fallback Policy
 
 If AI succeeds:
 
@@ -252,7 +437,7 @@ Failure cases:
 - input too large
 - location guardrail violation
 
-## 10. Structured Output Validation
+## 12. Structured Output Validation
 
 Future OpenAI implementation should use Structured Outputs with strict JSON schema. The validator should enforce:
 
@@ -262,13 +447,15 @@ Future OpenAI implementation should use Structured Outputs with strict JSON sche
 - requirement object shape
 - confidence range `0.0` through `1.0`
 - no `hard_filter_approved=true` unless source/approval supports it
+- valid `search_readiness.status`
+- `proceed_allowed=false` only for safety, permission, empty input, or unrecoverable technical failure
 - no country leakage in fixture tests
 - no candidate results in extraction schema
 - no raw AI output in exportable response by default
 
 Validation failure should trigger fallback or a clean error, depending on `CVBRAIN_AI_FALLBACK_ENABLED`.
 
-## 11. Test Strategy
+## 13. Test Strategy
 
 Interface/stub tests should make no real OpenAI calls. Required tests:
 
@@ -280,12 +467,18 @@ Interface/stub tests should make no real OpenAI calls. Required tests:
 - AI payload includes locale, country context, candidate market, and employer market
 - AI payload preserves source text but does not log it
 - location context mismatch warning can be represented
+- ambiguous clerk search has `proceed_allowed=true`
+- ambiguous clerk search produces company clarification questions
+- ambiguous clerk search does not invent location, industry, salary, tools, or hard filters
+- vague Sales Manager search has `proceed_allowed=true`
+- negotiation-only requirement is not a hard resume filter
+- blocked status is reserved for safety, technical, permission, or empty-input cases
 - no network calls in tests
 - fixture suite still passes
 
 The current implementation adds dormant stubs under `app/extractors/` and isolated tests in `tests/test_extractor_router.py`.
 
-## 12. Security and Privacy
+## 14. Security and Privacy
 
 Rules:
 
@@ -300,7 +493,7 @@ Rules:
 
 Operational metadata, if enabled later, must be non-sensitive: mode, engine, fallback status, schema version, model name, latency, and warning codes only.
 
-## 13. Cloud Run Implications
+## 15. Cloud Run Implications
 
 Future staging service:
 
@@ -332,7 +525,7 @@ Initial scaling:
 
 Dev service can remain deterministic or `auto` without OpenAI. Staging/prod should require API key protection before receiving any pilot traffic.
 
-## 14. Migration Plan
+## 16. Migration Plan
 
 Phase AI-0:
 

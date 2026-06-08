@@ -1,0 +1,39 @@
+{
+  "purpose": "Recruiter-controlled ambiguous-search proceed policy for future CVBrain Job Intelligence v1 outputs.",
+  "statuses": [
+    "ready",
+    "usable_with_warnings",
+    "exploratory",
+    "insufficient_for_precise_search",
+    "blocked_for_safety_or_technical_reason"
+  ],
+  "proceed_allowed_statuses": [
+    "ready",
+    "usable_with_warnings",
+    "exploratory",
+    "insufficient_for_precise_search"
+  ],
+  "blocked_status": "blocked_for_safety_or_technical_reason",
+  "decision_options": [
+    "continue_anyway",
+    "answer_clarifying_questions",
+    "ask_company",
+    "use_manual_search",
+    "cancel"
+  ],
+  "block_only_when": [
+    "empty_source_text",
+    "unsafe_or_prohibited_request",
+    "discriminatory_or_protected_filtering_request",
+    "api_security_or_permission_failure",
+    "technical_extraction_failure_without_fallback"
+  ],
+  "must_not_block_merely_because": [
+    "industry_missing",
+    "location_missing",
+    "compensation_missing",
+    "requirements_vague",
+    "role_title_broad",
+    "company_clarification_questions_unanswered"
+  ]
+}

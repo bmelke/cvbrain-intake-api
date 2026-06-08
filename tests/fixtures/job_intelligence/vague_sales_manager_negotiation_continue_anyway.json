@@ -1,0 +1,72 @@
+{
+  "id": "vague_sales_manager_negotiation_continue_anyway",
+  "assertion_scope": "future_schema_expectation",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Sales Manager. Must be good at negotiation.",
+  "expected": {
+    "job_title": "Sales Manager",
+    "seniority": "",
+    "location": {
+      "base": "",
+      "country_code": "UY_context_only",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [],
+    "should_have_contains": [],
+    "nice_to_have_contains": [],
+    "soft_competencies_contains": [
+      "negotiation"
+    ],
+    "search_terms_include": [
+      "Sales Manager"
+    ],
+    "must_not_include": [
+      "B2B",
+      "B2C",
+      "CRM",
+      "team size",
+      "compensation",
+      "travel",
+      "Montevideo",
+      "CABA",
+      "GBA",
+      "hard_filter_approved\": true"
+    ],
+    "warnings_include": [],
+    "missing_information_include": [
+      "industry",
+      "location",
+      "sales model",
+      "team size",
+      "must-have experience"
+    ],
+    "search_readiness": {
+      "status": "exploratory",
+      "proceed_allowed": true,
+      "recommended_action": "answer_clarifying_questions",
+      "recruiter_decision_required": true,
+      "continued_with_missing_information": false,
+      "recruiter_override_reason": null,
+      "decision_options": [
+        "continue_anyway",
+        "answer_clarifying_questions",
+        "ask_company",
+        "use_manual_search",
+        "cancel"
+      ]
+    },
+    "company_clarification_questions": [
+      "What industry or customer segment should this Sales Manager role target?",
+      "Is the role B2B, B2C, channel, retail, or another sales model?",
+      "What location or candidate market should be used?",
+      "Are there must-have tools, team size, or sales-cycle requirements?"
+    ],
+    "hard_filter_approved": false,
+    "negotiation_hard_resume_filter": false
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "id": "ambiguous_clerk_search_continue_anyway",
+  "assertion_scope": "future_schema_expectation",
+  "locale": "en-US",
+  "country_context": "US",
+  "candidate_market": "US",
+  "employer_market": "US",
+  "source_text": "Find all clerk applications.",
+  "expected": {
+    "job_title": "Clerk",
+    "seniority": "",
+    "location": {
+      "base": "",
+      "country_code": "US_context_only",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [],
+    "should_have_contains": [],
+    "nice_to_have_contains": [],
+    "search_terms_include": [
+      "Clerk",
+      "Office Clerk",
+      "Administrative Clerk"
+    ],
+    "must_not_include": [
+      "Montevideo",
+      "Buenos Aires",
+      "CABA",
+      "GBA",
+      "CRM",
+      "salary",
+      "compensation",
+      "hard_filter_approved\": true"
+    ],
+    "warnings_include": [],
+    "missing_information_include": [
+      "role specificity",
+      "location",
+      "industry",
+      "must-have requirements"
+    ],
+    "search_readiness": {
+      "status": "exploratory",
+      "proceed_allowed": true,
+      "recommended_action": "answer_clarifying_questions",
+      "recruiter_decision_required": true,
+      "continued_with_missing_information": false,
+      "recruiter_override_reason": null,
+      "decision_options": [
+        "continue_anyway",
+        "answer_clarifying_questions",
+        "ask_company",
+        "use_manual_search",
+        "cancel"
+      ]
+    },
+    "company_clarification_questions": [
+      "What type of clerk role is this?",
+      "What location or candidate market should be used?",
+      "Are any tools, industry experience, or must-have requirements required?"
+    ],
+    "hard_filter_approved": false
+  }
+}
