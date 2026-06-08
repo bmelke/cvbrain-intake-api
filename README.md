@@ -7,7 +7,7 @@ CVBrain Intake API is the standalone analyzer service used by the TrabajoAca Job
 - Dev Cloud Run service: cvbrain-intake-api-dev
 - Dev URL: https://cvbrain-intake-api-dev-4680101523.us-east1.run.app
 
-The service currently uses deterministic parsing only. It does not use OpenAI and does not connect to a database.
+The service defaults to deterministic parsing. Optional OpenAI Structured Output extraction is available only when explicitly enabled with environment variables. The service does not connect to a database.
 
 ## Endpoints
 
@@ -27,6 +27,8 @@ The current dev endpoint is public. Do not send real PII, real recruiter files, 
 
 Staging and production must set `CVBRAIN_INTAKE_API_KEY`.
 
+OpenAI extraction is only for job-intake interpretation. It must not rank candidates, choose candidates, replace manual search, or introduce candidate data.
+
 ## Local Setup
 
 ```bash
@@ -43,6 +45,12 @@ Without API key, useful for local development:
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
+Deterministic mode is the default and does not require `OPENAI_API_KEY`:
+
+```bash
+CVBRAIN_EXTRACTOR_MODE=deterministic uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
 With API key protection enabled:
 
 ```bash
@@ -54,6 +62,8 @@ CVBRAIN_INTAKE_API_KEY=local-test-key uvicorn app.main:app --host 127.0.0.1 --po
 ```bash
 pytest
 ```
+
+Tests use mocked providers and make no real OpenAI calls. `OPENAI_API_KEY` is not required for tests.
 
 Full local check:
 
@@ -67,6 +77,39 @@ The check runs:
 python3 -m py_compile app/main.py
 pytest
 ```
+
+## Extractor Modes
+
+`POST /api/job-intake/analyze` always returns the current flat compatibility fields. Optional metadata may include `engine`, `fallback_used`, `ai_model`, and `job_intelligence` when AI extraction succeeds.
+
+Environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CVBRAIN_EXTRACTOR_MODE` | `deterministic` | `deterministic`, `auto`, or `ai`. |
+| `OPENAI_API_KEY` | unset | Required only when AI is actually used. |
+| `CVBRAIN_OPENAI_MODEL` | unset | Required for AI mode. Auto mode uses AI only when both key and model are set. |
+| `CVBRAIN_AI_TIMEOUT_SECONDS` | `20` | OpenAI client timeout. |
+| `CVBRAIN_AI_FALLBACK_ENABLED` | `true` | Fall back to deterministic output on AI failure. |
+| `CVBRAIN_AI_STRICT_SCHEMA_ENABLED` | `true` | Request strict Structured Output schema where supported. |
+| `CVBRAIN_AI_MAX_INPUT_CHARS` | `12000` | Conservative input limit for AI mode. |
+| `CVBRAIN_AI_MAX_OUTPUT_TOKENS` | `4096` | Conservative output token limit for AI mode. |
+| `CVBRAIN_LOG_AI_METADATA` | `false` | Reserved for non-sensitive operational metadata only. |
+| `CVBRAIN_STORE_RAW_AI_OUTPUT` | `false` | Raw AI output must not be stored by default. |
+
+Mode behavior:
+
+- `deterministic`: always uses the deterministic parser. No OpenAI key or model is required.
+- `auto`: uses OpenAI only when both `OPENAI_API_KEY` and `CVBRAIN_OPENAI_MODEL` are configured; otherwise deterministic.
+- `ai`: attempts OpenAI Structured Output extraction. Missing key/model, invalid JSON, schema failure, timeout, or provider error falls back to deterministic when fallback is enabled, or returns a clean `ok=false` flat response when fallback is disabled.
+
+AI output target:
+
+```text
+OpenAI Structured Output -> CVBrain Job Intelligence v1 validation -> flat compatibility mapping
+```
+
+The top-level response remains backward-compatible for WordPress. `job_intelligence` is additive and present only after successful AI validation.
 
 ## Curl Examples
 
@@ -140,7 +183,7 @@ gcloud run deploy cvbrain-intake-api-dev \
 
 ### Staging
 
-Staging should require an API key:
+Staging should require an API key. For deterministic staging:
 
 ```bash
 gcloud run deploy cvbrain-intake-api-staging \
@@ -156,7 +199,24 @@ gcloud run deploy cvbrain-intake-api-staging \
   --max-instances 1
 ```
 
-Prefer a secret manager integration before using staging with broader access.
+For AI staging, document and configure secrets; do not commit them:
+
+```bash
+gcloud run deploy cvbrain-intake-api-staging \
+  --source . \
+  --region us-east1 \
+  --allow-unauthenticated \
+  --set-env-vars CVBRAIN_EXTRACTOR_MODE=ai,CVBRAIN_AI_FALLBACK_ENABLED=true,CVBRAIN_AI_STRICT_SCHEMA_ENABLED=true,CVBRAIN_OPENAI_MODEL=REPLACE_WITH_APPROVED_MODEL \
+  --set-secrets OPENAI_API_KEY=OPENAI_API_KEY:latest,CVBRAIN_INTAKE_API_KEY=CVBRAIN_INTAKE_API_KEY:latest \
+  --memory 512Mi \
+  --cpu 1 \
+  --concurrency 10 \
+  --timeout 60 \
+  --min-instances 0 \
+  --max-instances 2
+```
+
+Prefer Secret Manager integration before using staging with broader access.
 
 ### Production
 

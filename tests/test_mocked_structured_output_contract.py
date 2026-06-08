@@ -197,8 +197,8 @@ def test_validator_rejects_preferred_hard_filter_approval():
         validate_job_intelligence_v1(fixture)
 
 
-def test_mocked_contract_layer_has_no_openai_dependency_or_runtime_import():
+def test_mocked_contract_layer_has_no_runtime_openai_import():
     requirements = REQUIREMENTS_PATH.read_text(encoding="utf-8")
 
-    assert "openai" not in requirements.lower()
+    assert "openai" in requirements.lower()
     assert "openai" not in sys.modules

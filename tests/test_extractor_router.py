@@ -80,8 +80,10 @@ def test_ai_stub_failure_falls_back_and_adds_warning_when_key_exists():
         env={
             "CVBRAIN_EXTRACTOR_MODE": "ai",
             "OPENAI_API_KEY": "test-key-not-used",
+            "CVBRAIN_OPENAI_MODEL": "test-model-not-used",
             "CVBRAIN_AI_FALLBACK_ENABLED": "true",
-        }
+        },
+        ai_extractor=AIExtractorStub(),
     )
 
     result = router.extract(request())
@@ -122,11 +124,31 @@ def test_extractor_stubs_do_not_import_openai_or_make_network_calls():
         env={
             "CVBRAIN_EXTRACTOR_MODE": "ai",
             "OPENAI_API_KEY": "test-key-not-used",
+            "CVBRAIN_OPENAI_MODEL": "test-model-not-used",
+            "CVBRAIN_AI_FALLBACK_ENABLED": "true",
+        },
+        ai_extractor=AIExtractorStub(),
+    )
+
+    result = router.extract(request())
+
+    assert result["fallback_used"] is True
+    assert "openai" not in sys.modules
+
+
+def test_ai_mode_with_key_but_missing_model_falls_back_without_constructing_client():
+    router = ExtractorRouter(
+        env={
+            "CVBRAIN_EXTRACTOR_MODE": "ai",
+            "OPENAI_API_KEY": "test-key-not-used",
             "CVBRAIN_AI_FALLBACK_ENABLED": "true",
         }
     )
 
     result = router.extract(request())
 
+    assert result["ok"] is True
+    assert result["engine"] == "deterministic"
     assert result["fallback_used"] is True
+    assert "ai_missing_model" in result["warnings"]
     assert "openai" not in sys.modules

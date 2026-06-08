@@ -1,7 +1,4 @@
-"""Extractor interfaces for CVBrain intake analysis.
-
-These helpers are intentionally not wired into the live FastAPI endpoint yet.
-"""
+"""Extractor interfaces for CVBrain intake analysis."""
 
 from app.extractors.ai_stub import AIExtractorStub
 from app.extractors.base import (

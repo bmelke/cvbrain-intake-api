@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
+from app.extractors import ExtractorRequest, ExtractorRouter
+
 
 SERVICE_VERSION = "0.1.0"
 SERVICE_NAME = "cvbrain-intake-api"
@@ -20,6 +22,9 @@ class JobIntakeRequest(BaseModel):
     source_mime_type: str = "text/plain"
     recruiter_notes: str = ""
     locale: str = "es-UY"
+    country_context: Optional[str] = None
+    candidate_market: Optional[str] = None
+    employer_market: Optional[str] = None
 
 
 def unique(items: List[str]) -> List[str]:
@@ -363,4 +368,14 @@ def analyze(
         result["confidence"] = 0.0
         return result
 
-    return analyze_text(text)
+    request = ExtractorRequest(
+        source_text=text,
+        locale=payload.locale,
+        country_context=payload.country_context,
+        candidate_market=payload.candidate_market,
+        employer_market=payload.employer_market,
+        source_filename=payload.source_filename,
+        source_mime_type=payload.source_mime_type,
+        recruiter_notes=payload.recruiter_notes,
+    )
+    return ExtractorRouter().extract(request)

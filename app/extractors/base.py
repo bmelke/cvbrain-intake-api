@@ -10,6 +10,24 @@ from typing import Any, Dict, List, Optional
 DEFAULT_SCHEMA_VERSION = "cvbrain_job_intelligence_v1"
 
 
+def country_context_from_locale(locale: Optional[str]) -> Optional[str]:
+    """Derive a weak country context from locale without inventing a city."""
+
+    if not locale:
+        return None
+
+    lowered = locale.strip().lower()
+    if lowered.endswith("-uy") or lowered == "uy":
+        return "UY"
+    if lowered.endswith("-ar") or lowered == "ar":
+        return "AR"
+    if lowered.endswith("-us") or lowered == "us":
+        return "US"
+    if lowered.endswith("-es") or lowered == "es":
+        return "ES"
+    return None
+
+
 @dataclass(frozen=True)
 class ExtractorRequest:
     """Normalized request passed to extractor implementations."""
@@ -26,13 +44,14 @@ class ExtractorRequest:
 
     def ai_payload(self) -> Dict[str, Any]:
         """Build the future AI payload without logging or redacting source text."""
+        weak_country_context = self.country_context or country_context_from_locale(self.locale)
 
         return {
             "source_text": self.source_text,
             "locale": self.locale,
-            "country_context": self.country_context,
-            "candidate_market": self.candidate_market,
-            "employer_market": self.employer_market,
+            "country_context": weak_country_context,
+            "candidate_market": self.candidate_market or weak_country_context,
+            "employer_market": self.employer_market or weak_country_context,
             "source_filename": self.source_filename,
             "source_mime_type": self.source_mime_type,
             "recruiter_notes": self.recruiter_notes,

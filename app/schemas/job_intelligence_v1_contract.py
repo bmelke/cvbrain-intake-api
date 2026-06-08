@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, Iterable, List, Mapping
+from typing import Any, Dict, Iterable, List, Mapping, Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
 SCHEMA_VERSION = "cvbrain_job_intelligence_v1"
@@ -72,6 +74,31 @@ PII_OR_SECRET_PATTERN = re.compile(
 
 class JobIntelligenceValidationError(ValueError):
     """Raised when a mocked Job Intelligence v1 payload is not safe to map."""
+
+
+class JobIntelligenceV1Output(BaseModel):
+    """Pydantic target for OpenAI Structured Outputs.
+
+    Nested sections remain dictionaries/lists because the schema is still being
+    designed. The stricter semantic validation lives in
+    `validate_job_intelligence_v1`.
+    """
+
+    schema_version: str
+    job_profile: Dict[str, Any]
+    location_intelligence: Dict[str, Any]
+    requirements: Dict[str, Any]
+    search_strategy: Dict[str, Any]
+    missing_information: List[Any]
+    company_clarification_questions: List[Any]
+    candidate_screening_questions: List[Any]
+    search_readiness: Dict[str, Any]
+    quality_control: Dict[str, Any]
+    source: Optional[Dict[str, Any]] = None
+    fixture_id: Optional[str] = None
+    flat_compatibility: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(extra="allow")
 
 
 def validate_job_intelligence_v1(payload: Mapping[str, Any]) -> Dict[str, Any]:

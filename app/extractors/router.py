@@ -1,13 +1,8 @@
-"""Extractor router for future AI/deterministic selection.
-
-The router is test-only/library-only for now. It is intentionally not wired into
-/api/job-intake/analyze, so current endpoint behavior remains unchanged.
-"""
+"""Extractor router for optional AI/deterministic selection."""
 
 import os
 from typing import Any, Dict, Mapping, Optional
 
-from app.extractors.ai_stub import AIExtractorStub
 from app.extractors.base import ExtractorError, ExtractorRequest
 from app.extractors.deterministic import DeterministicExtractor
 
@@ -29,11 +24,11 @@ class ExtractorRouter:
     def __init__(
         self,
         deterministic_extractor: Optional[DeterministicExtractor] = None,
-        ai_extractor: Optional[AIExtractorStub] = None,
+        ai_extractor: Optional[Any] = None,
         env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.deterministic_extractor = deterministic_extractor or DeterministicExtractor()
-        self.ai_extractor = ai_extractor or AIExtractorStub()
+        self.ai_extractor = ai_extractor
         self.env = env if env is not None else os.environ
 
     def mode(self) -> str:
@@ -51,13 +46,16 @@ class ExtractorRouter:
     def openai_api_key_available(self) -> bool:
         return bool(str(self.env.get("OPENAI_API_KEY", "")).strip())
 
+    def openai_model_available(self) -> bool:
+        return bool(str(self.env.get("CVBRAIN_OPENAI_MODEL", "")).strip())
+
     def extract(self, request: ExtractorRequest) -> Dict[str, Any]:
         mode = self.mode()
 
         if mode == "deterministic":
             return self._deterministic(request, fallback_used=False)
 
-        if mode == "auto" and not self.openai_api_key_available():
+        if mode == "auto" and not (self.openai_api_key_available() and self.openai_model_available()):
             return self._deterministic(request, fallback_used=False)
 
         if mode == "ai" and not self.openai_api_key_available():
@@ -69,18 +67,35 @@ class ExtractorRouter:
                 ),
             )
 
+        if mode == "ai" and not self.openai_model_available():
+            return self._fallback_or_error(
+                request,
+                ExtractorError(
+                    "ai_missing_model",
+                    "CVBRAIN_OPENAI_MODEL is required when CVBRAIN_EXTRACTOR_MODE=ai.",
+                ),
+            )
+
         try:
-            payload = self.ai_extractor.extract(request)
+            ai_extractor = self._ai_extractor()
+            payload = ai_extractor.extract(request)
         except ExtractorError as error:
             return self._fallback_or_error(request, error)
 
         payload.setdefault("warnings", [])
-        payload["engine"] = getattr(self.ai_extractor, "engine", "ai")
+        payload["engine"] = getattr(ai_extractor, "engine", "ai")
         payload["fallback_used"] = False
         return payload
 
     def build_ai_payload(self, request: ExtractorRequest) -> Dict[str, Any]:
-        return self.ai_extractor.build_payload(request)
+        return self._ai_extractor().build_payload(request)
+
+    def _ai_extractor(self) -> Any:
+        if self.ai_extractor is None:
+            from app.extractors.openai_structured import OpenAIStructuredExtractor
+
+            self.ai_extractor = OpenAIStructuredExtractor.from_env(self.env)
+        return self.ai_extractor
 
     def _deterministic(
         self,
