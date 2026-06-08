@@ -1,0 +1,43 @@
+{
+  "id": "uy_missing_location_no_default_city",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Administrative Assistant\nAsistente administrativa para documentación y agenda. Mínima de 1 año de experiencia. Deseable Excel.",
+  "expected": {
+    "job_title": "Administrative Assistant",
+    "seniority": "",
+    "location": {
+      "base": "",
+      "country_code": "UY_context_only",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [
+      "1 año"
+    ],
+    "should_have_contains": [
+      "Excel"
+    ],
+    "search_terms_include": [
+      "Administrative Assistant",
+      "administrativa",
+      "Excel"
+    ],
+    "must_not_include": [
+      "Montevideo",
+      "Argentina",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": [
+      "location",
+      "work_modality"
+    ]
+  }
+}

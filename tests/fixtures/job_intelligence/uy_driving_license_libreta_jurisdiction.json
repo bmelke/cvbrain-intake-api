@@ -1,0 +1,36 @@
+{
+  "id": "uy_driving_license_libreta_jurisdiction",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Asistente de Operaciones\nLibreta de conducir excluyente. Ubicación Montevideo.",
+  "expected": {
+    "job_title": "Asistente de Operaciones",
+    "seniority": "",
+    "location": {
+      "base": "Montevideo",
+      "country_code": "UY",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [],
+    "credentials_required_contains": [
+      "Libreta de conducir"
+    ],
+    "should_have_contains": [],
+    "search_terms_include": [
+      "Montevideo"
+    ],
+    "must_not_include": [
+      "registro de conducir",
+      "Argentina",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

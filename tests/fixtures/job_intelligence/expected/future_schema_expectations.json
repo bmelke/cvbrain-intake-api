@@ -1,0 +1,16 @@
+{
+  "purpose": "Design-time expectations for CVBrain Job Intelligence v1. These are not full JSON snapshots and should be enforced only when the corresponding mapper/schema exists.",
+  "assertion_scopes": {
+    "current_runtime_contract": "Run against the current deterministic /api/job-intake/analyze endpoint.",
+    "future_schema_expectation": "Validate fixture intent and use as future mapper/AI acceptance criteria; do not fail current runtime solely for missing v1-only fields."
+  },
+  "required_future_guarantees": [
+    "country-aware location normalization",
+    "no Uruguay/Argentina leakage",
+    "explicit source locations preserved on mismatch",
+    "remote/hybrid only when explicit",
+    "hard_filter_candidate separated from hard_filter_approved",
+    "preferred/nice-to-have never silently promoted to hard filters",
+    "candidate results absent from extraction schema"
+  ]
+}

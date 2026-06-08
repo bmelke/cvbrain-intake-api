@@ -1,0 +1,139 @@
+{
+  "purpose": "Location-context fixture index used by tests and future mappers.",
+  "cases": [
+    {
+      "id": "uy_montevideo_hybrid",
+      "fixture_id": "uy_account_manager_medical_devices_montevideo_hybrid",
+      "expected": {
+        "country_code": "UY",
+        "base": "Montevideo",
+        "hybrid_allowed": true,
+        "must_not_include": [
+          "Argentina",
+          "Buenos Aires",
+          "CABA",
+          "GBA"
+        ]
+      }
+    },
+    {
+      "id": "uy_montevideo_canelones",
+      "fixture_id": "uy_sales_executive_b2b_montevideo_canelones",
+      "expected": {
+        "country_code": "UY",
+        "base_contains": [
+          "Montevideo",
+          "Canelones"
+        ],
+        "must_not_include": [
+          "Argentina",
+          "CABA",
+          "GBA"
+        ]
+      }
+    },
+    {
+      "id": "ar_buenos_aires_caba_gba",
+      "fixture_id": "ar_account_manager_medical_devices_buenos_aires_caba_gba",
+      "expected": {
+        "country_code": "AR",
+        "base_contains": [
+          "Buenos Aires",
+          "CABA",
+          "GBA"
+        ],
+        "must_not_include": [
+          "Montevideo",
+          "Canelones"
+        ]
+      }
+    },
+    {
+      "id": "cross_uy_context_caba_gba",
+      "fixture_id": "conflict_uy_context_source_caba_gba",
+      "expected": {
+        "warning": "country_context_mismatch",
+        "preserve": [
+          "CABA",
+          "GBA"
+        ],
+        "must_not_include": [
+          "Montevideo"
+        ]
+      }
+    },
+    {
+      "id": "cross_ar_context_montevideo",
+      "fixture_id": "conflict_ar_context_source_montevideo",
+      "expected": {
+        "warning": "country_context_mismatch",
+        "preserve": [
+          "Montevideo"
+        ],
+        "must_not_include": [
+          "Buenos Aires"
+        ]
+      }
+    },
+    {
+      "id": "uy_missing_location",
+      "fixture_id": "uy_missing_location_no_default_city",
+      "expected": {
+        "base": "",
+        "missing_information": [
+          "location",
+          "work_modality"
+        ],
+        "must_not_include": [
+          "Montevideo",
+          "CABA",
+          "GBA"
+        ]
+      }
+    },
+    {
+      "id": "ar_missing_location",
+      "fixture_id": "ar_missing_location_no_default_city",
+      "expected": {
+        "base": "",
+        "missing_information": [
+          "location",
+          "work_modality"
+        ],
+        "must_not_include": [
+          "Buenos Aires",
+          "CABA",
+          "GBA",
+          "Montevideo"
+        ]
+      }
+    },
+    {
+      "id": "uy_remote_only",
+      "fixture_id": "uy_remote_only_no_city",
+      "expected": {
+        "remote_allowed": true,
+        "base": "",
+        "must_not_include": [
+          "Montevideo",
+          "CABA",
+          "GBA"
+        ]
+      }
+    },
+    {
+      "id": "ar_hybrid_only",
+      "fixture_id": "ar_hybrid_only_no_city",
+      "expected": {
+        "hybrid_allowed": true,
+        "base": "",
+        "must_not_include": [
+          "Buenos Aires",
+          "CABA",
+          "GBA",
+          "Montevideo"
+        ]
+      }
+    }
+  ]
+}

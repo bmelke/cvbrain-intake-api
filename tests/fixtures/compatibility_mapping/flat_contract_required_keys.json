@@ -1,0 +1,37 @@
+{
+  "required_top_level_keys": [
+    "ok",
+    "version",
+    "role_title",
+    "role_family",
+    "summary",
+    "must_have",
+    "should_have",
+    "nice_to_have",
+    "blockers",
+    "credentials",
+    "experience",
+    "location",
+    "search_terms",
+    "semantic_terms",
+    "recruiter_questions",
+    "warnings",
+    "confidence"
+  ],
+  "required_nested_keys": {
+    "credentials": [
+      "required",
+      "preferred"
+    ],
+    "experience": [
+      "minimum_years",
+      "seniority"
+    ],
+    "location": [
+      "raw",
+      "normalized",
+      "remote_allowed",
+      "hybrid_allowed"
+    ]
+  }
+}

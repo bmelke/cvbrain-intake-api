@@ -1,0 +1,40 @@
+{
+  "id": "conflict_uy_context_source_caba_gba",
+  "assertion_scope": "future_schema_expectation",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Account Manager\nExperiencia comercial B2B. Ubicación CABA / GBA. Deseable CRM.",
+  "expected": {
+    "job_title": "Account Manager",
+    "seniority": "",
+    "location": {
+      "base": "CABA / GBA",
+      "country_code": "AR_candidate_from_source",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "search_terms_include": [
+      "Account Manager",
+      "CABA",
+      "GBA"
+    ],
+    "must_not_include": [
+      "Montevideo"
+    ],
+    "warnings_include": [
+      "country_context_mismatch"
+    ],
+    "missing_information_include": [
+      "candidate market",
+      "location confirmation"
+    ],
+    "hard_filter_approved": false
+  }
+}

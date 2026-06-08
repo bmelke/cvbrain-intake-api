@@ -1,0 +1,43 @@
+{
+  "id": "search_expansion_uy_account_manager_no_argentina_leakage",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Account Manager Semi Senior\nExperiencia mínima de 3 años en dispositivos médicos y salud. Deseable CRM. Ubicación Montevideo.",
+  "expected": {
+    "job_title": "Account Manager Semi Senior",
+    "seniority": "semi senior",
+    "location": {
+      "base": "Montevideo",
+      "country_code": "UY",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [
+      "dispositivos médicos",
+      "salud"
+    ],
+    "must_have_contains": [
+      "3 años"
+    ],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "search_terms_include": [
+      "Account Manager",
+      "dispositivos médicos",
+      "salud",
+      "CRM",
+      "Montevideo"
+    ],
+    "must_not_include": [
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

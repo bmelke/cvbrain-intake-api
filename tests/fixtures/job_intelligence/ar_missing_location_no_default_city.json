@@ -1,0 +1,43 @@
+{
+  "id": "ar_missing_location_no_default_city",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-AR",
+  "country_context": "AR",
+  "candidate_market": "AR",
+  "employer_market": "AR",
+  "source_text": "Sales Executive B2B\nVentas B2B y prospección de cuentas. Mínima de 2 años de experiencia. Deseable CRM.",
+  "expected": {
+    "job_title": "Sales Executive B2B",
+    "seniority": "",
+    "location": {
+      "base": "",
+      "country_code": "AR_context_only",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [
+      "2 años"
+    ],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "search_terms_include": [
+      "Sales Executive B2B",
+      "ventas b2b",
+      "CRM"
+    ],
+    "must_not_include": [
+      "Buenos Aires",
+      "CABA",
+      "GBA",
+      "Montevideo",
+      "Canelones"
+    ],
+    "warnings_include": [],
+    "missing_information_include": [
+      "location",
+      "work_modality"
+    ]
+  }
+}

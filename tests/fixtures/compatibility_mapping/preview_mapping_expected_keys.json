@@ -1,0 +1,28 @@
+{
+  "required_keys": [
+    "mode",
+    "source",
+    "query_text",
+    "keywords",
+    "must_have_terms",
+    "preferred_terms",
+    "negative_terms",
+    "location",
+    "experience",
+    "credentials",
+    "filters_preview",
+    "ignored_filters",
+    "warnings",
+    "not_executed"
+  ],
+  "expected_mode": "preview_only",
+  "not_executed": true,
+  "unsupported_filters_today": [
+    "location",
+    "remote_allowed",
+    "hybrid_allowed",
+    "minimum_years",
+    "seniority",
+    "negative_terms"
+  ]
+}

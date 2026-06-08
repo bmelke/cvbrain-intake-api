@@ -1,0 +1,43 @@
+{
+  "id": "uy_logistics_coordinator_montevideo_canelones",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Logistics Coordinator\nCoordinador de logística para coordinación de entregas, documentación y proveedores. Mínima de 2 años de experiencia. Deseable Excel o ERP. Ubicación Montevideo / Canelones.",
+  "expected": {
+    "job_title": "Logistics Coordinator",
+    "seniority": "",
+    "location": {
+      "base": "Montevideo, Canelones",
+      "country_code": "UY",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [
+      "2 años"
+    ],
+    "should_have_contains": [
+      "Excel"
+    ],
+    "nice_to_have_contains": [],
+    "search_terms_include": [
+      "Logistics Coordinator",
+      "logística",
+      "coordinador",
+      "Excel",
+      "Montevideo",
+      "Canelones"
+    ],
+    "must_not_include": [
+      "Argentina",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "conflict_ar_context_source_montevideo",
+  "assertion_scope": "future_schema_expectation",
+  "locale": "es-AR",
+  "country_context": "AR",
+  "candidate_market": "AR",
+  "employer_market": "AR",
+  "source_text": "Sales Executive B2B\nExperiencia comercial. Ubicación Montevideo. Deseable CRM.",
+  "expected": {
+    "job_title": "Sales Executive B2B",
+    "seniority": "",
+    "location": {
+      "base": "Montevideo",
+      "country_code": "UY_candidate_from_source",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "search_terms_include": [
+      "Sales Executive B2B",
+      "Montevideo"
+    ],
+    "must_not_include": [
+      "Buenos Aires"
+    ],
+    "warnings_include": [
+      "country_context_mismatch"
+    ],
+    "missing_information_include": [
+      "candidate market",
+      "location confirmation"
+    ],
+    "hard_filter_approved": false
+  }
+}

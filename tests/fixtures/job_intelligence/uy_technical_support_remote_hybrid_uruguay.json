@@ -1,0 +1,38 @@
+{
+  "id": "uy_technical_support_remote_hybrid_uruguay",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Technical Support\nSoporte técnico para help desk, troubleshooting y atención de tickets. Mínima de 2 años de experiencia. Modalidad remoto o híbrido para Uruguay.",
+  "expected": {
+    "job_title": "Technical Support",
+    "seniority": "",
+    "location": {
+      "base": "Uruguay",
+      "country_code": "UY",
+      "hybrid_allowed": true,
+      "remote_allowed": true
+    },
+    "industries": [],
+    "must_have_contains": [
+      "2 años"
+    ],
+    "should_have_contains": [],
+    "nice_to_have_contains": [],
+    "search_terms_include": [
+      "Technical Support",
+      "soporte técnico",
+      "help desk"
+    ],
+    "must_not_include": [
+      "Montevideo",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

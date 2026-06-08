@@ -1,0 +1,28 @@
+{
+  "required_top_level_keys": [
+    "job_profile",
+    "requirements",
+    "soft_competencies",
+    "education_preferences",
+    "responsibilities",
+    "screening_questions",
+    "search_hints",
+    "missing_information"
+  ],
+  "required_job_profile_keys": [
+    "job_title",
+    "seniority",
+    "employment_type",
+    "location",
+    "primary_industries",
+    "secondary_industries"
+  ],
+  "future_metadata_not_required_now": [
+    "confidence",
+    "source_span",
+    "hard_filter_candidate",
+    "hard_filter_approved",
+    "country_code",
+    "work_modality"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "id": "ar_account_manager_medical_devices_buenos_aires_caba_gba",
+  "assertion_scope": "future_schema_expectation",
+  "locale": "es-AR",
+  "country_context": "AR",
+  "candidate_market": "AR",
+  "employer_market": "AR",
+  "source_text": "Account Manager Semi Senior para dispositivos médicos.\nMínima de 3 años.\nDeseable CRM.\nUbicación Buenos Aires / CABA / GBA.",
+  "expected": {
+    "job_title": "Account Manager Semi Senior",
+    "seniority": "semi senior",
+    "location": {
+      "base": "Buenos Aires / CABA / GBA",
+      "country_code": "AR",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [
+      "dispositivos médicos",
+      "medical devices"
+    ],
+    "must_have_contains": [
+      "3 años",
+      "dispositivos médicos"
+    ],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "search_terms_include": [
+      "Account Manager",
+      "dispositivos médicos",
+      "CRM",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "must_not_include": [
+      "Montevideo",
+      "Canelones"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

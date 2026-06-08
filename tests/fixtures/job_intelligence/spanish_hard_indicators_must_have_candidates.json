@@ -1,0 +1,47 @@
+{
+  "id": "spanish_hard_indicators_must_have_candidates",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Jefe de Operaciones\nExcluyente experiencia en coordinación de equipos. Imprescindible Excel avanzado. Requerido manejo de indicadores. Mínima de 4 años. Debe tener disponibilidad para visitas a clientes.",
+  "expected": {
+    "job_title": "Jefe de Operaciones",
+    "seniority": "",
+    "location": {
+      "base": "",
+      "country_code": "UY_context_only",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [
+      "Excluyente experiencia",
+      "Imprescindible Excel",
+      "Requerido manejo",
+      "Mínima de 4 años",
+      "Debe tener disponibilidad"
+    ],
+    "should_have_contains": [],
+    "search_terms_include": [
+      "Excel"
+    ],
+    "must_not_include": [
+      "hard_filter_approved\": true",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": [],
+    "current_runtime": {
+      "must_have_contains": [
+        "Excluyente experiencia",
+        "Imprescindible Excel",
+        "Requerido manejo",
+        "Mínima de 4 años"
+      ]
+    }
+  }
+}

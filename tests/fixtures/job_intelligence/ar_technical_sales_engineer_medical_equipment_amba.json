@@ -1,0 +1,42 @@
+{
+  "id": "ar_technical_sales_engineer_medical_equipment_amba",
+  "assertion_scope": "future_schema_expectation",
+  "locale": "es-AR",
+  "country_context": "AR",
+  "candidate_market": "AR",
+  "employer_market": "AR",
+  "source_text": "Technical Sales Engineer\nVenta técnica de equipamiento médico para clientes de salud. Mínima de 3 años de experiencia. Zona AMBA. Deseable CRM.",
+  "expected": {
+    "job_title": "Technical Sales Engineer",
+    "seniority": "",
+    "location": {
+      "base": "AMBA",
+      "country_code": "AR",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [
+      "equipamiento médico",
+      "medical equipment"
+    ],
+    "must_have_contains": [
+      "3 años",
+      "equipamiento médico"
+    ],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "search_terms_include": [
+      "Technical Sales Engineer",
+      "equipamiento médico",
+      "AMBA"
+    ],
+    "must_not_include": [
+      "Uruguay",
+      "Montevideo",
+      "Canelones"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

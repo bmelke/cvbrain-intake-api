@@ -1,0 +1,22 @@
+{
+  "purpose": "Compatibility mapping expectations from Job Intelligence v1 into flat, WordPress rich draft, preview mapping, and search-ready profile.",
+  "mapping_targets": [
+    "flat_cvbrain_contract",
+    "wordpress_rich_draft",
+    "super_cv_mapping_preview",
+    "search_ready_profile",
+    "shadow_qa_and_pilot_review"
+  ],
+  "boundaries": [
+    "candidate ranking remains Super CV-owned",
+    "weight is extraction/search-priority guidance only",
+    "candidate results are absent from extraction schema by default",
+    "hard_filter_candidate is not hard_filter_approved",
+    "country-specific expansion requires matching country context or explicit source evidence"
+  ],
+  "privacy": {
+    "contains_candidate_pii": false,
+    "candidate_ids_allowed_by_default": false,
+    "persisted": false
+  }
+}

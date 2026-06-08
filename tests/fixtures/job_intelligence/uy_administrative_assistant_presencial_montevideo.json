@@ -1,0 +1,41 @@
+{
+  "id": "uy_administrative_assistant_presencial_montevideo",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Administrative Assistant\nAsistente administrativa para soporte documental, agenda y coordinación interna. Mínima de 1 año de experiencia. Deseable Excel. Ubicación Montevideo, presencial.",
+  "expected": {
+    "job_title": "Administrative Assistant",
+    "seniority": "",
+    "location": {
+      "base": "Montevideo",
+      "country_code": "UY",
+      "hybrid_allowed": false,
+      "remote_allowed": false
+    },
+    "industries": [],
+    "must_have_contains": [
+      "1 año"
+    ],
+    "should_have_contains": [
+      "Excel"
+    ],
+    "nice_to_have_contains": [],
+    "search_terms_include": [
+      "Administrative Assistant",
+      "administrativa",
+      "Excel",
+      "Montevideo"
+    ],
+    "must_not_include": [
+      "ventas b2b",
+      "Account Manager",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

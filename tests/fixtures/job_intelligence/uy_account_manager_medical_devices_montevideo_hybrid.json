@@ -1,0 +1,50 @@
+{
+  "id": "uy_account_manager_medical_devices_montevideo_hybrid",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Account Manager Semi Senior con experiencia en dispositivos médicos.\nMínima de 3 años.\nDeseable CRM.\nUbicación Montevideo, híbrido.",
+  "expected": {
+    "job_title": "Account Manager Semi Senior",
+    "seniority": "semi senior",
+    "location": {
+      "base": "Montevideo",
+      "country_code": "UY",
+      "hybrid_allowed": true,
+      "remote_allowed": null
+    },
+    "industries": [
+      "dispositivos médicos",
+      "medical devices"
+    ],
+    "must_have_contains": [
+      "3 años",
+      "dispositivos médicos"
+    ],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "nice_to_have_contains": [],
+    "search_terms_include": [
+      "Account Manager",
+      "dispositivos médicos",
+      "CRM",
+      "Montevideo"
+    ],
+    "must_not_include": [
+      "Argentina",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": [],
+    "current_runtime": {
+      "must_have_contains": [
+        "3 años"
+      ]
+    }
+  }
+}

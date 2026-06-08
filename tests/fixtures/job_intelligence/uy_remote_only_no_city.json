@@ -1,0 +1,42 @@
+{
+  "id": "uy_remote_only_no_city",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Technical Support\nSoporte técnico help desk remoto. Mínima de 2 años de experiencia. Deseable inglés.",
+  "expected": {
+    "job_title": "Technical Support",
+    "seniority": "",
+    "location": {
+      "base": "",
+      "country_code": "UY_context_only",
+      "hybrid_allowed": null,
+      "remote_allowed": true
+    },
+    "industries": [],
+    "must_have_contains": [
+      "2 años"
+    ],
+    "should_have_contains": [
+      "inglés"
+    ],
+    "search_terms_include": [
+      "Technical Support",
+      "soporte técnico",
+      "help desk",
+      "inglés"
+    ],
+    "must_not_include": [
+      "Montevideo",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": [
+      "location"
+    ]
+  }
+}

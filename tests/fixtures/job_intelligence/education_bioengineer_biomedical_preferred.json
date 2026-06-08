@@ -1,0 +1,45 @@
+{
+  "id": "education_bioengineer_biomedical_preferred",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Account Manager Medical Devices\nExperiencia en dispositivos médicos. Deseable título de Bioingeniero o Ingeniero Biomédico. Deseable CRM.",
+  "expected": {
+    "job_title": "Account Manager Medical Devices",
+    "seniority": "",
+    "location": {
+      "base": "",
+      "country_code": "UY_context_only",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [
+      "dispositivos médicos",
+      "medical devices"
+    ],
+    "must_have_contains": [],
+    "should_have_contains": [
+      "Bioingeniero",
+      "CRM"
+    ],
+    "credentials_preferred_contains": [
+      "Bioingeniero",
+      "Ingeniero Biomédico"
+    ],
+    "search_terms_include": [
+      "Account Manager",
+      "dispositivos médicos",
+      "CRM"
+    ],
+    "must_not_include": [
+      "hard_filter_approved\": true",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

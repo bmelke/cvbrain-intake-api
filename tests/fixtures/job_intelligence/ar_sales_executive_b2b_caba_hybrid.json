@@ -1,0 +1,38 @@
+{
+  "id": "ar_sales_executive_b2b_caba_hybrid",
+  "assertion_scope": "future_schema_expectation",
+  "locale": "es-AR",
+  "country_context": "AR",
+  "candidate_market": "AR",
+  "employer_market": "AR",
+  "source_text": "Sales Executive B2B\nVentas B2B y prospección de cuentas corporativas. Mínima de 2 años de experiencia. Deseable CRM. Ubicación CABA, híbrido.",
+  "expected": {
+    "job_title": "Sales Executive B2B",
+    "seniority": "",
+    "location": {
+      "base": "CABA",
+      "country_code": "AR",
+      "hybrid_allowed": true,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [
+      "2 años"
+    ],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "search_terms_include": [
+      "Sales Executive B2B",
+      "ventas b2b",
+      "CRM",
+      "CABA"
+    ],
+    "must_not_include": [
+      "Montevideo",
+      "Canelones"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

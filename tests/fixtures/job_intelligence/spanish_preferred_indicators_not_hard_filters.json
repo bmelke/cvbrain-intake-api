@@ -1,0 +1,45 @@
+{
+  "id": "spanish_preferred_indicators_not_hard_filters",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Analista Comercial\nDeseable CRM. Valorable experiencia en reporting. Preferentemente manejo de Excel. Ideal conocimiento de ERP.",
+  "expected": {
+    "job_title": "Analista Comercial",
+    "seniority": "",
+    "location": {
+      "base": "",
+      "country_code": "UY_context_only",
+      "hybrid_allowed": null,
+      "remote_allowed": null
+    },
+    "industries": [],
+    "must_have_contains": [],
+    "should_have_contains": [
+      "Deseable CRM",
+      "Valorable experiencia",
+      "Preferentemente manejo",
+      "Ideal conocimiento"
+    ],
+    "search_terms_include": [
+      "CRM",
+      "Excel"
+    ],
+    "must_not_include": [
+      "hard_filter_approved\": true",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": [],
+    "current_runtime": {
+      "must_not_include": [
+        "hard_filter_approved\": true",
+        "CABA",
+        "GBA"
+      ]
+    }
+  }
+}

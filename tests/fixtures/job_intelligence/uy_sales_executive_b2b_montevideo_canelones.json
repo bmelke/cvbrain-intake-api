@@ -1,0 +1,42 @@
+{
+  "id": "uy_sales_executive_b2b_montevideo_canelones",
+  "assertion_scope": "current_runtime_contract",
+  "locale": "es-UY",
+  "country_context": "UY",
+  "candidate_market": "UY",
+  "employer_market": "UY",
+  "source_text": "Sales Executive B2B\nPerfil comercial para ventas B2B y cartera de clientes. Mínima de 2 años de experiencia. Deseable CRM. Ubicación Montevideo / Canelones, presencial.",
+  "expected": {
+    "job_title": "Sales Executive B2B",
+    "seniority": "",
+    "location": {
+      "base": "Montevideo, Canelones",
+      "country_code": "UY",
+      "hybrid_allowed": false,
+      "remote_allowed": false
+    },
+    "industries": [],
+    "must_have_contains": [
+      "2 años"
+    ],
+    "should_have_contains": [
+      "CRM"
+    ],
+    "nice_to_have_contains": [],
+    "search_terms_include": [
+      "Sales Executive B2B",
+      "ventas b2b",
+      "CRM",
+      "Montevideo",
+      "Canelones"
+    ],
+    "must_not_include": [
+      "Argentina",
+      "Buenos Aires",
+      "CABA",
+      "GBA"
+    ],
+    "warnings_include": [],
+    "missing_information_include": []
+  }
+}

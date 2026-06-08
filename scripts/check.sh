@@ -4,5 +4,4 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR" || exit 1
 
-python3 -m py_compile app/main.py
-pytest
+./scripts/evaluate_fixtures.sh
