@@ -1,0 +1,152 @@
+{
+  "schema_version": "cvbrain_job_intelligence_v1",
+  "fixture_id": "uy_caba_context_mismatch_ai_output",
+  "source": {
+    "input_concept": "Account Manager. Experiencia comercial B2B. Ubicación CABA / GBA. Deseable CRM.",
+    "locale": "es-UY",
+    "country_context": "UY",
+    "candidate_market": "UY",
+    "employer_market": "UY"
+  },
+  "job_profile": {
+    "job_title": "Account Manager",
+    "normalized_role_title": "Account Manager",
+    "role_family": "sales",
+    "seniority": "",
+    "summary": "Commercial Account Manager intake with source location CABA / GBA that conflicts with Uruguay context.",
+    "primary_industries": [],
+    "work_modality": null
+  },
+  "location_intelligence": {
+    "raw": "CABA / GBA",
+    "normalized": "CABA / GBA",
+    "country_code": "AR_candidate_from_source",
+    "remote_allowed": null,
+    "hybrid_allowed": null,
+    "onsite_required": null,
+    "country_context_mismatch": true,
+    "hard_filter_candidate": true,
+    "hard_filter_approved": false,
+    "warnings": [
+      "country_context_mismatch"
+    ]
+  },
+  "requirements": {
+    "must_have": [],
+    "should_have": [
+      {
+        "text": "CRM",
+        "source_text": "Deseable CRM",
+        "importance": "preferred",
+        "explicit": true,
+        "hard_filter_candidate": false,
+        "hard_filter_approved": false
+      }
+    ],
+    "nice_to_have": [],
+    "credentials": [],
+    "blockers": [],
+    "experience": {
+      "minimum_years": null,
+      "seniority": ""
+    },
+    "soft_competencies": []
+  },
+  "search_strategy": {
+    "target_titles": [
+      "Account Manager"
+    ],
+    "search_terms": [
+      "Account Manager",
+      "CABA",
+      "GBA",
+      "CRM"
+    ],
+    "semantic_terms": [
+      "commercial sales"
+    ],
+    "negative_terms": []
+  },
+  "missing_information": [
+    {
+      "id": "confirm_candidate_market",
+      "field": "candidate_market",
+      "description": "Source location conflicts with the Uruguay context.",
+      "suggested_question": "Should this search target CABA/GBA candidates or a Uruguay candidate market?",
+      "can_continue_without_answer": true
+    }
+  ],
+  "company_clarification_questions": [
+    {
+      "id": "confirm_location_market",
+      "question": "Should this search target CABA/GBA candidates or a Uruguay candidate market?",
+      "related_fields": [
+        "location_intelligence",
+        "candidate_market"
+      ],
+      "blocking_level": "advisory",
+      "asked_to": "hiring_company"
+    }
+  ],
+  "candidate_screening_questions": [],
+  "search_readiness": {
+    "status": "usable_with_warnings",
+    "proceed_allowed": true,
+    "recommended_action": "answer_clarifying_questions",
+    "recruiter_decision_required": true,
+    "continued_with_missing_information": false,
+    "recruiter_override_reason": null,
+    "decision_options": [
+      "continue_anyway",
+      "answer_clarifying_questions",
+      "ask_company",
+      "use_manual_search",
+      "cancel"
+    ]
+  },
+  "quality_control": {
+    "warnings": [
+      "country_context_mismatch"
+    ],
+    "confidence": 0.55,
+    "contains_candidate_data": false,
+    "contains_candidate_pii": false
+  },
+  "flat_compatibility": {
+    "role_title": "Account Manager",
+    "must_have": [],
+    "should_have": [
+      "CRM"
+    ],
+    "nice_to_have": [],
+    "credentials": {
+      "required": [],
+      "preferred": []
+    },
+    "experience": {
+      "minimum_years": null,
+      "seniority": ""
+    },
+    "location": {
+      "normalized": "CABA / GBA",
+      "hybrid_allowed": null
+    },
+    "search_terms": [
+      "Account Manager",
+      "CABA",
+      "GBA",
+      "CRM"
+    ],
+    "semantic_terms": [
+      "commercial sales"
+    ],
+    "recruiter_questions": [
+      "Should this search target CABA/GBA candidates or a Uruguay candidate market?"
+    ],
+    "warnings": [
+      "country_context_mismatch",
+      "search_readiness_usable_with_warnings"
+    ],
+    "confidence": 0.55
+  }
+}

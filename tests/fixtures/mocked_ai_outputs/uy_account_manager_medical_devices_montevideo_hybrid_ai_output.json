@@ -1,0 +1,153 @@
+{
+  "schema_version": "cvbrain_job_intelligence_v1",
+  "fixture_id": "uy_account_manager_medical_devices_montevideo_hybrid_ai_output",
+  "source": {
+    "input_concept": "Account Manager Semi Senior con experiencia en dispositivos médicos. Mínima de 3 años. Deseable CRM. Ubicación Montevideo, híbrido.",
+    "locale": "es-UY",
+    "country_context": "UY",
+    "candidate_market": "UY",
+    "employer_market": "UY"
+  },
+  "job_profile": {
+    "job_title": "Account Manager Semi Senior",
+    "normalized_role_title": "Account Manager Semi Senior",
+    "role_family": "sales",
+    "seniority": "semi senior",
+    "summary": "Commercial Account Manager role for medical devices in Montevideo with hybrid modality.",
+    "primary_industries": [
+      "dispositivos médicos",
+      "medical devices"
+    ],
+    "work_modality": "hybrid"
+  },
+  "location_intelligence": {
+    "raw": "Montevideo, híbrido",
+    "normalized": "Montevideo",
+    "country_code": "UY",
+    "remote_allowed": null,
+    "hybrid_allowed": true,
+    "onsite_required": null,
+    "country_context_mismatch": false,
+    "hard_filter_candidate": true,
+    "hard_filter_approved": false,
+    "warnings": []
+  },
+  "requirements": {
+    "must_have": [
+      {
+        "text": "Minimum 3 years of experience",
+        "source_text": "Mínima de 3 años",
+        "importance": "must_have",
+        "explicit": true,
+        "hard_filter_candidate": true,
+        "hard_filter_approved": false
+      },
+      {
+        "text": "Experience in dispositivos médicos",
+        "source_text": "con experiencia en dispositivos médicos",
+        "importance": "must_have",
+        "explicit": true,
+        "hard_filter_candidate": true,
+        "hard_filter_approved": false
+      }
+    ],
+    "should_have": [
+      {
+        "text": "CRM",
+        "source_text": "Deseable CRM",
+        "importance": "preferred",
+        "explicit": true,
+        "hard_filter_candidate": false,
+        "hard_filter_approved": false
+      }
+    ],
+    "nice_to_have": [],
+    "credentials": [],
+    "blockers": [],
+    "experience": {
+      "minimum_years": 3,
+      "seniority": "semi senior"
+    },
+    "soft_competencies": []
+  },
+  "search_strategy": {
+    "target_titles": [
+      "Account Manager",
+      "Account Manager Semi Senior"
+    ],
+    "search_terms": [
+      "Account Manager",
+      "Account Manager Semi Senior",
+      "dispositivos médicos",
+      "medical devices",
+      "CRM",
+      "Montevideo"
+    ],
+    "semantic_terms": [
+      "healthcare sales",
+      "medical devices"
+    ],
+    "negative_terms": []
+  },
+  "missing_information": [],
+  "company_clarification_questions": [],
+  "candidate_screening_questions": [],
+  "search_readiness": {
+    "status": "ready",
+    "proceed_allowed": true,
+    "recommended_action": "continue_anyway",
+    "recruiter_decision_required": false,
+    "continued_with_missing_information": false,
+    "recruiter_override_reason": null,
+    "decision_options": [
+      "continue_anyway",
+      "use_manual_search",
+      "cancel"
+    ]
+  },
+  "quality_control": {
+    "warnings": [],
+    "confidence": 0.9,
+    "contains_candidate_data": false,
+    "contains_candidate_pii": false
+  },
+  "flat_compatibility": {
+    "role_title": "Account Manager Semi Senior",
+    "must_have": [
+      "Minimum 3 years of experience",
+      "Experience in dispositivos médicos"
+    ],
+    "should_have": [
+      "CRM"
+    ],
+    "nice_to_have": [],
+    "credentials": {
+      "required": [],
+      "preferred": []
+    },
+    "experience": {
+      "minimum_years": 3,
+      "seniority": "semi senior"
+    },
+    "location": {
+      "normalized": "Montevideo",
+      "hybrid_allowed": true
+    },
+    "search_terms": [
+      "Account Manager",
+      "Account Manager Semi Senior",
+      "dispositivos médicos",
+      "medical devices",
+      "CRM",
+      "Montevideo"
+    ],
+    "semantic_terms": [
+      "healthcare sales",
+      "medical devices",
+      "dispositivos médicos"
+    ],
+    "recruiter_questions": [],
+    "warnings": [],
+    "confidence": 0.9
+  }
+}

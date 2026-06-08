@@ -1,0 +1,173 @@
+{
+  "schema_version": "cvbrain_job_intelligence_v1",
+  "fixture_id": "vague_sales_manager_negotiation_ai_output",
+  "source": {
+    "input_concept": "Sales Manager. Must be good at negotiation.",
+    "locale": "en-US",
+    "country_context": "US",
+    "candidate_market": "US",
+    "employer_market": "US"
+  },
+  "job_profile": {
+    "job_title": "Sales Manager",
+    "normalized_role_title": "Sales Manager",
+    "role_family": "sales",
+    "seniority": "manager",
+    "summary": "Broad Sales Manager search with negotiation as an interview-verifiable competency.",
+    "primary_industries": [],
+    "work_modality": null
+  },
+  "location_intelligence": {
+    "raw": "",
+    "normalized": "",
+    "country_code": "US",
+    "remote_allowed": null,
+    "hybrid_allowed": null,
+    "onsite_required": null,
+    "country_context_mismatch": false,
+    "hard_filter_candidate": false,
+    "hard_filter_approved": false,
+    "warnings": []
+  },
+  "requirements": {
+    "must_have": [],
+    "should_have": [],
+    "nice_to_have": [],
+    "credentials": [],
+    "blockers": [],
+    "experience": {
+      "minimum_years": null,
+      "seniority": "manager"
+    },
+    "soft_competencies": [
+      {
+        "text": "Negotiation",
+        "source_text": "Must be good at negotiation",
+        "importance": "must_have",
+        "evidence_expected": "interview",
+        "hard_filter_candidate": false,
+        "hard_filter_approved": false
+      }
+    ]
+  },
+  "search_strategy": {
+    "target_titles": [
+      "Sales Manager"
+    ],
+    "search_terms": [
+      "Sales Manager"
+    ],
+    "semantic_terms": [
+      "sales leadership"
+    ],
+    "negative_terms": []
+  },
+  "missing_information": [
+    {
+      "id": "sales_context",
+      "field": "sales_context",
+      "description": "The request does not specify the sales market or product context.",
+      "suggested_question": "What sales market, product category, and must-have experience should be used?",
+      "can_continue_without_answer": true
+    },
+    {
+      "id": "location",
+      "field": "location",
+      "description": "No work location or candidate market was provided.",
+      "suggested_question": "What location or candidate market should be used?",
+      "can_continue_without_answer": true
+    }
+  ],
+  "company_clarification_questions": [
+    {
+      "id": "sales_context",
+      "question": "What sales market, product category, and must-have experience should be used?",
+      "related_fields": [
+        "job_profile",
+        "requirements"
+      ],
+      "blocking_level": "advisory",
+      "asked_to": "hiring_company"
+    },
+    {
+      "id": "sales_location",
+      "question": "What location or candidate market should be used?",
+      "related_fields": [
+        "location_intelligence"
+      ],
+      "blocking_level": "advisory",
+      "asked_to": "hiring_company"
+    }
+  ],
+  "candidate_screening_questions": [
+    {
+      "id": "negotiation_screen",
+      "question": "Ask the candidate to describe a negotiation they led and how the outcome was achieved.",
+      "related_competency": "Negotiation",
+      "evidence_expected": "interview",
+      "hard_filter_candidate": false,
+      "hard_filter_approved": false
+    }
+  ],
+  "search_readiness": {
+    "status": "exploratory",
+    "proceed_allowed": true,
+    "recommended_action": "answer_clarifying_questions",
+    "recruiter_decision_required": true,
+    "continued_with_missing_information": false,
+    "recruiter_override_reason": null,
+    "decision_options": [
+      "continue_anyway",
+      "answer_clarifying_questions",
+      "ask_company",
+      "use_manual_search",
+      "cancel"
+    ]
+  },
+  "quality_control": {
+    "warnings": [
+      "broad_role_title",
+      "soft_competency_not_resume_filter",
+      "missing_location"
+    ],
+    "confidence": 0.48,
+    "contains_candidate_data": false,
+    "contains_candidate_pii": false
+  },
+  "flat_compatibility": {
+    "role_title": "Sales Manager",
+    "must_have": [],
+    "should_have": [],
+    "nice_to_have": [],
+    "credentials": {
+      "required": [],
+      "preferred": []
+    },
+    "experience": {
+      "minimum_years": null,
+      "seniority": "manager"
+    },
+    "location": {
+      "normalized": "",
+      "hybrid_allowed": null
+    },
+    "search_terms": [
+      "Sales Manager"
+    ],
+    "semantic_terms": [
+      "sales leadership"
+    ],
+    "recruiter_questions": [
+      "What sales market, product category, and must-have experience should be used?",
+      "What location or candidate market should be used?",
+      "Ask the candidate to describe a negotiation they led and how the outcome was achieved."
+    ],
+    "warnings": [
+      "broad_role_title",
+      "soft_competency_not_resume_filter",
+      "missing_location",
+      "search_readiness_exploratory"
+    ],
+    "confidence": 0.48
+  }
+}

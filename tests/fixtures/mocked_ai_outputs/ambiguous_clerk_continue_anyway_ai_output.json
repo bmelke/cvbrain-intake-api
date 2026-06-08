@@ -1,0 +1,168 @@
+{
+  "schema_version": "cvbrain_job_intelligence_v1",
+  "fixture_id": "ambiguous_clerk_continue_anyway_ai_output",
+  "source": {
+    "input_concept": "Find all clerk applications.",
+    "locale": "en-US",
+    "country_context": "US",
+    "candidate_market": "US",
+    "employer_market": "US"
+  },
+  "job_profile": {
+    "job_title": "Clerk",
+    "normalized_role_title": "Clerk",
+    "role_family": "administration",
+    "seniority": "",
+    "summary": "Broad clerk search with insufficient specificity for a precise search.",
+    "primary_industries": [],
+    "work_modality": null
+  },
+  "location_intelligence": {
+    "raw": "",
+    "normalized": "",
+    "country_code": "US",
+    "remote_allowed": null,
+    "hybrid_allowed": null,
+    "onsite_required": null,
+    "country_context_mismatch": false,
+    "hard_filter_candidate": false,
+    "hard_filter_approved": false,
+    "warnings": []
+  },
+  "requirements": {
+    "must_have": [],
+    "should_have": [],
+    "nice_to_have": [],
+    "credentials": [],
+    "blockers": [],
+    "experience": {
+      "minimum_years": null,
+      "seniority": ""
+    },
+    "soft_competencies": []
+  },
+  "search_strategy": {
+    "target_titles": [
+      "Clerk",
+      "Office Clerk",
+      "Administrative Clerk"
+    ],
+    "search_terms": [
+      "clerk",
+      "office clerk",
+      "administrative clerk"
+    ],
+    "semantic_terms": [
+      "administrative support"
+    ],
+    "negative_terms": []
+  },
+  "missing_information": [
+    {
+      "id": "role_specificity",
+      "field": "role_specificity",
+      "description": "The request does not specify what type of clerk role is needed.",
+      "suggested_question": "What type of clerk role is this?",
+      "can_continue_without_answer": true
+    },
+    {
+      "id": "location",
+      "field": "location",
+      "description": "No work location or candidate market was provided.",
+      "suggested_question": "What location or candidate market should be used?",
+      "can_continue_without_answer": true
+    },
+    {
+      "id": "must_have_requirements",
+      "field": "must_have_requirements",
+      "description": "No resume-verifiable must-have requirements were provided.",
+      "suggested_question": "Are there any must-have experience or credential requirements?",
+      "can_continue_without_answer": true
+    }
+  ],
+  "company_clarification_questions": [
+    {
+      "id": "clerk_type",
+      "question": "What type of clerk role is this?",
+      "related_fields": [
+        "job_profile",
+        "role_family"
+      ],
+      "blocking_level": "advisory",
+      "asked_to": "hiring_company"
+    },
+    {
+      "id": "clerk_location",
+      "question": "What location or candidate market should be used?",
+      "related_fields": [
+        "location_intelligence"
+      ],
+      "blocking_level": "advisory",
+      "asked_to": "hiring_company"
+    }
+  ],
+  "candidate_screening_questions": [],
+  "search_readiness": {
+    "status": "exploratory",
+    "proceed_allowed": true,
+    "recommended_action": "answer_clarifying_questions",
+    "recruiter_decision_required": true,
+    "continued_with_missing_information": false,
+    "recruiter_override_reason": null,
+    "decision_options": [
+      "continue_anyway",
+      "answer_clarifying_questions",
+      "ask_company",
+      "use_manual_search",
+      "cancel"
+    ]
+  },
+  "quality_control": {
+    "warnings": [
+      "broad_role_title",
+      "missing_location",
+      "missing_must_have_requirements"
+    ],
+    "confidence": 0.42,
+    "contains_candidate_data": false,
+    "contains_candidate_pii": false
+  },
+  "flat_compatibility": {
+    "role_title": "Clerk",
+    "must_have": [],
+    "should_have": [],
+    "nice_to_have": [],
+    "credentials": {
+      "required": [],
+      "preferred": []
+    },
+    "experience": {
+      "minimum_years": null,
+      "seniority": ""
+    },
+    "location": {
+      "normalized": "",
+      "hybrid_allowed": null
+    },
+    "search_terms": [
+      "Clerk",
+      "Office Clerk",
+      "Administrative Clerk"
+    ],
+    "semantic_terms": [
+      "administrative support"
+    ],
+    "recruiter_questions": [
+      "What type of clerk role is this?",
+      "What location or candidate market should be used?",
+      "Are there any must-have experience or credential requirements?"
+    ],
+    "warnings": [
+      "broad_role_title",
+      "missing_location",
+      "missing_must_have_requirements",
+      "search_readiness_exploratory"
+    ],
+    "confidence": 0.42
+  }
+}
