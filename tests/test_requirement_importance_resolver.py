@@ -24,11 +24,45 @@ Trabajo hibrido en Montevideo, con guardias coordinadas. Deseable conocimientos 
 
 Sin experiencia no avanzar para este rol de soporte."""
 
+FULL_GA_MUST_HAVE = [
+    "Experiencia de al menos 1 año resolviendo incidentes de hardware",
+    "Experiencia de al menos 1 año resolviendo incidentes de software",
+    "Experiencia de al menos 1 año resolviendo incidentes de redes básicas",
+    "Experiencia de al menos 1 año brindando soporte remoto",
+    "Buena comunicación",
+    "Registro de tickets",
+    "Formación técnica en informática o certificación equivalente",
+]
+
+FULL_GA_PREFERRED = [
+    "Conocimientos de Microsoft 365",
+    "Conocimientos de Active Directory",
+    "Conocimientos de herramientas de mesa de ayuda",
+]
+
+ORPHAN_FRAGMENTS = [
+    "software",
+    "redes basicas",
+    "redes básicas",
+    "y soporte remoto",
+    "y registro de tickets",
+    "Excluyente experiencia de al menos 1 ano resolviendo incidentes de",
+]
+
 
 def fold(value):
     text = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
     normalized = unicodedata.normalize("NFKD", text)
     return "".join(ch for ch in normalized if not unicodedata.combining(ch)).casefold()
+
+
+def assert_no_orphan_fragments(items):
+    normalized_items = [fold(item).strip(" -:.,;") for item in items]
+    for item in normalized_items:
+        assert not item.startswith(("y ", "e ", "o ", "and ", "or ")), items
+    for orphan in ORPHAN_FRAGMENTS:
+        orphan_folded = fold(orphan)
+        assert orphan_folded not in normalized_items, items
 
 
 def analyze_payload(text):
@@ -143,8 +177,8 @@ def test_hard_category_soft_local_credential_item_is_not_must_have(monkeypatch):
     data = response.json()
     assert response.status_code == 200
     assert data["ok"] is True
-    assert "formacion tecnica en informatica o certificacion equivalente" in fold(data["must_have"])
-    assert "formacion tecnica en informatica o certificacion equivalente" in fold(data["credentials"]["required"])
+    assert data["must_have"] == ["Formación técnica en informática o certificación equivalente"]
+    assert data["credentials"]["required"] == ["Formación técnica en informática o certificación equivalente"]
 
     assert "libreta de conducir categoria a" not in fold(data["must_have"])
     assert "libreta de conducir categoria a" not in fold(data["credentials"]["required"])
@@ -168,11 +202,10 @@ def test_soft_category_hard_local_travel_item_becomes_must_have_and_blocker(monk
     data = response.json()
     assert response.status_code == 200
     assert data["ok"] is True
-    assert "titulo de administracion de empresas" in fold(data["nice_to_have"])
-    assert "carnet de conducir" in fold(data["nice_to_have"])
-    assert "disponibilidad para viajar" in fold(data["must_have"])
+    assert data["nice_to_have"] == ["Título de administración de empresas", "Carnet de conducir"]
+    assert data["must_have"] == ["Disponibilidad para viajar"]
     assert "disponibilidad para viajar" not in fold(data["nice_to_have"])
-    assert "no avanzar si no puede viajar" in fold(data["blockers"])
+    assert data["blockers"] == ["No avanzar si no puede viajar"]
 
 
 def test_neutral_section_mixed_local_modifiers_are_resolved_independently(monkeypatch):
@@ -194,6 +227,64 @@ def test_neutral_section_mixed_local_modifiers_are_resolved_independently(monkey
     assert "buena comunicacion" in fold(data["must_have"])
     assert "microsoft 365" not in fold(data["must_have"])
     assert "microsoft 365" in fold(data["should_have"] + data["nice_to_have"])
+
+
+def test_hard_coordinated_experience_list_expands_complete_items(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload(
+            "Excluyente experiencia de al menos 1 ano resolviendo incidentes de hardware, "
+            "software, redes basicas y soporte remoto."
+        ),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == FULL_GA_MUST_HAVE[:4]
+    assert data["should_have"] == []
+    assert data["nice_to_have"] == []
+    assert_no_orphan_fragments(data["must_have"])
+
+
+def test_soft_coordinated_knowledge_list_expands_complete_preferred_items(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload(
+            "Deseable conocimientos de Microsoft 365, Active Directory y herramientas de mesa de ayuda."
+        ),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == []
+    assert data["should_have"] == FULL_GA_PREFERRED
+    assert data["nice_to_have"] == []
+    assert_no_orphan_fragments(data["should_have"])
+
+
+def test_compound_communication_and_ticketing_requirement_splits_without_dangling_conjunction(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload("Imprescindible buena comunicacion y registro de tickets."),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == ["Buena comunicación", "Registro de tickets"]
+    assert data["should_have"] == []
+    assert_no_orphan_fragments(data["must_have"])
 
 
 def test_structured_requirements_are_rebucketed_before_flat_mapping():
@@ -255,18 +346,13 @@ def test_full_ga_support_request_resolves_item_importance_without_leakage(monkey
     credentials_preferred = fold(data["credentials"]["preferred"])
     blockers = fold(data["blockers"])
 
-    for expected in [
-        "hardware",
-        "software",
-        "redes basicas",
-        "soporte remoto",
-        "buena comunicacion",
-        "registro de tickets",
-        "formacion tecnica en informatica o certificacion equivalente",
-    ]:
-        assert expected in must
+    assert data["must_have"] == FULL_GA_MUST_HAVE
+    assert data["should_have"] == ["Libreta de conducir categoría A"] + FULL_GA_PREFERRED
+    assert data["nice_to_have"] == []
+    assert_no_orphan_fragments(data["must_have"])
 
     assert "sin experiencia no avanzar" in blockers
+    assert "sin experiencia no avanzar" not in must
 
     for forbidden in [
         "libreta de conducir",
@@ -326,16 +412,8 @@ def test_full_ga_structured_output_is_normalized_before_schema_validation():
     credentials_required = fold(flat["credentials"]["required"])
     credentials_preferred = fold(flat["credentials"]["preferred"])
 
-    for expected in [
-        "hardware",
-        "software",
-        "redes basicas",
-        "soporte remoto",
-        "buena comunicacion",
-        "registro de tickets",
-        "formacion tecnica en informatica o certificacion equivalente",
-    ]:
-        assert expected in must
+    assert flat["must_have"] == FULL_GA_MUST_HAVE
+    assert_no_orphan_fragments(flat["must_have"])
 
     for forbidden in [
         "libreta de conducir",
@@ -360,12 +438,18 @@ def test_full_ga_openai_flow_returns_success_after_requirement_normalization():
     payload = minimal_job_intelligence(
         {
             "must_have": [
+                requirement_item("Al menos 1 año de experiencia resolviendo incidentes de hardware", "must_have"),
                 requirement_item(
                     "Excluyente experiencia de al menos 1 ano resolviendo incidentes de hardware, "
                     "software, redes basicas y soporte remoto",
                     "must_have",
                 ),
+                requirement_item("software", "must_have"),
+                requirement_item("Excluyente experiencia de al menos 1 ano resolviendo incidentes de", "must_have"),
+                requirement_item("redes basicas", "must_have"),
+                requirement_item("y soporte remoto", "must_have"),
                 requirement_item("Imprescindible buena comunicacion y registro de tickets", "must_have"),
+                requirement_item("y registro de tickets", "must_have"),
                 requirement_item(
                     "Credenciales requeridas: formacion tecnica en informatica o certificacion equivalente. "
                     "Libreta de conducir categoria A valorable para visitas puntuales.",
@@ -408,6 +492,11 @@ def test_full_ga_openai_flow_returns_success_after_requirement_normalization():
     assert result["engine"] == "openai"
     assert result["fallback_used"] is False
     assert result["ai_model"] == "gpt-5.4-nano"
+    assert result["must_have"] == FULL_GA_MUST_HAVE
+    assert_no_orphan_fragments(result["must_have"])
+    ji_must_have = [item["text"] for item in result["job_intelligence"]["requirements"]["must_have"]]
+    assert_no_orphan_fragments(ji_must_have)
+    assert ji_must_have == FULL_GA_MUST_HAVE
     assert "libreta de conducir" not in fold(result["must_have"])
     assert "microsoft 365" not in fold(result["must_have"])
     assert "active directory" not in fold(result["must_have"])

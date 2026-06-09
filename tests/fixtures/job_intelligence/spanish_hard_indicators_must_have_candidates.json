@@ -17,9 +17,9 @@
     },
     "industries": [],
     "must_have_contains": [
-      "Excluyente experiencia",
-      "Imprescindible Excel",
-      "Requerido manejo",
+      "Experiencia",
+      "Excel avanzado",
+      "Manejo de indicadores",
       "Mínima de 4 años",
       "Debe tener disponibilidad"
     ],
@@ -37,9 +37,9 @@
     "missing_information_include": [],
     "current_runtime": {
       "must_have_contains": [
-        "Excluyente experiencia",
-        "Imprescindible Excel",
-        "Requerido manejo",
+        "Experiencia",
+        "Excel avanzado",
+        "Manejo de indicadores",
         "Mínima de 4 años"
       ]
     }
