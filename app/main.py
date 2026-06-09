@@ -7,6 +7,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 from app.extractors import ExtractorRequest, ExtractorRouter
+from app.normalization.requirement_importance import resolve_requirements_from_text
 
 
 SERVICE_VERSION = "0.1.0"
@@ -256,41 +257,7 @@ def analyze_text(text: str) -> Dict[str, Any]:
     seniority = extract_seniority(text)
     location = extract_location(text)
 
-    must_have = extract_by_indicators(
-        text,
-        [
-            "excluyente",
-            "imprescindible",
-            "requerido",
-            "requerida",
-            "mínimo",
-            "minimo",
-            "mínima",
-            "minima",
-            "indispensable",
-        ],
-    )
-
-    should_have = extract_by_indicators(
-        text,
-        [
-            "deseable",
-            "valorable",
-            "preferentemente",
-            "ideal",
-        ],
-    )
-
-    blockers = extract_by_indicators(
-        text,
-        [
-            "no considerar",
-            "sin experiencia no",
-            "excluyente no",
-        ],
-    )
-
-    credentials = extract_credentials(text)
+    resolved_requirements = resolve_requirements_from_text(text)
     search_terms = extract_search_terms(text, role_title)
 
     warnings = []
@@ -311,11 +278,11 @@ def analyze_text(text: str) -> Dict[str, Any]:
         "role_title": role_title,
         "role_family": "",
         "summary": text[:280].strip(),
-        "must_have": must_have,
-        "should_have": should_have,
-        "nice_to_have": [],
-        "blockers": blockers,
-        "credentials": credentials,
+        "must_have": resolved_requirements["must_have"],
+        "should_have": resolved_requirements["should_have"],
+        "nice_to_have": resolved_requirements["nice_to_have"],
+        "blockers": resolved_requirements["blockers"],
+        "credentials": resolved_requirements["credentials"],
         "experience": {
             "minimum_years": years,
             "seniority": seniority,

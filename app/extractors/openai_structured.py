@@ -14,6 +14,7 @@ from typing import Any, Dict, Mapping, Optional
 
 from app.extractors.base import ExtractorError, ExtractorRequest
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
+from app.normalization.requirement_importance import normalize_job_intelligence_requirements
 from app.schemas.job_intelligence_v1_contract import (
     JobIntelligenceValidationError,
     validate_job_intelligence_v1,
@@ -44,6 +45,10 @@ Rules:
 - Do not infer remote/hybrid/onsite unless explicit.
 - Do not invent salary, compensation, degrees, licenses, certifications, tools, team size, or travel.
 - Do not promote preferred or nice-to-have items to must-have.
+- Section/category labels are defaults only; local item modifiers are final authority.
+- Split compound requirement text into individual items before assigning importance.
+- Soft local modifiers such as deseable, valorable, preferred, plus, or nice to have downgrade items even under hard sections.
+- Hard local modifiers such as excluyente, imprescindible, obligatorio, no presentarse a menos que, or sin X no avanzar upgrade items even under soft sections.
 - Do not turn soft competencies into hard resume filters.
 - Separate requirements from responsibilities.
 - Separate search terms from evidence.
@@ -122,6 +127,8 @@ class OpenAIStructuredExtractor:
         try:
             response = self._responses_parse(ai_payload)
             job_intelligence = self._extract_payload(response)
+            validate_job_intelligence_v1(job_intelligence)
+            job_intelligence = normalize_job_intelligence_requirements(job_intelligence)
             validate_job_intelligence_v1(job_intelligence)
         except ExtractorError as error:
             self._log_exception(

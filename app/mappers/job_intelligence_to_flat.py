@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Mapping
 
+from app.normalization.requirement_importance import normalize_job_intelligence_requirements
 from app.schemas.job_intelligence_v1_contract import validate_job_intelligence_v1
 
 
@@ -17,7 +18,8 @@ FLAT_VERSION = "0.1.0"
 def derive_flat_compatibility(payload: Mapping[str, Any]) -> Dict[str, Any]:
     """Derive the WordPress-compatible flat response from Job Intelligence v1."""
 
-    validated = validate_job_intelligence_v1(payload)
+    validated = normalize_job_intelligence_requirements(validate_job_intelligence_v1(payload))
+    validated = validate_job_intelligence_v1(validated)
 
     job_profile = validated["job_profile"]
     location = validated["location_intelligence"]
