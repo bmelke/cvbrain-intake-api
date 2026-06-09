@@ -18,8 +18,7 @@ FLAT_VERSION = "0.1.0"
 def derive_flat_compatibility(payload: Mapping[str, Any]) -> Dict[str, Any]:
     """Derive the WordPress-compatible flat response from Job Intelligence v1."""
 
-    validated = normalize_job_intelligence_requirements(validate_job_intelligence_v1(payload))
-    validated = validate_job_intelligence_v1(validated)
+    validated = validate_job_intelligence_v1(normalize_job_intelligence_requirements(payload))
 
     job_profile = validated["job_profile"]
     location = validated["location_intelligence"]

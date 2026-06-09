@@ -3,12 +3,26 @@ import unicodedata
 
 from fastapi.testclient import TestClient
 
+from app.extractors import ExtractorRequest
+from app.extractors.openai_structured import OpenAIStructuredExtractor
 from app.main import app
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
 from app.normalization.requirement_importance import normalize_job_intelligence_requirements
 
 
 client = TestClient(app)
+
+FULL_GA_SUPPORT_REQUEST = """La posicion apunta a soporte tecnico de primer nivel para usuarios internos y clientes corporativos.
+
+Rol: Tecnico de Soporte IT Junior.
+
+Excluyente experiencia de al menos 1 ano resolviendo incidentes de hardware, software, redes basicas y soporte remoto. Imprescindible buena comunicacion y registro de tickets.
+
+Credenciales requeridas: formacion tecnica en informatica o certificacion equivalente. Libreta de conducir categoria A valorable para visitas puntuales.
+
+Trabajo hibrido en Montevideo, con guardias coordinadas. Deseable conocimientos de Microsoft 365, Active Directory y herramientas de mesa de ayuda.
+
+Sin experiencia no avanzar para este rol de soporte."""
 
 
 def fold(value):
@@ -99,6 +113,19 @@ def requirement_item(text, importance):
         "hard_filter_candidate": importance == "must_have",
         "hard_filter_approved": False,
     }
+
+
+class FakeResponses:
+    def __init__(self, response):
+        self.response = response
+
+    def create(self, **kwargs):
+        return self.response
+
+
+class FakeOpenAIClient:
+    def __init__(self, response):
+        self.responses = FakeResponses(response)
 
 
 def test_hard_category_soft_local_credential_item_is_not_must_have(monkeypatch):
@@ -207,3 +234,183 @@ def test_structured_requirements_are_rebucketed_before_flat_mapping():
     assert "no avanzar si no puede viajar" in fold(flat["blockers"])
     assert "libreta de conducir categoria a" not in fold(flat["credentials"]["required"])
     assert "libreta de conducir categoria a" in fold(flat["credentials"]["preferred"])
+
+
+def test_full_ga_support_request_resolves_item_importance_without_leakage(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload(FULL_GA_SUPPORT_REQUEST),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+
+    must = fold(data["must_have"])
+    should_or_nice = fold(data["should_have"] + data["nice_to_have"])
+    credentials_required = fold(data["credentials"]["required"])
+    credentials_preferred = fold(data["credentials"]["preferred"])
+    blockers = fold(data["blockers"])
+
+    for expected in [
+        "hardware",
+        "software",
+        "redes basicas",
+        "soporte remoto",
+        "buena comunicacion",
+        "registro de tickets",
+        "formacion tecnica en informatica o certificacion equivalente",
+    ]:
+        assert expected in must
+
+    assert "sin experiencia no avanzar" in blockers
+
+    for forbidden in [
+        "libreta de conducir",
+        "microsoft 365",
+        "active directory",
+        "herramientas de mesa de ayuda",
+    ]:
+        assert forbidden not in must
+
+    assert "libreta de conducir categoria a" not in credentials_required
+    assert "libreta de conducir categoria a" in credentials_preferred
+    assert "microsoft 365" in should_or_nice
+    assert "active directory" in should_or_nice
+    assert "herramientas de mesa de ayuda" in should_or_nice
+
+
+def test_full_ga_structured_output_is_normalized_before_schema_validation():
+    payload = minimal_job_intelligence(
+        {
+            "must_have": [
+                requirement_item(
+                    "Excluyente experiencia de al menos 1 ano resolviendo incidentes de hardware, "
+                    "software, redes basicas y soporte remoto",
+                    "must_have",
+                ),
+                requirement_item("Imprescindible buena comunicacion y registro de tickets", "must_have"),
+                requirement_item(
+                    "Credenciales requeridas: formacion tecnica en informatica o certificacion equivalente. "
+                    "Libreta de conducir categoria A valorable para visitas puntuales.",
+                    "must_have",
+                ),
+            ],
+            "should_have": [
+                {
+                    **requirement_item(
+                        "Deseable conocimientos de Microsoft 365, Active Directory y herramientas de mesa de ayuda",
+                        "preferred",
+                    ),
+                    "hard_filter_candidate": True,
+                    "hard_filter_approved": True,
+                }
+            ],
+            "blockers": ["Sin experiencia no avanzar para este rol de soporte"],
+        }
+    )
+    payload["job_profile"]["job_title"] = "Tecnico de Soporte IT Junior"
+    payload["job_profile"]["normalized_role_title"] = "Tecnico de Soporte IT Junior"
+    payload["location_intelligence"]["raw"] = "Trabajo hibrido en Montevideo"
+    payload["location_intelligence"]["normalized"] = "Montevideo"
+    payload["location_intelligence"]["hybrid_allowed"] = True
+
+    normalized = normalize_job_intelligence_requirements(payload)
+    flat = derive_flat_compatibility(payload)
+
+    must = fold(flat["must_have"])
+    should_or_nice = fold(flat["should_have"] + flat["nice_to_have"])
+    credentials_required = fold(flat["credentials"]["required"])
+    credentials_preferred = fold(flat["credentials"]["preferred"])
+
+    for expected in [
+        "hardware",
+        "software",
+        "redes basicas",
+        "soporte remoto",
+        "buena comunicacion",
+        "registro de tickets",
+        "formacion tecnica en informatica o certificacion equivalente",
+    ]:
+        assert expected in must
+
+    for forbidden in [
+        "libreta de conducir",
+        "microsoft 365",
+        "active directory",
+        "herramientas de mesa de ayuda",
+    ]:
+        assert forbidden not in must
+
+    assert "libreta de conducir categoria a" not in credentials_required
+    assert "libreta de conducir categoria a" in credentials_preferred
+    assert "formacion tecnica en informatica o certificacion equivalente" in credentials_required
+    assert "formacion tecnica en informatica o certificacion equivalente" not in credentials_preferred
+
+    assert "microsoft 365" in should_or_nice
+    assert "active directory" in should_or_nice
+    assert "herramientas de mesa de ayuda" in should_or_nice
+    assert normalized["requirements"]["should_have"][0]["hard_filter_approved"] is False
+
+
+def test_full_ga_openai_flow_returns_success_after_requirement_normalization():
+    payload = minimal_job_intelligence(
+        {
+            "must_have": [
+                requirement_item(
+                    "Excluyente experiencia de al menos 1 ano resolviendo incidentes de hardware, "
+                    "software, redes basicas y soporte remoto",
+                    "must_have",
+                ),
+                requirement_item("Imprescindible buena comunicacion y registro de tickets", "must_have"),
+                requirement_item(
+                    "Credenciales requeridas: formacion tecnica en informatica o certificacion equivalente. "
+                    "Libreta de conducir categoria A valorable para visitas puntuales.",
+                    "must_have",
+                ),
+            ],
+            "should_have": [
+                {
+                    **requirement_item(
+                        "Deseable conocimientos de Microsoft 365, Active Directory y herramientas de mesa de ayuda",
+                        "preferred",
+                    ),
+                    "hard_filter_candidate": True,
+                    "hard_filter_approved": True,
+                }
+            ],
+            "blockers": ["Sin experiencia no avanzar para este rol de soporte"],
+        }
+    )
+    payload["job_profile"]["job_title"] = "Tecnico de Soporte IT Junior"
+    payload["job_profile"]["normalized_role_title"] = "Tecnico de Soporte IT Junior"
+
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="gpt-5.4-nano",
+        client=FakeOpenAIClient(response={"output_parsed": payload}),
+    )
+
+    result = extractor.extract(
+        ExtractorRequest(
+            source_text=FULL_GA_SUPPORT_REQUEST,
+            locale="es-UY",
+            country_context="UY",
+            candidate_market="UY",
+            employer_market="UY",
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert result["ai_model"] == "gpt-5.4-nano"
+    assert "libreta de conducir" not in fold(result["must_have"])
+    assert "microsoft 365" not in fold(result["must_have"])
+    assert "active directory" not in fold(result["must_have"])
+    assert "herramientas de mesa de ayuda" not in fold(result["must_have"])
+    assert "libreta de conducir categoria a" not in fold(result["credentials"]["required"])
+    assert "libreta de conducir categoria a" in fold(result["credentials"]["preferred"])

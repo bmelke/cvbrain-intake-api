@@ -144,10 +144,23 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any]) -> Dict[
                     credential = dict(normalized)
                     buckets["credentials"].append(credential)
 
-    requirements["must_have"] = _unique_requirement_items(buckets["must_have"])
-    requirements["should_have"] = _unique_requirement_items(buckets["should_have"])
-    requirements["nice_to_have"] = _unique_requirement_items(buckets["nice_to_have"])
-    requirements["credentials"] = _unique_requirement_items(buckets["credentials"])
+    must_have = _unique_requirement_items(buckets["must_have"])
+    should_have = _unique_requirement_items(buckets["should_have"])
+    nice_to_have = _unique_requirement_items(buckets["nice_to_have"])
+
+    must_keys = _item_keys(must_have)
+    should_have = [item for item in should_have if _fold(str(item.get("text", ""))) not in must_keys]
+    should_keys = _item_keys(should_have)
+    nice_to_have = [
+        item
+        for item in nice_to_have
+        if _fold(str(item.get("text", ""))) not in must_keys | should_keys
+    ]
+
+    requirements["must_have"] = must_have
+    requirements["should_have"] = should_have
+    requirements["nice_to_have"] = nice_to_have
+    requirements["credentials"] = _unique_credentials_by_strongest_importance(buckets["credentials"])
     requirements["blockers"] = _unique(blockers)
     output["requirements"] = requirements
     return output
@@ -183,10 +196,10 @@ def normalize_structured_requirement_item(item: Mapping[str, Any], default_impor
 def resolve_importance(text: str, section_default: Importance = PREFERRED) -> Importance:
     """Resolve final importance. Local modifiers outrank section defaults."""
 
-    if SOFT_PATTERN.search(text):
-        return NICE_TO_HAVE if section_default == NICE_TO_HAVE else PREFERRED
     if HARD_PATTERN.search(text):
         return MUST_HAVE
+    if SOFT_PATTERN.search(text):
+        return NICE_TO_HAVE if section_default == NICE_TO_HAVE else PREFERRED
     return section_default or PREFERRED
 
 
@@ -222,16 +235,15 @@ def blocker_text_for_clause(text: str) -> str:
 
 
 def _iter_clauses_with_defaults(text: str) -> Iterable[tuple[str, Importance]]:
-    current_default: Importance = PREFERRED
     for sentence in re.split(r"[\n.;]+", text):
         sentence = sentence.strip(" -\t\r\n")
         if not sentence:
             continue
         default = _section_default(sentence)
-        if default:
-            current_default = default
+        if not default:
+            default = resolve_importance(sentence, PREFERRED)
         for clause in split_requirement_clauses(sentence):
-            yield clause, current_default
+            yield clause, default
 
 
 def _resolve_clause(clause: str, default: Importance) -> Optional[RequirementItem]:
@@ -302,6 +314,36 @@ def _unique_requirement_items(items: Iterable[Mapping[str, Any]]) -> List[Dict[s
             seen.add(key)
             output.append(dict(item))
     return output
+
+
+def _unique_credentials_by_strongest_importance(items: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    by_key: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    for item in items:
+        text = str(item.get("text", "")).strip()
+        key = _fold(text)
+        if not text:
+            continue
+        if key not in by_key:
+            by_key[key] = dict(item)
+            order.append(key)
+            continue
+        existing = by_key[key]
+        if _importance_rank(str(item.get("importance", ""))) < _importance_rank(str(existing.get("importance", ""))):
+            by_key[key] = dict(item)
+    return [by_key[key] for key in order]
+
+
+def _item_keys(items: Iterable[Mapping[str, Any]]) -> set[str]:
+    return {_fold(str(item.get("text", ""))) for item in items if str(item.get("text", "")).strip()}
+
+
+def _importance_rank(importance: str) -> int:
+    if importance == MUST_HAVE:
+        return 0
+    if importance in {STRONGLY_PREFERRED, PREFERRED}:
+        return 1
+    return 2
 
 
 def _fold(text: str) -> str:

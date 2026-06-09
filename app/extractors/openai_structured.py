@@ -127,7 +127,6 @@ class OpenAIStructuredExtractor:
         try:
             response = self._responses_parse(ai_payload)
             job_intelligence = self._extract_payload(response)
-            validate_job_intelligence_v1(job_intelligence)
             job_intelligence = normalize_job_intelligence_requirements(job_intelligence)
             validate_job_intelligence_v1(job_intelligence)
         except ExtractorError as error:
