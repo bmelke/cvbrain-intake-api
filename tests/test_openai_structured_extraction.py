@@ -1,11 +1,12 @@
 import json
+import logging
 import sys
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from app.extractors import ExtractorRequest, ExtractorRouter
-from app.extractors.openai_structured import OpenAIStructuredExtractor
+from app.extractors.openai_structured import OpenAIStructuredExtractor, job_intelligence_v1_response_schema
 from app.main import app
 
 
@@ -22,6 +23,9 @@ class FakeResponses:
         self.calls = []
 
     def parse(self, **kwargs):
+        raise AssertionError("OpenAIStructuredExtractor should use responses.create, not responses.parse")
+
+    def create(self, **kwargs):
         self.calls.append(kwargs)
         if self.error:
             raise self.error
@@ -142,7 +146,28 @@ def test_ai_mode_with_mocked_openai_success_derives_flat_contract(monkeypatch):
     assert "job_intelligence" in data
     for blocked in ["Argentina", "Buenos Aires", "CABA", "GBA"]:
         assert blocked not in serialized
-    assert fake_client.responses.calls
+    call = fake_client.responses.calls[0]
+    assert "response_format" not in call
+    assert call["text"]["format"]["type"] == "json_schema"
+    assert call["text"]["format"]["name"] == "cvbrain_job_intelligence_v1"
+    assert call["text"]["format"]["schema"]["additionalProperties"] is False
+    assert call["input"][0]["role"] == "system"
+
+
+def test_openai_schema_avoids_free_form_strict_schema_traps():
+    schema = job_intelligence_v1_response_schema()
+
+    def walk(value):
+        if isinstance(value, dict):
+            assert value.get("additionalProperties") is not True
+            assert value.get("items") != {}
+            for child in value.values():
+                walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child)
+
+    walk(schema)
 
 
 def test_ai_invalid_json_falls_back_when_enabled():
@@ -169,6 +194,36 @@ def test_ai_invalid_json_falls_back_when_enabled():
     assert result["fallback_used"] is True
     assert "ai_fallback_used" in result["warnings"]
     assert "ai_invalid_json" in result["warnings"]
+
+
+def test_ai_parses_responses_output_array_text():
+    fixture = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    response = {
+        "output": [
+            {
+                "type": "message",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": json.dumps(fixture, ensure_ascii=False),
+                    }
+                ],
+            }
+        ]
+    }
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response=response),
+    )
+
+    result = extractor.extract(request())
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert result["role_title"] == "Account Manager Semi Senior"
+    assert result["location"]["normalized"] == "Montevideo"
 
 
 def test_ai_schema_failure_returns_clean_error_when_fallback_disabled():
@@ -233,6 +288,42 @@ def test_ai_timeout_fallback_and_clean_error_paths():
     assert error["ok"] is False
     assert error["engine"] == "openai"
     assert "ai_timeout" in error["warnings"]
+
+
+def test_provider_error_logs_safe_diagnostics_without_public_detail(caplog):
+    source_text = (
+        "Account Manager Semi Senior con experiencia en dispositivos médicos. "
+        "Mínima de 3 años. Deseable CRM. Ubicación Montevideo, híbrido."
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="sk-test-secret-should-not-log",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=FakeOpenAIClient(error=RuntimeError("provider exploded with sk-test-secret-should-not-log")),
+    )
+    router = ExtractorRouter(
+        env={
+            "CVBRAIN_EXTRACTOR_MODE": "ai",
+            "OPENAI_API_KEY": "sk-test-secret-should-not-log",
+            "CVBRAIN_OPENAI_MODEL": "test-model-not-used",
+            "CVBRAIN_AI_FALLBACK_ENABLED": "false",
+        },
+        ai_extractor=extractor,
+    )
+
+    with caplog.at_level(logging.INFO, logger="cvbrain.openai_structured"):
+        result = router.extract(request(source_text))
+
+    log_output = "\n".join(record.getMessage() for record in caplog.records)
+    assert result["ok"] is False
+    assert result["warnings"] == ["ai_provider_error"]
+    assert "provider_error" in log_output
+    assert "RuntimeError" in log_output
+    assert "responses.create:text.format.json_schema" in log_output
+    assert "source_text_length" in log_output
+    assert "Account Manager Semi Senior" not in log_output
+    assert "sk-test-secret-should-not-log" not in log_output
+    assert "[redacted-api-key]" in log_output
 
 
 def test_ambiguous_clerk_ai_output_can_continue_without_invented_specifics():

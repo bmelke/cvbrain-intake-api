@@ -8,12 +8,13 @@ injected client.
 from __future__ import annotations
 
 import json
+import logging
+import re
 from typing import Any, Dict, Mapping, Optional
 
 from app.extractors.base import ExtractorError, ExtractorRequest
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
 from app.schemas.job_intelligence_v1_contract import (
-    JobIntelligenceV1Output,
     JobIntelligenceValidationError,
     validate_job_intelligence_v1,
 )
@@ -22,6 +23,8 @@ from app.schemas.job_intelligence_v1_contract import (
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_MAX_INPUT_CHARS = 12000
 DEFAULT_MAX_OUTPUT_TOKENS = 4096
+OPENAI_API_SHAPE = "responses.create:text.format.json_schema"
+LOGGER = logging.getLogger("cvbrain.openai_structured")
 
 
 SYSTEM_INSTRUCTIONS = """You are CVBrain Job Intake extraction.
@@ -70,6 +73,8 @@ class OpenAIStructuredExtractor:
         max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
         max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
         strict_schema_enabled: bool = True,
+        fallback_enabled: bool = True,
+        extractor_mode: str = "ai",
         client: Optional[Any] = None,
     ) -> None:
         self.api_key = api_key
@@ -78,6 +83,8 @@ class OpenAIStructuredExtractor:
         self.max_input_chars = max_input_chars
         self.max_output_tokens = max_output_tokens
         self.strict_schema_enabled = strict_schema_enabled
+        self.fallback_enabled = fallback_enabled
+        self.extractor_mode = extractor_mode
         self.client = client
 
     @classmethod
@@ -89,6 +96,8 @@ class OpenAIStructuredExtractor:
             max_input_chars=_env_int(env, "CVBRAIN_AI_MAX_INPUT_CHARS", DEFAULT_MAX_INPUT_CHARS),
             max_output_tokens=_env_int(env, "CVBRAIN_AI_MAX_OUTPUT_TOKENS", DEFAULT_MAX_OUTPUT_TOKENS),
             strict_schema_enabled=_env_bool(env, "CVBRAIN_AI_STRICT_SCHEMA_ENABLED", True),
+            fallback_enabled=_env_bool(env, "CVBRAIN_AI_FALLBACK_ENABLED", True),
+            extractor_mode=str(env.get("CVBRAIN_EXTRACTOR_MODE", "ai")).strip().lower() or "ai",
         )
 
     def build_payload(self, request: ExtractorRequest) -> Dict[str, Any]:
@@ -104,30 +113,63 @@ class OpenAIStructuredExtractor:
     def extract(self, request: ExtractorRequest) -> Dict[str, Any]:
         ai_payload = self.build_payload(request)
 
+        self._log_event(
+            "request_start",
+            request_payload=ai_payload,
+            parse_path="not_started",
+        )
+
         try:
             response = self._responses_parse(ai_payload)
             job_intelligence = self._extract_payload(response)
             validate_job_intelligence_v1(job_intelligence)
-        except ExtractorError:
+        except ExtractorError as error:
+            self._log_exception(
+                error.code,
+                error,
+                request_payload=ai_payload,
+            )
             raise
         except JobIntelligenceValidationError as error:
+            self._log_exception(
+                "schema_validation_failed",
+                error,
+                request_payload=ai_payload,
+            )
             raise ExtractorError(
                 "ai_schema_validation_failed",
                 "OpenAI output failed CVBrain Job Intelligence v1 validation.",
                 warnings=["ai_schema_validation_failed"],
             ) from error
         except TimeoutError as error:
+            self._log_exception(
+                "timeout",
+                error,
+                request_payload=ai_payload,
+            )
             raise ExtractorError(
                 "ai_timeout",
                 "OpenAI structured extraction timed out.",
                 warnings=["ai_timeout"],
             ) from error
         except Exception as error:
+            self._log_exception(
+                "provider_error",
+                error,
+                request_payload=ai_payload,
+            )
             raise ExtractorError(
                 "ai_provider_error",
                 "OpenAI structured extraction failed.",
                 warnings=["ai_provider_error"],
             ) from error
+
+        self._log_event(
+            "request_success",
+            request_payload=ai_payload,
+            parse_path="validated_job_intelligence",
+            parsed_json_keys=sorted(job_intelligence.keys()),
+        )
 
         flat = derive_flat_compatibility(job_intelligence)
         flat["engine"] = self.engine
@@ -147,14 +189,6 @@ class OpenAIStructuredExtractor:
             },
         ]
 
-        if hasattr(client.responses, "parse"):
-            return client.responses.parse(
-                model=self.model,
-                input=input_messages,
-                text_format=JobIntelligenceV1Output,
-                max_output_tokens=self.max_output_tokens,
-            )
-
         return client.responses.create(
             model=self.model,
             input=input_messages,
@@ -162,7 +196,8 @@ class OpenAIStructuredExtractor:
                 "format": {
                     "type": "json_schema",
                     "name": "cvbrain_job_intelligence_v1",
-                    "schema": JobIntelligenceV1Output.schema(),
+                    "description": "CVBrain Job Intelligence v1 extraction output.",
+                    "schema": job_intelligence_v1_response_schema(),
                     "strict": self.strict_schema_enabled,
                 }
             },
@@ -188,25 +223,346 @@ class OpenAIStructuredExtractor:
     def _extract_payload(self, response: Any) -> Dict[str, Any]:
         parsed = _get_response_value(response, "output_parsed")
         if parsed is not None:
-            return _coerce_payload(parsed)
+            payload = _coerce_payload(parsed)
+            self._log_event(
+                "response_parse",
+                parse_path="output_parsed",
+                raw_output_text_found=False,
+                parsed_json_keys=sorted(payload.keys()),
+            )
+            return payload
 
         output_text = _get_response_value(response, "output_text")
         if output_text:
-            return _loads_json(str(output_text))
+            payload = _loads_json(str(output_text))
+            self._log_event(
+                "response_parse",
+                parse_path="output_text",
+                raw_output_text_found=True,
+                parsed_json_keys=sorted(payload.keys()),
+            )
+            return payload
+
+        output_text = _output_text_from_output_items(_get_response_value(response, "output"))
+        if output_text:
+            payload = _loads_json(output_text)
+            self._log_event(
+                "response_parse",
+                parse_path="output_array.output_text",
+                raw_output_text_found=True,
+                parsed_json_keys=sorted(payload.keys()),
+            )
+            return payload
 
         refusal = _get_response_value(response, "refusal")
         if refusal:
+            self._log_event(
+                "response_refusal",
+                parse_path="refusal",
+                sanitized_exception_message=_sanitize_text(str(refusal)),
+            )
             raise ExtractorError(
                 "ai_refusal",
                 "OpenAI refused the structured extraction request.",
                 warnings=["ai_refusal"],
             )
 
+        self._log_event(
+            "response_parse_failed",
+            parse_path="missing_output_text",
+            raw_output_text_found=False,
+            response_keys=_safe_keys(response),
+        )
         raise ExtractorError(
             "ai_invalid_json",
             "OpenAI response did not include structured JSON.",
             warnings=["ai_invalid_json"],
         )
+
+    def _log_event(self, event: str, **metadata: Any) -> None:
+        safe_metadata = {
+            "event": event,
+            "extractor_mode": self.extractor_mode,
+            "model": self.model,
+            "api_shape": OPENAI_API_SHAPE,
+            "strict_schema_enabled": self.strict_schema_enabled,
+            "fallback_enabled": self.fallback_enabled,
+        }
+        safe_metadata.update(_safe_log_metadata(metadata))
+        LOGGER.info("cvbrain_openai_extractor %s", json.dumps(safe_metadata, sort_keys=True))
+
+    def _log_exception(
+        self,
+        event: str,
+        error: BaseException,
+        request_payload: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        self._log_event(
+            event,
+            request_payload=request_payload,
+            exception_class=error.__class__.__name__,
+            sanitized_exception_message=_sanitize_text(str(error)),
+            openai_request_id=getattr(error, "request_id", None),
+            http_status=getattr(error, "status_code", None),
+            sanitized_openai_error_body=_sanitize_text(str(getattr(error, "body", ""))),
+        )
+
+
+def job_intelligence_v1_response_schema() -> Dict[str, Any]:
+    """OpenAI Structured Outputs-compatible JSON schema.
+
+    This schema avoids free-form `{}` items and `additionalProperties: true`,
+    which are common causes of provider-side schema failures. Fields that are
+    optional in product semantics are represented as nullable required fields.
+    """
+
+    requirement_item = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "text": {"type": "string"},
+            "source_text": {"type": "string"},
+            "importance": {
+                "type": "string",
+                "enum": ["must_have", "strongly_preferred", "preferred", "nice_to_have", "low_importance"],
+            },
+            "explicit": {"type": "boolean"},
+            "hard_filter_candidate": {"type": "boolean"},
+            "hard_filter_approved": {"type": "boolean"},
+        },
+        "required": [
+            "text",
+            "source_text",
+            "importance",
+            "explicit",
+            "hard_filter_candidate",
+            "hard_filter_approved",
+        ],
+    }
+
+    missing_information_item = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "id": {"type": "string"},
+            "field": {"type": "string"},
+            "description": {"type": "string"},
+            "suggested_question": {"type": "string"},
+            "can_continue_without_answer": {"type": "boolean"},
+        },
+        "required": ["id", "field", "description", "suggested_question", "can_continue_without_answer"],
+    }
+
+    company_question_item = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "id": {"type": "string"},
+            "question": {"type": "string"},
+            "related_fields": {"type": "array", "items": {"type": "string"}},
+            "blocking_level": {"type": "string", "enum": ["advisory", "blocking"]},
+            "asked_to": {"type": "string", "enum": ["hiring_company"]},
+        },
+        "required": ["id", "question", "related_fields", "blocking_level", "asked_to"],
+    }
+
+    candidate_screening_item = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "id": {"type": "string"},
+            "question": {"type": "string"},
+            "related_competency": {"type": "string"},
+            "evidence_expected": {"type": "string", "enum": ["resume", "interview", "screening", "reference"]},
+            "hard_filter_candidate": {"type": "boolean"},
+            "hard_filter_approved": {"type": "boolean"},
+        },
+        "required": [
+            "id",
+            "question",
+            "related_competency",
+            "evidence_expected",
+            "hard_filter_candidate",
+            "hard_filter_approved",
+        ],
+    }
+
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "schema_version": {"type": "string", "enum": ["cvbrain_job_intelligence_v1"]},
+            "job_profile": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "job_title": {"type": "string"},
+                    "normalized_role_title": {"type": "string"},
+                    "role_family": {"type": "string"},
+                    "seniority": {"type": "string"},
+                    "summary": {"type": "string"},
+                    "primary_industries": {"type": "array", "items": {"type": "string"}},
+                    "work_modality": {"type": ["string", "null"], "enum": ["onsite", "hybrid", "remote", None]},
+                },
+                "required": [
+                    "job_title",
+                    "normalized_role_title",
+                    "role_family",
+                    "seniority",
+                    "summary",
+                    "primary_industries",
+                    "work_modality",
+                ],
+            },
+            "location_intelligence": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "raw": {"type": "string"},
+                    "normalized": {"type": "string"},
+                    "country_code": {"type": "string"},
+                    "remote_allowed": {"type": ["boolean", "null"]},
+                    "hybrid_allowed": {"type": ["boolean", "null"]},
+                    "onsite_required": {"type": ["boolean", "null"]},
+                    "country_context_mismatch": {"type": "boolean"},
+                    "hard_filter_candidate": {"type": "boolean"},
+                    "hard_filter_approved": {"type": "boolean"},
+                    "warnings": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": [
+                    "raw",
+                    "normalized",
+                    "country_code",
+                    "remote_allowed",
+                    "hybrid_allowed",
+                    "onsite_required",
+                    "country_context_mismatch",
+                    "hard_filter_candidate",
+                    "hard_filter_approved",
+                    "warnings",
+                ],
+            },
+            "requirements": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "must_have": {"type": "array", "items": requirement_item},
+                    "should_have": {"type": "array", "items": requirement_item},
+                    "nice_to_have": {"type": "array", "items": requirement_item},
+                    "credentials": {"type": "array", "items": requirement_item},
+                    "blockers": {"type": "array", "items": {"type": "string"}},
+                    "experience": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "minimum_years": {"type": ["integer", "null"]},
+                            "seniority": {"type": "string"},
+                        },
+                        "required": ["minimum_years", "seniority"],
+                    },
+                    "soft_competencies": {"type": "array", "items": requirement_item},
+                },
+                "required": [
+                    "must_have",
+                    "should_have",
+                    "nice_to_have",
+                    "credentials",
+                    "blockers",
+                    "experience",
+                    "soft_competencies",
+                ],
+            },
+            "search_strategy": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "target_titles": {"type": "array", "items": {"type": "string"}},
+                    "search_terms": {"type": "array", "items": {"type": "string"}},
+                    "semantic_terms": {"type": "array", "items": {"type": "string"}},
+                    "negative_terms": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["target_titles", "search_terms", "semantic_terms", "negative_terms"],
+            },
+            "missing_information": {"type": "array", "items": missing_information_item},
+            "company_clarification_questions": {"type": "array", "items": company_question_item},
+            "candidate_screening_questions": {"type": "array", "items": candidate_screening_item},
+            "search_readiness": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ready",
+                            "usable_with_warnings",
+                            "exploratory",
+                            "insufficient_for_precise_search",
+                            "blocked_for_safety_or_technical_reason",
+                        ],
+                    },
+                    "proceed_allowed": {"type": "boolean"},
+                    "recommended_action": {
+                        "type": "string",
+                        "enum": [
+                            "continue_anyway",
+                            "answer_clarifying_questions",
+                            "ask_company",
+                            "use_manual_search",
+                            "cancel",
+                        ],
+                    },
+                    "recruiter_decision_required": {"type": "boolean"},
+                    "continued_with_missing_information": {"type": "boolean"},
+                    "recruiter_override_reason": {"type": ["string", "null"]},
+                    "decision_options": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "continue_anyway",
+                                "answer_clarifying_questions",
+                                "ask_company",
+                                "use_manual_search",
+                                "cancel",
+                            ],
+                        },
+                    },
+                },
+                "required": [
+                    "status",
+                    "proceed_allowed",
+                    "recommended_action",
+                    "recruiter_decision_required",
+                    "continued_with_missing_information",
+                    "recruiter_override_reason",
+                    "decision_options",
+                ],
+            },
+            "quality_control": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "warnings": {"type": "array", "items": {"type": "string"}},
+                    "confidence": {"type": "number"},
+                    "contains_candidate_data": {"type": "boolean"},
+                    "contains_candidate_pii": {"type": "boolean"},
+                },
+                "required": ["warnings", "confidence", "contains_candidate_data", "contains_candidate_pii"],
+            },
+        },
+        "required": [
+            "schema_version",
+            "job_profile",
+            "location_intelligence",
+            "requirements",
+            "search_strategy",
+            "missing_information",
+            "company_clarification_questions",
+            "candidate_screening_questions",
+            "search_readiness",
+            "quality_control",
+        ],
+    }
 
 
 def _coerce_payload(value: Any) -> Dict[str, Any]:
@@ -242,6 +598,81 @@ def _get_response_value(response: Any, key: str) -> Any:
     if isinstance(response, Mapping):
         return response.get(key)
     return getattr(response, key, None)
+
+
+def _output_text_from_output_items(output: Any) -> str:
+    texts = []
+    if not isinstance(output, list):
+        return ""
+
+    for item in output:
+        content = _get_response_value(item, "content")
+        if not isinstance(content, list):
+            continue
+        for content_item in content:
+            content_type = _get_response_value(content_item, "type")
+            if content_type == "output_text":
+                text = _get_response_value(content_item, "text")
+                if text:
+                    texts.append(str(text))
+
+    return "".join(texts).strip()
+
+
+def _safe_keys(value: Any) -> list[str]:
+    if isinstance(value, Mapping):
+        return sorted(str(key) for key in value.keys())
+    keys = []
+    for key in ("id", "object", "status", "output", "output_text", "error", "refusal"):
+        if hasattr(value, key):
+            keys.append(key)
+    return keys
+
+
+def _safe_log_metadata(metadata: Mapping[str, Any]) -> Dict[str, Any]:
+    safe: Dict[str, Any] = {}
+    for key, value in metadata.items():
+        if value is None:
+            continue
+        if key == "request_payload" and isinstance(value, Mapping):
+            safe["locale"] = value.get("locale")
+            safe["country_context"] = value.get("country_context")
+            safe["candidate_market"] = value.get("candidate_market")
+            safe["employer_market"] = value.get("employer_market")
+            safe["source_mime_type"] = value.get("source_mime_type")
+            safe["source_filename_present"] = bool(value.get("source_filename"))
+            safe["source_text_length"] = len(str(value.get("source_text", "")))
+            safe["recruiter_notes_present"] = bool(str(value.get("recruiter_notes", "")).strip())
+            continue
+        if key in {"parsed_json_keys", "response_keys"} and isinstance(value, list):
+            safe[key] = [str(item)[:80] for item in value]
+            continue
+        if key in {
+            "parse_path",
+            "exception_class",
+            "sanitized_exception_message",
+            "openai_request_id",
+            "http_status",
+            "sanitized_openai_error_body",
+        }:
+            safe[key] = _sanitize_text(str(value))
+            continue
+        if key == "raw_output_text_found":
+            safe[key] = bool(value)
+            continue
+        safe[key] = _sanitize_text(str(value))
+    return safe
+
+
+def _sanitize_text(value: str, limit: int = 800) -> str:
+    if not value:
+        return ""
+    redacted = re.sub(r"sk-[A-Za-z0-9_-]+", "[redacted-api-key]", value)
+    redacted = re.sub(r"sk-proj-[A-Za-z0-9_-]+", "[redacted-api-key]", redacted)
+    redacted = re.sub(r"Bearer\s+[A-Za-z0-9._-]+", "Bearer [redacted]", redacted, flags=re.I)
+    redacted = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "[redacted-email]", redacted)
+    redacted = redacted.replace("\n", " ")
+    return redacted[:limit]
 
 
 def _env_bool(env: Mapping[str, str], key: str, default: bool) -> bool:
