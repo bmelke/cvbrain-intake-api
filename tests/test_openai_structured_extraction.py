@@ -253,6 +253,51 @@ def test_ai_schema_failure_returns_clean_error_when_fallback_disabled():
     assert result["search_terms"] == []
 
 
+def test_schema_failure_logs_safe_internal_diagnostics(caplog):
+    source_text = (
+        "La posicion apunta a soporte tecnico de primer nivel para usuarios internos y clientes corporativos. "
+        "Rol: Tecnico de Soporte IT Junior. Excluyente experiencia de al menos 1 ano."
+    )
+    invalid_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    invalid_payload["search_readiness"]["status"] = "not_a_valid_status"
+    extractor = OpenAIStructuredExtractor(
+        api_key="sk-test-secret-should-not-log",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=FakeOpenAIClient(response={"output_parsed": invalid_payload}),
+    )
+    router = ExtractorRouter(
+        env={
+            "CVBRAIN_EXTRACTOR_MODE": "ai",
+            "OPENAI_API_KEY": "sk-test-secret-should-not-log",
+            "CVBRAIN_OPENAI_MODEL": "test-model-not-used",
+            "CVBRAIN_AI_FALLBACK_ENABLED": "false",
+        },
+        ai_extractor=extractor,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="cvbrain.openai_structured"):
+        result = router.extract(request(source_text))
+
+    log_output = "\n".join(record.getMessage() for record in caplog.records)
+    assert result["ok"] is False
+    assert result["warnings"] == ["ai_schema_validation_failed"]
+    assert "cvbrain.ai_schema_validation_failed" in log_output
+    assert "search_readiness.status" in log_output
+    assert "validation_error_count" in log_output
+    assert "parsed_top_level_keys" in log_output
+    assert "job_intelligence_top_level_keys" in log_output
+    assert "requirements_bucket_counts" in log_output
+    assert "requirement_item_summaries" in log_output
+    assert "flat_output_bucket_counts" in log_output
+    assert "test-model-not-used" in log_output
+    assert "strict_schema_enabled" in log_output
+    assert "fallback_enabled" in log_output
+    assert "source_text_length" in log_output
+    assert source_text not in log_output
+    assert "sk-test-secret-should-not-log" not in log_output
+
+
 def test_ai_timeout_fallback_and_clean_error_paths():
     extractor = OpenAIStructuredExtractor(
         api_key="test-key-not-used",

@@ -117,6 +117,8 @@ class OpenAIStructuredExtractor:
 
     def extract(self, request: ExtractorRequest) -> Dict[str, Any]:
         ai_payload = self.build_payload(request)
+        parsed_job_intelligence: Optional[Dict[str, Any]] = None
+        job_intelligence: Optional[Dict[str, Any]] = None
 
         self._log_event(
             "request_start",
@@ -126,8 +128,8 @@ class OpenAIStructuredExtractor:
 
         try:
             response = self._responses_parse(ai_payload)
-            job_intelligence = self._extract_payload(response)
-            job_intelligence = normalize_job_intelligence_requirements(job_intelligence, source_text=request.source_text)
+            parsed_job_intelligence = self._extract_payload(response)
+            job_intelligence = normalize_job_intelligence_requirements(parsed_job_intelligence, source_text=request.source_text)
             validate_job_intelligence_v1(job_intelligence)
         except ExtractorError as error:
             self._log_exception(
@@ -137,6 +139,12 @@ class OpenAIStructuredExtractor:
             )
             raise
         except JobIntelligenceValidationError as error:
+            self._log_schema_validation_failure(
+                error,
+                request_payload=ai_payload,
+                parsed_job_intelligence=parsed_job_intelligence,
+                job_intelligence=job_intelligence,
+            )
             self._log_exception(
                 "schema_validation_failed",
                 error,
@@ -311,6 +319,43 @@ class OpenAIStructuredExtractor:
             openai_request_id=getattr(error, "request_id", None),
             http_status=getattr(error, "status_code", None),
             sanitized_openai_error_body=_sanitize_text(str(getattr(error, "body", ""))),
+        )
+
+    def _log_schema_validation_failure(
+        self,
+        error: JobIntelligenceValidationError,
+        request_payload: Mapping[str, Any],
+        parsed_job_intelligence: Optional[Mapping[str, Any]],
+        job_intelligence: Optional[Mapping[str, Any]],
+    ) -> None:
+        message = str(error)
+        diagnostics = {
+            "event": "cvbrain.ai_schema_validation_failed",
+            "exception_class": error.__class__.__name__,
+            "sanitized_exception_message": _sanitize_text(message),
+            "validation_error_fields": _validation_error_fields(message),
+            "validation_error_count": _validation_error_count(message),
+            "parsed_top_level_keys": _safe_keys(parsed_job_intelligence or {}),
+            "job_intelligence_top_level_keys": _safe_keys(job_intelligence or {}),
+            "requirements_bucket_counts": _requirements_bucket_counts(job_intelligence),
+            "requirement_item_summaries": _requirement_item_summaries(job_intelligence),
+            "flat_output_bucket_counts": _flat_output_bucket_counts(job_intelligence),
+            "model": self.model,
+            "extractor_mode": self.extractor_mode,
+            "strict_schema_enabled": self.strict_schema_enabled,
+            "fallback_enabled": self.fallback_enabled,
+            "locale": request_payload.get("locale"),
+            "country_context": request_payload.get("country_context"),
+            "candidate_market": request_payload.get("candidate_market"),
+            "employer_market": request_payload.get("employer_market"),
+            "source_mime_type": request_payload.get("source_mime_type"),
+            "source_filename_present": bool(request_payload.get("source_filename")),
+            "source_text_length": len(str(request_payload.get("source_text", ""))),
+            "recruiter_notes_present": bool(str(request_payload.get("recruiter_notes", "")).strip()),
+        }
+        LOGGER.warning(
+            "cvbrain.ai_schema_validation_failed %s",
+            json.dumps(diagnostics, ensure_ascii=False, sort_keys=True),
         )
 
 
@@ -668,6 +713,113 @@ def _safe_log_metadata(metadata: Mapping[str, Any]) -> Dict[str, Any]:
             continue
         safe[key] = _sanitize_text(str(value))
     return safe
+
+
+def _validation_error_count(message: str) -> int:
+    parts = [part.strip() for part in str(message).split(";") if part.strip()]
+    return len(parts) if parts else 0
+
+
+def _validation_error_fields(message: str) -> list[str]:
+    fields = []
+    for part in [chunk.strip() for chunk in str(message).split(";") if chunk.strip()]:
+        match = re.search(r"\b([a-zA-Z_]+(?:\.[a-zA-Z_]+)+)\b", part)
+        if match:
+            fields.append(match.group(1))
+            continue
+        top_level = re.search(r"missing top-level section:\s*([a-zA-Z_]+)", part)
+        if top_level:
+            fields.append(top_level.group(1))
+    return list(dict.fromkeys(fields))
+
+
+def _requirements_bucket_counts(job_intelligence: Optional[Mapping[str, Any]]) -> Dict[str, int]:
+    requirements = _requirements_mapping(job_intelligence)
+    return {
+        "must_have": _list_count(requirements.get("must_have")),
+        "should_have": _list_count(requirements.get("should_have")),
+        "nice_to_have": _list_count(requirements.get("nice_to_have")),
+        "credentials": _list_count(requirements.get("credentials")),
+        "blockers": _list_count(requirements.get("blockers")),
+        "soft_competencies": _list_count(requirements.get("soft_competencies")),
+    }
+
+
+def _flat_output_bucket_counts(job_intelligence: Optional[Mapping[str, Any]]) -> Dict[str, int]:
+    requirements = _requirements_mapping(job_intelligence)
+    credentials = [item for item in requirements.get("credentials", []) if isinstance(item, Mapping)]
+    return {
+        "must_have": _list_count(requirements.get("must_have")),
+        "should_have": _list_count(requirements.get("should_have")),
+        "nice_to_have": _list_count(requirements.get("nice_to_have")),
+        "blockers": _list_count(requirements.get("blockers")),
+        "credentials_required": sum(1 for item in credentials if str(item.get("importance", "")) == "must_have"),
+        "credentials_preferred": sum(1 for item in credentials if str(item.get("importance", "")) != "must_have"),
+    }
+
+
+def _requirement_item_summaries(job_intelligence: Optional[Mapping[str, Any]]) -> list[Dict[str, Any]]:
+    requirements = _requirements_mapping(job_intelligence)
+    summaries: list[Dict[str, Any]] = []
+    for bucket in ("must_have", "should_have", "nice_to_have", "credentials", "soft_competencies"):
+        items = requirements.get(bucket, [])
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, Mapping):
+                summaries.append(
+                    {
+                        "bucket": bucket,
+                        "text": _sanitize_text(str(item), 160),
+                        "source_text": "",
+                        "importance": "",
+                        "explicit": None,
+                        "hard_filter_candidate": None,
+                        "hard_filter_approved": None,
+                    }
+                )
+                continue
+            summaries.append(
+                {
+                    "bucket": bucket,
+                    "text": _sanitize_text(str(item.get("text", "")), 160),
+                    "source_text": _sanitize_text(str(item.get("source_text", "")), 120),
+                    "importance": _sanitize_text(str(item.get("importance", "")), 40),
+                    "explicit": item.get("explicit") if isinstance(item.get("explicit"), bool) else None,
+                    "hard_filter_candidate": item.get("hard_filter_candidate")
+                    if isinstance(item.get("hard_filter_candidate"), bool)
+                    else None,
+                    "hard_filter_approved": item.get("hard_filter_approved")
+                    if isinstance(item.get("hard_filter_approved"), bool)
+                    else None,
+                }
+            )
+    blockers = requirements.get("blockers", [])
+    if isinstance(blockers, list):
+        for blocker in blockers:
+            summaries.append(
+                {
+                    "bucket": "blockers",
+                    "text": _sanitize_text(str(blocker), 160),
+                    "source_text": "",
+                    "importance": "blocker",
+                    "explicit": None,
+                    "hard_filter_candidate": None,
+                    "hard_filter_approved": None,
+                }
+            )
+    return summaries[:80]
+
+
+def _requirements_mapping(job_intelligence: Optional[Mapping[str, Any]]) -> Mapping[str, Any]:
+    if not isinstance(job_intelligence, Mapping):
+        return {}
+    requirements = job_intelligence.get("requirements", {})
+    return requirements if isinstance(requirements, Mapping) else {}
+
+
+def _list_count(value: Any) -> int:
+    return len(value) if isinstance(value, list) else 0
 
 
 def _sanitize_text(value: str, limit: int = 800) -> str:
