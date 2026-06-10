@@ -1,0 +1,419 @@
+CVBRAIN_JOB_INTAKE_HR_REALISTIC_TEST_SET_V2
+
+IMPORTANTE:
+- Este archivo NO incluye role_hint ni ningún metadato de rol dentro de las búsquedas.
+- Para probar el API, Codex debe enviar solamente el texto que aparece entre cada marcador BUSQUEDA_### y END_BUSQUEDA_###.
+- Los marcadores son solo separadores del fixture; no forman parte de la búsqueda real.
+- Cada búsqueda está redactada como un pedido real de RRHH/HR, con lenguaje humano, ambigüedades, excluyentes, deseables, valorables, blockers, ubicación y modalidad.
+- Payload sugerido por cada caso:
+  {
+    "source_text": "<texto de la búsqueda, sin marcadores>",
+    "source_filename": "",
+    "source_mime_type": "text/plain",
+    "recruiter_notes": "",
+    "locale": "es-UY",
+    "country_context": "UY",
+    "candidate_market": "UY",
+    "employer_market": "UY"
+  }
+
+
+BUSQUEDA_001
+Nuestro cliente es un grupo empresarial con varias unidades de negocio y operaciones en distintos rubros. Busca incorporar un Gerente Corporativo de Legales que pueda ordenar y liderar la función legal interna, reportando a dirección. La persona deberá tener experiencia real en áreas legales corporativas, no solamente en estudio jurídico externo. Es excluyente haber ocupado posiciones gerenciales o de jefatura durante al menos 5 años, trabajando con contratos comerciales, asuntos societarios, cumplimiento normativo, gobierno corporativo y coordinación con estudios externos. Se valora experiencia en organizaciones multiempresa o con operaciones regionales. Inglés jurídico será un plus, pero no debe usarse como filtro excluyente. La posición es en Montevideo, modalidad híbrida. No avanzar perfiles puramente litigiosos sin experiencia corporativa ni perfiles junior de asesoría legal.
+END_BUSQUEDA_001
+
+BUSQUEDA_002
+Empresa industrial en crecimiento necesita sumar un Ingeniero de Planta para tomar responsabilidad sobre producción, logística interna y mejora de procesos. La búsqueda apunta a alguien que haya estado en planta, cerca de la operación, no solamente en tareas de escritorio. Es excluyente experiencia supervisando procesos productivos, controlando recursos, administrando stock de insumos, revisando layout y proponiendo mejoras. También deberá colaborar con indicadores de gestión, costos industriales, control de calidad y análisis de eficiencia. Deseable experiencia en mejora continua, Lean Manufacturing o desarrollo de nuevos productos. Formación en ingeniería industrial, mecánica, química o similar será muy valorada. Trabajo presencial en zona Canelones, con interacción frecuente con dirección. No avanzar candidatos sin experiencia concreta en planta industrial.
+END_BUSQUEDA_002
+
+BUSQUEDA_003
+Para empresa B2B con equipo comercial activo, buscamos un Analista de Ventas que ayude a ordenar información, dar seguimiento a objetivos y transformar datos comerciales en decisiones. Necesitamos alguien que haya trabajado con reportes de ventas, forecast, indicadores, objetivos por vendedor, pipeline y análisis de desvíos. Es excluyente Excel avanzado y experiencia vinculada a áreas comerciales, no solamente administración general. Deseable Power BI, CRM y experiencia con Salesforce o herramientas similares. La persona debe poder interactuar con vendedores, gerencia comercial y administración. Formación en administración, marketing, economía o similar será valorable. Modalidad híbrida en Montevideo. No avanzar perfiles que solo hayan hecho carga de datos o facturación sin análisis comercial.
+END_BUSQUEDA_003
+
+BUSQUEDA_004
+Cliente del rubro salud busca un Account Manager Semi Senior para desarrollar y mantener cuentas en instituciones médicas. La posición requiere experiencia comercial en salud, laboratorios, equipamiento médico, dispositivos médicos o servicios vinculados al sector. Mínimo 3 años gestionando cuentas corporativas, con visitas a clientes, seguimiento de oportunidades y negociación. Se valorará experiencia con licitaciones, compras hospitalarias o procesos de aprobación técnica. CRM es deseable, no excluyente. Tener cartera previa en mutualistas, sanatorios o clínicas será un plus. Base Montevideo, modalidad híbrida con visitas a clientes. No avanzar vendedores retail ni perfiles exclusivamente de consumo masivo sin contacto con instituciones de salud.
+END_BUSQUEDA_004
+
+BUSQUEDA_005
+La posición apunta a soporte técnico de primer nivel para usuarios internos y clientes corporativos. Rol: Técnico de Soporte IT Junior. Excluyente experiencia de al menos 1 año resolviendo incidentes de hardware, software, redes básicas y soporte remoto. Imprescindible buena comunicación y registro de tickets. Credenciales requeridas: formación técnica en informática o certificación equivalente. Libreta de conducir categoría A valorable para visitas puntuales. Trabajo híbrido en Montevideo, con guardias coordinadas. Deseable conocimientos de Microsoft 365, Active Directory y herramientas de mesa de ayuda. Sin experiencia no avanzar para este rol de soporte.
+END_BUSQUEDA_005
+
+BUSQUEDA_006
+Operador logístico nacional busca un Coordinador de Logística para organizar rutas, flota y entregas diarias. La persona deberá tener experiencia coordinando transportistas, controlando cumplimiento de entregas, resolviendo desvíos, reclamos y urgencias operativas. Es excluyente haber trabajado en logística de distribución o transporte, con contacto directo con choferes y clientes. Se valorará experiencia con TMS, WMS, Excel y tableros de indicadores. Libreta profesional puede sumar, pero no es requisito. Ubicación Montevideo zona oeste, modalidad presencial. No avanzar perfiles que solo hayan trabajado en depósito sin planificación de rutas ni coordinación operativa.
+END_BUSQUEDA_006
+
+BUSQUEDA_007
+Pyme industrial busca Jefe de Administración y Finanzas para ordenar la gestión administrativa y dar soporte a dirección. La persona deberá liderar pagos, cobranzas, conciliaciones bancarias, flujo de fondos, reportes de gestión, facturación y coordinación con estudio contable. Es excluyente experiencia administrando finanzas en empresas reales, idealmente pymes industriales o comerciales. Debe entender contabilidad local, impuestos, documentación y controles internos. Deseable manejo de Odoo, Memory u otro ERP. Título de contador será valorable, pero se acepta experiencia sólida equivalente. Montevideo, presencial con cierta flexibilidad. No avanzar asistentes administrativos sin responsabilidad sobre finanzas.
+END_BUSQUEDA_007
+
+BUSQUEDA_008
+Empresa de servicios tecnológicos busca Ejecutivo Comercial B2B para vender soluciones a empresas. El rol requiere prospección, armado de propuestas, negociación, seguimiento de pipeline y mantenimiento de cartera. Es excluyente experiencia vendiendo a empresas, con procesos consultivos y ciclos comerciales no inmediatos. Deseable conocimiento de software, cloud, ciberseguridad, servicios gestionados o infraestructura. Inglés técnico será valorable, no excluyente. Se espera autonomía, buena comunicación y capacidad de entender necesidades del cliente. Modalidad híbrida en Montevideo. No avanzar vendedores de mostrador, consumo masivo o retail sin experiencia B2B.
+END_BUSQUEDA_008
+
+BUSQUEDA_009
+Empresa de servicios con dotación superior a 100 personas busca Responsable de Recursos Humanos generalista. La persona deberá gestionar selección, onboarding, clima, comunicación interna, coordinación con mandos medios, control de novedades y relación con estudio externo de liquidación de sueldos. Es excluyente experiencia en RRHH generalista, con exposición a conflictos laborales y gestión de personas en operación. Deseable experiencia en empresas de servicios, contact center, seguridad, limpieza o facilities. Formación en RRHH, relaciones laborales, psicología o administración será valorable. Montevideo, presencial. No avanzar perfiles exclusivamente de selección sin experiencia generalista.
+END_BUSQUEDA_009
+
+BUSQUEDA_010
+Compañía de servicios busca Supervisor de Call Center para liderar equipo de atención telefónica y canales digitales. Debe manejar métricas, calidad, ausentismo, turnos, coaching, seguimiento de reclamos y escalamiento de casos. Es excluyente experiencia previa supervisando agentes o equipos de contact center. Deseable manejo de CRM, herramientas de telefonía, dashboards y metodologías de calidad. Se valorará experiencia en servicios financieros o atención de alto volumen. Montevideo, presencial. No avanzar agentes senior sin experiencia formal liderando equipos ni perfiles comerciales sin contact center.
+END_BUSQUEDA_010
+
+BUSQUEDA_011
+Empresa mediana busca Analista Contable Senior para sumarse al equipo de administración. Se requiere experiencia en cierres contables, conciliaciones, registraciones, balances, impuestos, reportes mensuales y soporte a auditorías. Es importante que conozca normativa local uruguaya y pueda trabajar con autonomía. Contador recibido o estudiante avanzado con experiencia sólida. Deseable manejo de Memory, SAP, Odoo u otro ERP. Modalidad híbrida en Montevideo. No avanzar perfiles que solo hayan hecho tareas administrativas, facturación o pago a proveedores sin trabajo contable real.
+END_BUSQUEDA_011
+
+BUSQUEDA_012
+Importadora con alto movimiento de mercadería busca Encargado de Depósito. La persona deberá liderar equipo operativo, controlar ingresos y egresos, organizar inventarios, preparar pedidos, asegurar trazabilidad y mantener orden físico y documental. Es excluyente experiencia en depósito con responsabilidad sobre personas y stock. Deseable manejo de WMS, Excel y lectura de reportes de inventario. Libreta de conducir es valorable para movimientos puntuales, pero no excluyente. Trabajo presencial en Montevideo. No avanzar operarios generales sin experiencia liderando personal ni perfiles logísticos puramente administrativos.
+END_BUSQUEDA_012
+
+BUSQUEDA_013
+Marca de consumo busca Community Manager Senior con mirada estratégica y capacidad operativa. Se espera experiencia armando calendarios de contenidos, publicando en redes, respondiendo comunidad, coordinando piezas con diseño, midiendo resultados y dando soporte a campañas. Es excluyente contar con portfolio o ejemplos de cuentas gestionadas. Deseable experiencia en TikTok, Meta Ads básico, herramientas de programación y reportes. Fotografía, video o edición serán plus. Montevideo, modalidad híbrida. No avanzar perfiles sin portfolio ni personas que solo hayan manejado cuentas personales.
+END_BUSQUEDA_013
+
+BUSQUEDA_014
+Agencia de publicidad y comunicación busca Ejecutivo de Cuentas para gestionar clientes, campañas y entregables. La persona deberá recibir briefings, organizar equipos internos, dar seguimiento a presupuestos, coordinar cronogramas y asegurar calidad de respuesta al cliente. Es excluyente experiencia en agencia o en coordinación de proyectos de comunicación/marketing. Deseable experiencia en campañas digitales, pauta y contenidos. Inglés será valorable. Modalidad híbrida en Montevideo. No avanzar perfiles creativos sin gestión de cliente ni administrativos sin experiencia en campañas.
+END_BUSQUEDA_014
+
+BUSQUEDA_015
+Startup tecnológica busca Desarrollador Backend Python para trabajar en APIs y servicios internos. Es excluyente experiencia con Python y desarrollo backend, idealmente FastAPI o Django. Debe manejar APIs REST, bases SQL, Git, testing y despliegues en entornos cloud. Deseable Docker, GCP, AWS o integración con servicios externos. Experiencia con OpenAI APIs será valorable, no excluyente. Modalidad remoto Uruguay o híbrido Montevideo. No avanzar perfiles exclusivamente frontend ni personas que solo hayan hecho scripts aislados sin aplicaciones backend.
+END_BUSQUEDA_015
+
+BUSQUEDA_016
+Empresa de producto digital busca Desarrollador Frontend React para evolución de plataforma web. Se requiere experiencia con React, TypeScript, consumo de APIs, manejo de estado, componentes reutilizables y responsive design. Es excluyente haber trabajado en aplicaciones web reales, no solo landing pages. Deseable Next.js, Tailwind, testing y experiencia con diseño en Figma. Valorable experiencia en SaaS o productos B2B. Trabajo remoto desde Uruguay. No avanzar maquetadores sin lógica frontend ni perfiles WordPress puros.
+END_BUSQUEDA_016
+
+BUSQUEDA_017
+Empresa tecnológica busca DevOps Engineer Semi Senior para fortalecer su operación cloud. La persona deberá haber trabajado con Docker, CI/CD, Linux, monitoreo, logs y despliegues productivos. Es excluyente experiencia práctica automatizando pipelines y resolviendo incidentes de infraestructura. Deseable Kubernetes, Terraform, GCP o AWS. Inglés técnico será valorable. Modalidad remota o híbrida. No avanzar administradores Windows sin experiencia cloud ni desarrolladores sin operación real.
+END_BUSQUEDA_017
+
+BUSQUEDA_018
+Compañía de servicios IT busca Analista de Ciberseguridad Junior para tareas de monitoreo y soporte en seguridad. Se requiere base técnica en redes, sistemas operativos y buenas prácticas de seguridad. Deseable experiencia con SIEM, análisis de logs, hardening, gestión de vulnerabilidades o respuesta a incidentes. Certificaciones Security+, Cisco, Microsoft o similares serán valorables. Modalidad híbrida en Montevideo con guardias coordinadas. No avanzar candidatos sin base técnica comprobable ni perfiles que solo hayan hecho cursos sin práctica.
+END_BUSQUEDA_018
+
+BUSQUEDA_019
+Industria alimenticia busca Especialista en Compras para gestionar proveedores, precios, órdenes de compra y abastecimiento de insumos. La persona deberá negociar condiciones, controlar entregas, analizar costos y coordinar con producción y administración. Es excluyente experiencia en compras con negociación real, no solo carga de órdenes. Deseable experiencia con materias primas, envases o insumos industriales. Comercio exterior será valorable. Montevideo/Canelones, presencial. No avanzar perfiles administrativos sin negociación ni compradores exclusivamente de servicios generales.
+END_BUSQUEDA_019
+
+BUSQUEDA_020
+Empresa importadora busca Analista de Comercio Exterior para coordinar operaciones de importación. Debe manejar documentación, contacto con despachantes, seguimiento de embarques, coordinación logística, Incoterms, costos y tiempos. Es excluyente experiencia en comercio exterior o logística internacional. Deseable inglés, Excel avanzado y conocimiento de normativa aduanera. Se valorará experiencia con productos regulados. Montevideo, modalidad híbrida. No avanzar perfiles de compras locales sin operación internacional.
+END_BUSQUEDA_020
+
+BUSQUEDA_021
+Restaurante con alta rotación busca Encargado de Local. La persona será responsable de salón, caja, turnos, proveedores, stock, atención al cliente y coordinación del equipo. Es excluyente experiencia previa como encargado, supervisor o responsable operativo en gastronomía. Debe poder manejar presión, horarios rotativos y resolución de problemas diarios. Deseable experiencia en restaurantes de volumen, control de costos e indicadores básicos. Conocimiento de cocina será valorable. Montevideo. No avanzar mozos o cajeros sin responsabilidad sobre equipo.
+END_BUSQUEDA_021
+
+BUSQUEDA_022
+Grupo gastronómico busca Jefe de Cocina para liderar operación diaria, producción y servicio. Se requiere experiencia organizando mise en place, costos, compras, bromatología, calidad y equipo de cocina. Es excluyente haber liderado cocina en restaurantes, hoteles o servicios de volumen. Carné de manipulación de alimentos requerido. Deseable experiencia en cocina uruguaya, mediterránea o parrilla. Montevideo, presencial con horarios gastronómicos. No avanzar cocineros sin liderazgo ni perfiles de cocina doméstica.
+END_BUSQUEDA_022
+
+BUSQUEDA_023
+Empresa proveedora de maquinaria agrícola busca Vendedor Técnico para desarrollar clientes en el sector agropecuario. Es excluyente experiencia comercial en maquinaria, agroinsumos, equipos industriales o soluciones técnicas para campo. La persona deberá visitar clientes, detectar necesidades, preparar cotizaciones y explicar características técnicas. Deseable conocimiento del ciclo productivo agropecuario. Libreta de conducir requerida por viajes al interior. Base Montevideo o litoral. No avanzar vendedores de salón sin disponibilidad para viajar.
+END_BUSQUEDA_023
+
+BUSQUEDA_024
+Empresa del sector agro busca Ingeniero Agrónomo Comercial para asesorar productores y vender soluciones técnicas. Es excluyente formación agronómica o experiencia técnica equivalente en campo. Debe tener capacidad de asesoramiento, venta consultiva, seguimiento de clientes y visitas frecuentes. Deseable experiencia con fertilizantes, semillas, protección vegetal o nutrición animal. Libreta de conducir requerida. Posición para interior del país, con alta movilidad. No avanzar perfiles administrativos del agro sin trabajo de campo.
+END_BUSQUEDA_024
+
+BUSQUEDA_025
+Laboratorio busca Responsable de Calidad para mantener y mejorar su sistema de gestión. Se requiere experiencia en documentación, procedimientos, auditorías, desvíos, acciones correctivas, indicadores y cumplimiento normativo. Es excluyente experiencia previa en calidad dentro de laboratorio, industria farmacéutica, alimentos, química o ambiente regulado. Deseable ISO 9001, GMP o similar. Formación en química, bioquímica, farmacia, ingeniería o carreras afines será valorable. Montevideo, presencial. No avanzar perfiles sin experiencia documentada en calidad.
+END_BUSQUEDA_025
+
+BUSQUEDA_026
+Empresa vinculada al rubro farmacéutico busca Químico Farmacéutico para asumir responsabilidades de dirección técnica y cumplimiento. Es excluyente contar con título habilitante. Se valorará experiencia en laboratorio, distribución regulada, industria farmacéutica o droguería. La persona deberá manejar documentación, auditorías, trazabilidad, procedimientos, controles y relación con organismos. Deseable experiencia con MSP y buenas prácticas. Montevideo, presencial. No avanzar candidatos sin título habilitante ni perfiles de química sin responsabilidad regulatoria.
+END_BUSQUEDA_026
+
+BUSQUEDA_027
+Laboratorio o empresa de salud busca Visitador Médico para gestionar agenda de visitas, presentar productos y mantener relación con médicos, farmacias o instituciones. Es excluyente experiencia comercial vinculada a salud o visita médica. Debe manejar objetivos, reportes, planificación de rutas y seguimiento de contactos. Deseable cartera previa en Montevideo. Formación en salud será valorable. Libreta de conducir suma, pero no es excluyente salvo que el cliente indique movilidad propia. Modalidad híbrida con visitas. No avanzar vendedores sin contacto con el sector salud.
+END_BUSQUEDA_027
+
+BUSQUEDA_028
+Empresa de servicios busca Analista de Datos Junior para apoyar áreas comerciales y financieras con reportes e indicadores. Es excluyente manejo de SQL, Excel avanzado y visualización de datos. Deseable Power BI, Python y nociones estadísticas. La persona deberá poder entender pedidos de usuarios internos, limpiar datos y presentar conclusiones. Experiencia en ventas o finanzas será valorable. Montevideo, híbrido. No avanzar perfiles sin ejemplos concretos de reportes, dashboards o consultas de datos.
+END_BUSQUEDA_028
+
+BUSQUEDA_029
+Compañía tecnológica busca Data Engineer Semi Senior para construir y mantener pipelines de datos. Es excluyente experiencia con SQL avanzado, ETL/ELT, modelado y procesamiento de datos. Deseable Python, Airflow, BigQuery, Snowflake o herramientas cloud. La persona deberá trabajar con analistas, producto y desarrollo para asegurar calidad y disponibilidad de datos. Inglés técnico será valorable. Remoto Uruguay. No avanzar analistas BI que solo consumen datos sin experiencia construyendo pipelines.
+END_BUSQUEDA_029
+
+BUSQUEDA_030
+Empresa SaaS B2B busca Product Manager para liderar evolución de producto. La persona deberá definir roadmap, priorizar backlog, hacer discovery, documentar necesidades, coordinar con diseño/desarrollo y medir impacto. Es excluyente experiencia previa con ownership de producto digital. Deseable experiencia B2B SaaS, métricas de adopción, pricing o integración con clientes. Inglés será valorable. Modalidad remota o híbrida. No avanzar project managers que solo gestionaron cronogramas sin decisiones de producto.
+END_BUSQUEDA_030
+
+BUSQUEDA_031
+Empresa de software busca Project Manager IT para coordinar proyectos con clientes y equipos técnicos. Es excluyente experiencia gestionando proyectos de software, cronogramas, riesgos, stakeholders, alcance y entregables. Debe conocer metodologías ágiles y documentación de proyectos. Deseable certificación Scrum, PMP o similar. Inglés valorable para clientes internacionales. Híbrido Montevideo. No avanzar coordinadores administrativos sin proyectos tecnológicos ni líderes técnicos sin gestión formal.
+END_BUSQUEDA_031
+
+BUSQUEDA_032
+Compañía tecnológica busca Business Analyst para relevar necesidades, documentar requerimientos y acompañar al equipo de desarrollo. Es excluyente experiencia escribiendo historias de usuario, criterios de aceptación, flujos, casos de uso y documentación funcional. Deseable conocimiento de APIs, bases de datos, Jira, Confluence o herramientas similares. Inglés valorable. Modalidad híbrida. No avanzar testers o usuarios clave sin experiencia real de análisis funcional.
+END_BUSQUEDA_032
+
+BUSQUEDA_033
+Empresa de producto busca QA Tester Manual para validar funcionalidades web y API. Es excluyente experiencia diseñando casos de prueba, ejecutando pruebas, reportando bugs claros y validando historias de usuario. Deseable Postman, SQL básico, pruebas de regresión y trabajo con Jira. Automatización con Cypress o Playwright será valorable. Remoto Uruguay. No avanzar usuarios finales que solo probaron sistemas informalmente ni perfiles sin experiencia QA.
+END_BUSQUEDA_033
+
+BUSQUEDA_034
+Compañía de software busca QA Automation Engineer para fortalecer cobertura de pruebas. Es excluyente experiencia automatizando pruebas web o API con Cypress, Playwright, Selenium u otra herramienta. Debe manejar Git, CI/CD y diseño de casos mantenibles. Deseable TypeScript, Python, testing de APIs y buenas prácticas de QA. Remoto. No avanzar QA manual sin automatización real ni developers sin experiencia en calidad.
+END_BUSQUEDA_034
+
+BUSQUEDA_035
+Empresa digital busca UX/UI Designer con experiencia en producto. Es excluyente presentar portfolio con casos de wireframes, prototipos, diseño visual y decisiones de experiencia de usuario. Deseable Figma avanzado, research, design systems y testeo con usuarios. Experiencia en SaaS o plataformas B2B será valorable. Modalidad remota o híbrida. No avanzar diseñadores gráficos enfocados solo en piezas estáticas sin producto digital.
+END_BUSQUEDA_035
+
+BUSQUEDA_036
+Empresa tecnológica busca Arquitecto de Software para definir lineamientos técnicos, integración entre sistemas y evolución de arquitectura. Es excluyente experiencia diseñando APIs, arquitecturas escalables, decisiones de tecnología, patrones y seguridad. Debe haber liderado técnicamente equipos o proyectos complejos. Deseable cloud, microservicios, mensajería, observabilidad y performance. Inglés valorable. Remoto. No avanzar developers senior que no hayan participado en diseño arquitectónico.
+END_BUSQUEDA_036
+
+BUSQUEDA_037
+Industria manufacturera busca Responsable de Mantenimiento para liderar mantenimiento preventivo y correctivo. Es excluyente experiencia en maquinaria industrial, planificación de paradas, gestión de repuestos y liderazgo de técnicos. Deseable conocimientos de electricidad, neumática, hidráulica, PLC y mejora de disponibilidad. Formación técnica o ingeniería será valorable. Montevideo/Canelones, presencial. No avanzar mantenimiento edilicio sin experiencia industrial.
+END_BUSQUEDA_037
+
+BUSQUEDA_038
+Planta industrial busca Técnico Electromecánico para diagnóstico, reparación y mantenimiento de equipos. Es excluyente experiencia práctica en entornos industriales. Deseable lectura de planos eléctricos, PLC básico, soldadura, neumática o hidráulica. Formación técnica requerida. Libreta de conducir será valorable para traslados puntuales. Turnos rotativos. No avanzar personas sin experiencia práctica ni técnicos exclusivamente domiciliarios.
+END_BUSQUEDA_038
+
+BUSQUEDA_039
+Empresa metalúrgica busca Operario Calificado CNC. Es excluyente experiencia operando torno CNC, centro de mecanizado o maquinaria similar. Debe interpretar planos, usar instrumentos de medición, controlar calidad de piezas y cumplir tolerancias. Deseable programación básica o ajuste de parámetros. Formación técnica será valorable. Trabajo presencial. No avanzar operarios generales sin experiencia CNC ni perfiles que solo hayan visto máquinas en curso.
+END_BUSQUEDA_039
+
+BUSQUEDA_040
+Empresa textil busca Jefe de Producción para liderar taller y asegurar cumplimiento de tiempos, calidad y planificación. Es excluyente experiencia en confección, textil o rubro productivo similar, con personal a cargo. Debe manejar indicadores, cuellos de botella, coordinación con corte, costura, terminaciones y despacho. Deseable conocimiento de costos y mantenimiento básico. Montevideo, presencial. No avanzar perfiles sin experiencia productiva ni supervisores de rubros sin afinidad.
+END_BUSQUEDA_040
+
+BUSQUEDA_041
+Empresa constructora busca Encargado de Obra para coordinar cuadrillas, materiales, cronogramas y seguridad en sitio. Es excluyente experiencia en obra, lectura de planos, seguimiento de avances y reporte a dirección técnica. Deseable experiencia en vivienda, edificios o reformas comerciales. Libreta de conducir valorable para traslados. Montevideo. No avanzar capataces sin manejo de documentación ni perfiles puramente operarios.
+END_BUSQUEDA_041
+
+BUSQUEDA_042
+Estudio de arquitectura busca Arquitecto Proyectista para documentación ejecutiva y coordinación técnica. Es excluyente manejo de AutoCAD y/o Revit, desarrollo de planos, detalles constructivos y coordinación con ingenierías. Deseable experiencia en proyectos residenciales, normativa local y seguimiento de permisos. Inglés será valorable. Montevideo, híbrido. No avanzar diseñadores sin documentación técnica ni renders-only.
+END_BUSQUEDA_042
+
+BUSQUEDA_043
+Constructora busca Ingeniero Civil o técnico con fuerte experiencia en presupuestos. Es excluyente manejo de cómputos métricos, análisis de precios, costos, licitaciones y armado de ofertas. Deseable experiencia en obra, Excel avanzado, S10 u otros sistemas de presupuestación. Montevideo, híbrido. No avanzar perfiles exclusivamente de dirección de obra que no hayan preparado presupuestos ni administrativos sin conocimiento técnico.
+END_BUSQUEDA_043
+
+BUSQUEDA_044
+Empresa con operaciones en obra e industria busca Técnico Prevencionista. Es excluyente contar con título habilitante y experiencia en seguridad laboral, planes de prevención, recorridas, capacitaciones, investigación de incidentes y documentación. Deseable experiencia en construcción o planta industrial. Libreta requerida si debe visitar diferentes sitios. Montevideo/interior. No avanzar candidatos sin título habilitante ni administrativos de seguridad.
+END_BUSQUEDA_044
+
+BUSQUEDA_045
+Empresa comercial busca Analista de Marketing Digital para gestionar campañas y medición. Es excluyente experiencia con Meta Ads o Google Ads, reportes, optimización, análisis de performance y coordinación con contenidos. Deseable GA4, SEO, email marketing y manejo de presupuestos. Diseño básico será valorable. Montevideo, híbrido. No avanzar community managers sin pauta ni analytics.
+END_BUSQUEDA_045
+
+BUSQUEDA_046
+Retail busca E-commerce Manager para administrar tienda online, catálogo, promociones, stock, conversión y performance. Es excluyente experiencia gestionando plataformas de e-commerce, no solo ventas por redes. Deseable Shopify, WooCommerce, VTEX, MercadoLibre, analytics y coordinación logística. Se valorará experiencia con campañas digitales. Montevideo, híbrido. No avanzar vendedores online sin gestión de plataforma ni perfiles solo de marketing sin operación de e-commerce.
+END_BUSQUEDA_046
+
+BUSQUEDA_047
+Cadena retail busca Encargado de Sucursal para liderar local comercial. Es excluyente experiencia con ventas, caja, inventario, equipo a cargo, indicadores y atención al cliente. Debe poder organizar horarios, controlar stock, motivar vendedores y resolver reclamos. Deseable experiencia en moda, tecnología, hogar o consumo masivo. Horarios comerciales. No avanzar vendedores sin liderazgo ni perfiles administrativos sin piso de venta.
+END_BUSQUEDA_047
+
+BUSQUEDA_048
+Marca de retail busca Visual Merchandiser para potenciar exhibición en tiendas. Es excluyente experiencia en vidrieras, layout, armado de campañas, exhibición de producto y recorridas por puntos de venta. Deseable experiencia en moda, decoración o retail de alto tráfico. Formación en diseño será valorable. Montevideo con recorridas. No avanzar diseñadores sin experiencia en tienda ni vendedores sin visual.
+END_BUSQUEDA_048
+
+BUSQUEDA_049
+Institución financiera busca Analista de Créditos para evaluación de solicitudes. Es excluyente experiencia analizando documentación, scoring, riesgo, capacidad de pago, comportamiento crediticio y recomendación de aprobación/rechazo. Deseable experiencia en financiera, banco, cooperativa o fintech. Excel avanzado requerido. Montevideo, híbrido. No avanzar vendedores de crédito sin análisis ni administrativos de backoffice sin evaluación.
+END_BUSQUEDA_049
+
+BUSQUEDA_050
+Empresa de servicios busca Ejecutivo de Cobranzas Corporativas para gestionar cartera B2B. Es excluyente experiencia negociando pagos, dando seguimiento a morosidad, conciliando saldos y coordinando acuerdos. Deseable manejo de ERP, Excel y reportes. Experiencia prejudicial o legal será valorable. Montevideo, presencial/híbrido. No avanzar perfiles de atención al cliente sin cobranza ni cobradores solo de consumo individual.
+END_BUSQUEDA_050
+
+BUSQUEDA_051
+Institución financiera busca Oficial de Cumplimiento para prevención de lavado y gestión regulatoria. Es excluyente experiencia en KYC, monitoreo de operaciones, reportes regulatorios, análisis de alertas y políticas de cumplimiento. Deseable certificación AML, conocimiento BCU y experiencia en banco, financiera o fintech. Montevideo, híbrido. No avanzar abogados sin experiencia compliance ni perfiles administrativos sin regulación.
+END_BUSQUEDA_051
+
+BUSQUEDA_052
+Empresa financiera busca Analista de Riesgo Operacional. Es excluyente experiencia identificando riesgos, diseñando controles, manteniendo matrices, registrando incidentes, proponiendo planes de acción y haciendo seguimiento. Deseable experiencia en banca, seguros, fintech o auditoría. Conocimiento normativo BCU será valorable. Montevideo, híbrido. No avanzar perfiles solo financieros sin gestión de riesgo o control interno.
+END_BUSQUEDA_052
+
+BUSQUEDA_053
+Broker de seguros busca Ejecutivo Comercial para asesorar clientes, cotizar, renovar pólizas y hacer seguimiento comercial. Es excluyente experiencia en seguros o intermediación, con conocimiento de coberturas, documentación y trato con aseguradoras. Deseable cartera propia o experiencia corporativa. Certificaciones del rubro serán valorables. Montevideo, híbrido. No avanzar vendedores sin experiencia en seguros.
+END_BUSQUEDA_053
+
+BUSQUEDA_054
+Aseguradora busca Liquidador de Siniestros para analizar reclamos, documentación, cobertura y coordinación con peritos o talleres. Es excluyente experiencia en gestión de siniestros o análisis de reclamos de seguros. Deseable experiencia en automotores, patrimoniales o responsabilidad civil. Montevideo, híbrido. No avanzar administrativos generales sin contacto con pólizas ni atención al cliente sin análisis de cobertura.
+END_BUSQUEDA_054
+
+BUSQUEDA_055
+Empresa de servicios busca Administrativo de Recursos Humanos para apoyar la gestión diaria del área. Es excluyente experiencia con legajos, altas y bajas, control horario, licencias, novedades y coordinación con estudio de liquidación. Deseable manejo de GNS, Memory, Worky u otra herramienta. Selección será valorable, pero no central. Montevideo, presencial. No avanzar perfiles administrativos sin experiencia en RRHH.
+END_BUSQUEDA_055
+
+BUSQUEDA_056
+Compañía mediana busca Payroll Specialist con experiencia directa en liquidación de sueldos uruguayos. Es excluyente haber liquidado nómina, BPS, IRPF, FONASA, licencias, aguinaldo, salario vacacional y egresos. Deseable manejo de Memory Worky u otro sistema local. Montevideo, híbrido. No avanzar asistentes de RRHH que solo enviaron novedades a estudio externo sin liquidar.
+END_BUSQUEDA_056
+
+BUSQUEDA_057
+Consultora busca Reclutador IT para búsquedas tecnológicas. Es excluyente experiencia identificando perfiles de desarrollo, infraestructura, datos o producto, haciendo screening técnico básico y gestionando pipeline. Deseable LinkedIn Recruiter, búsquedas booleanas, ATS e inglés. Modalidad remota/híbrida. No avanzar recruiters generalistas sin experiencia IT ni personas que solo hicieron selección operativa.
+END_BUSQUEDA_057
+
+BUSQUEDA_058
+Institución educativa busca Coordinador Académico para organizar cursos, docentes y seguimiento de alumnos. Es excluyente experiencia en coordinación educativa, planificación, gestión de calendarios, comunicación con docentes y resolución de situaciones académicas. Deseable manejo de LMS y plataformas virtuales. Título docente o formación pedagógica será valorable. Montevideo, presencial. No avanzar administrativos educativos sin coordinación académica.
+END_BUSQUEDA_058
+
+BUSQUEDA_059
+Academia tecnológica busca Docente de Programación para cursos introductorios y prácticos. Es excluyente experiencia programando en Python, JavaScript u otro lenguaje relevante, y capacidad de explicar conceptos a estudiantes. Deseable experiencia docente, manejo de grupos y preparación de materiales. Modalidad remota o híbrida. No avanzar programadores sin interés docente ni docentes sin práctica real en programación.
+END_BUSQUEDA_059
+
+BUSQUEDA_060
+Empresa de servicios busca Responsable de Atención al Cliente para liderar equipo multicanal. Es excluyente experiencia coordinando soporte, reclamos, métricas, capacitación, escalamiento y mejora de procesos. Deseable CRM, omnicanalidad y reportes. La persona deberá trabajar con operaciones, comercial y administración. Montevideo, híbrido. No avanzar agentes sin liderazgo ni perfiles comerciales sin experiencia en atención estructurada.
+END_BUSQUEDA_060
+
+BUSQUEDA_061
+Empresa SaaS busca Customer Success Manager para acompañar clientes B2B luego de la venta. Es excluyente experiencia en onboarding, adopción, seguimiento de cuentas, renovaciones, upsell y prevención de churn. Deseable experiencia en software, tecnología o servicios recurrentes. Inglés valorable. Remoto/híbrido. No avanzar vendedores hunter sin gestión postventa ni soporte técnico sin manejo de cuentas.
+END_BUSQUEDA_061
+
+BUSQUEDA_062
+Software house busca Implementador para configurar sistemas, capacitar usuarios y acompañar clientes en puesta en marcha. Es excluyente experiencia relevando necesidades, parametrizando soluciones, documentando procesos y dando soporte funcional. Deseable SQL básico, ERP, SaaS o experiencia con visitas a cliente. Libreta valorable para implementaciones presenciales. Híbrido. No avanzar soporte técnico que solo resolvió incidencias sin implementar.
+END_BUSQUEDA_062
+
+BUSQUEDA_063
+Consultora tecnológica busca Consultor ERP para proyectos de implementación. Es excluyente experiencia relevando procesos administrativos, contables, comerciales o logísticos y configurando un ERP. Deseable Odoo, SAP Business One, Oracle NetSuite, Microsoft Dynamics u otro sistema. Formación contable o de administración será valorable. Híbrido. No avanzar usuarios finales de ERP sin experiencia implementando.
+END_BUSQUEDA_063
+
+BUSQUEDA_064
+Empresa de sistemas busca Analista Funcional con foco financiero. Es excluyente experiencia entendiendo procesos de cuentas a pagar, cuentas a cobrar, conciliaciones, tesorería o contabilidad, y traduciéndolos a requerimientos de sistema. Deseable experiencia en proyectos ERP, SQL básico y documentación funcional. Montevideo, híbrido. No avanzar contadores sin experiencia de sistemas ni analistas funcionales sin procesos financieros.
+END_BUSQUEDA_064
+
+BUSQUEDA_065
+Empresa de servicios IT busca Técnico de Infraestructura para soporte avanzado. Es excluyente experiencia con servidores Windows o Linux, redes, backups, virtualización, permisos, monitoreo y resolución de incidentes complejos. Deseable VMware, Hyper-V, firewalls, Microsoft 365 y scripting. Guardias coordinadas. Montevideo, híbrido. No avanzar help desk nivel 1 sin infraestructura.
+END_BUSQUEDA_065
+
+BUSQUEDA_066
+Empresa tecnológica busca Administrador de Base de Datos. Es excluyente experiencia con SQL Server, PostgreSQL u otra base relacional, incluyendo backups, restauración, tuning, permisos, monitoreo y mantenimiento. Deseable alta disponibilidad, scripting y cloud. Modalidad remota/híbrida. No avanzar developers que solo consultan bases sin administración real.
+END_BUSQUEDA_066
+
+BUSQUEDA_067
+Empresa de tecnología aplicada a salud busca Ingeniero de Datos. Es excluyente experiencia integrando datos, creando pipelines, trabajando con SQL avanzado y asegurando calidad de datos. Deseable conocimiento de HL7, FHIR o datos clínicos. Inglés valorable. Remoto. No avanzar analistas que solo hacen dashboards sin construir integraciones.
+END_BUSQUEDA_067
+
+BUSQUEDA_068
+Empresa de limpieza y facilities busca Coordinador de Operaciones para gestionar servicios en clientes. Es excluyente experiencia coordinando supervisores, horarios, ausentismo, insumos, visitas a clientes y resolución de problemas en campo. Libreta de conducir requerida por recorridas. Deseable experiencia en facilities, limpieza, seguridad o servicios tercerizados. Montevideo. No avanzar administrativos sin operación en terreno.
+END_BUSQUEDA_068
+
+BUSQUEDA_069
+Empresa de seguridad privada busca Supervisor Operativo. Es excluyente experiencia coordinando guardias, turnos, recorridas, reportes, cobertura de ausencias y contacto con clientes. Carné habilitante requerido. Libreta de conducir será valorable si debe recorrer servicios. Montevideo. No avanzar guardias sin experiencia supervisando ni perfiles administrativos del rubro.
+END_BUSQUEDA_069
+
+BUSQUEDA_070
+Empresa corporativa busca Responsable de Facilities para gestionar mantenimiento edilicio, limpieza, seguridad, proveedores, compras menores, reportes y cumplimiento de servicios. Es excluyente experiencia coordinando proveedores y operaciones de oficina, edificio o planta. Deseable experiencia corporativa y manejo de presupuestos. Montevideo, presencial. No avanzar técnicos sin gestión ni administrativos sin operación de facilities.
+END_BUSQUEDA_070
+
+BUSQUEDA_071
+Dirección de empresa busca Asistente Ejecutivo con experiencia real en soporte a gerencia o directorio. Es excluyente manejo de agenda compleja, coordinación de reuniones, viajes, reportes, documentación, seguimiento de pendientes y confidencialidad. Inglés deseable. Excel, redacción y criterio profesional requeridos. Montevideo, presencial/híbrido. No avanzar recepcionistas sin soporte ejecutivo ni administrativos sin trato con dirección.
+END_BUSQUEDA_071
+
+BUSQUEDA_072
+Empresa internacional busca Secretaria Recepcionista Bilingüe. Es excluyente inglés oral fluido para atención telefónica, recepción de visitas extranjeras y coordinación administrativa. Debe manejar agenda, proveedores, correspondencia y soporte básico a oficinas. Deseable experiencia en empresas multinacionales. Montevideo, presencial. No avanzar candidatos sin inglés conversacional real.
+END_BUSQUEDA_072
+
+BUSQUEDA_073
+Distribuidora busca Administrativo Comercial para dar soporte al equipo de ventas. Es excluyente experiencia cargando pedidos, facturación, coordinación con depósito, atención a clientes y seguimiento de entregas. Deseable Excel, ERP y conocimiento de procesos comerciales. Valorable experiencia en distribución o consumo masivo. Montevideo, presencial. No avanzar administrativos sin contacto con ventas o clientes.
+END_BUSQUEDA_073
+
+BUSQUEDA_074
+Retail busca Analista de Pricing para trabajar con precios, márgenes y promociones. Es excluyente experiencia armando listas de precios, analizando costos, competencia, rentabilidad y comportamiento comercial. Deseable Power BI, Excel avanzado y experiencia en retail o consumo masivo. Montevideo, híbrido. No avanzar administrativos de compras sin análisis de pricing.
+END_BUSQUEDA_074
+
+BUSQUEDA_075
+Empresa retail busca Category Manager para gestionar surtido, proveedores, precios, promociones y margen de una categoría. Es excluyente experiencia comercial analítica, negociación con proveedores y seguimiento de resultados. Deseable experiencia en retail, consumo masivo o e-commerce. Montevideo, híbrido. No avanzar compradores operativos sin análisis de categoría.
+END_BUSQUEDA_075
+
+BUSQUEDA_076
+Empresa de consumo masivo busca Trade Marketing Analyst. Es excluyente experiencia coordinando acciones en punto de venta, materiales POP, activaciones, comunicación con ventas y análisis de resultados. Deseable experiencia en consumo masivo, retail o distribución. Libreta de conducir valorable para recorridas. Montevideo, híbrido. No avanzar perfiles de marketing digital sin ejecución en canal.
+END_BUSQUEDA_076
+
+BUSQUEDA_077
+Empresa corporativa busca Analista de Sustentabilidad para reportes e indicadores ESG. Es excluyente experiencia documentando indicadores ambientales, sociales o de gobernanza, coordinando información interna y preparando reportes. Deseable GRI, huella de carbono, residuos o eficiencia energética. Inglés valorable. Montevideo, híbrido. No avanzar perfiles de comunicación sin datos ni gestión de sustentabilidad.
+END_BUSQUEDA_077
+
+BUSQUEDA_078
+Industria busca Responsable de Medio Ambiente para gestionar permisos, monitoreos, residuos, efluentes, documentación y relación con autoridades. Es excluyente formación ambiental o afín y experiencia en industria. Deseable ISO 14001, auditorías y gestión de indicadores. Presencial con visitas a planta. No avanzar perfiles ambientales sin experiencia industrial ni consultores sin operación interna.
+END_BUSQUEDA_078
+
+BUSQUEDA_079
+Empresa de servicios técnicos busca Técnico en Refrigeración. Es excluyente experiencia instalando, diagnosticando y reparando equipos de frío, cámaras, aire acondicionado o sistemas similares. Libreta de conducir requerida por visitas a clientes. Deseable certificaciones técnicas y experiencia en mantenimiento preventivo. Montevideo/interior. No avanzar sin experiencia práctica comprobable.
+END_BUSQUEDA_079
+
+BUSQUEDA_080
+Planta industrial busca Electricista Industrial. Es excluyente experiencia con tableros, motores, mantenimiento eléctrico, lectura de planos y resolución de fallas en industria. Formación técnica requerida. Deseable PLC básico, variadores y seguridad eléctrica. Turnos rotativos. No avanzar electricistas domiciliarios sin experiencia industrial.
+END_BUSQUEDA_080
+
+BUSQUEDA_081
+Empresa proveedora de servicios busca Ejecutivo de Licitaciones para preparar ofertas públicas y privadas. Es excluyente experiencia leyendo pliegos, armando documentación, coordinando garantías, presupuestos y seguimiento de procesos. Deseable experiencia con compras públicas. Rubro salud o tecnología será valorable. Montevideo, híbrido. No avanzar administrativos sin licitaciones.
+END_BUSQUEDA_081
+
+BUSQUEDA_082
+Área legal corporativa busca Analista Legal Junior. Es excluyente estudiante avanzado o egresado de derecho, con experiencia o interés en contratos, seguimiento de expedientes, redacción de documentos y soporte societario. Deseable experiencia corporativa o estudio con clientes empresariales. Inglés valorable. Montevideo, híbrido. No avanzar perfiles exclusivamente penales o litigiosos sin interés corporativo.
+END_BUSQUEDA_082
+
+BUSQUEDA_083
+Estudio profesional busca Escribano Junior o estudiante avanzado de notariado. Es excluyente formación notarial, manejo de documentación, certificaciones, registros y trámites. Deseable experiencia inmobiliaria o societaria. Montevideo, presencial. No avanzar administrativos sin formación notarial.
+END_BUSQUEDA_083
+
+BUSQUEDA_084
+Inmobiliaria busca Agente Comercial para captación, visitas, negociación y seguimiento de operaciones. Es excluyente perfil comercial fuerte y experiencia en ventas, idealmente inmobiliarias. Deseable conocimiento del mercado de Montevideo, CRM y redes de captación. Libreta y movilidad serán valorables. Modalidad independiente. No avanzar candidatos sin perfil comercial.
+END_BUSQUEDA_084
+
+BUSQUEDA_085
+Empresa inmobiliaria busca Administrador de Propiedades para gestionar alquileres, contratos, reclamos, mantenimiento y relación con propietarios e inquilinos. Es excluyente experiencia administrando propiedades o carteras de inmuebles. Deseable conocimiento legal básico, garantías y sistemas de administración. Montevideo, híbrido. No avanzar agentes de venta sin gestión administrativa de propiedades.
+END_BUSQUEDA_085
+
+BUSQUEDA_086
+Empresa de servicios corporativos busca Coordinador de Eventos. Es excluyente experiencia organizando eventos, proveedores, presupuestos, cronogramas y ejecución en sitio. Deseable inglés, protocolo y experiencia con eventos empresariales. Horarios variables según evento. No avanzar community managers o administrativos sin eventos reales.
+END_BUSQUEDA_086
+
+BUSQUEDA_087
+Empresa de comunicación busca Diseñador Gráfico Senior. Es excluyente portfolio con identidad visual, piezas digitales, impresas y campañas. Debe manejar Adobe y/o Figma con criterio visual sólido. Deseable motion graphics, UX básico y experiencia con marcas. Montevideo o remoto. No avanzar candidatos sin portfolio.
+END_BUSQUEDA_087
+
+BUSQUEDA_088
+Productora o equipo de marketing busca Editor Audiovisual. Es excluyente experiencia editando video para redes, institucionales o publicidad, con manejo de Premiere, DaVinci o herramienta similar. Deseable motion graphics, color y adaptación de formatos. Portfolio requerido. Modalidad remota/híbrida. No avanzar perfiles sin muestras concretas.
+END_BUSQUEDA_088
+
+BUSQUEDA_089
+Medio digital busca Periodista con experiencia en redacción web. Es excluyente capacidad de escribir noticias claras, editar contenidos, manejar fuentes, titular y aplicar SEO básico. Deseable WordPress, redes sociales y criterio editorial. Montevideo/remoto. No avanzar candidatos sin muestras de escritura ni perfiles puramente de comunicación institucional.
+END_BUSQUEDA_089
+
+BUSQUEDA_090
+Empresa de producto digital busca Redactor UX para escribir microcopy, mensajes de error, flujos, emails transaccionales y contenido claro para usuarios. Es excluyente experiencia en UX writing, producto digital o contenidos orientados a experiencia. Deseable experiencia en fintech, SaaS o banca. Inglés valorable. Remoto. No avanzar copywriters publicitarios sin producto digital.
+END_BUSQUEDA_090
+
+BUSQUEDA_091
+Fintech busca Analista de Operaciones para conciliaciones, monitoreo transaccional, resolución de incidencias, soporte operativo y reportes. Es excluyente experiencia en operaciones financieras, pagos, adquirencia, billeteras digitales o backoffice transaccional. Deseable SQL, Excel avanzado y conocimiento de prevención de fraude. Montevideo, híbrido. No avanzar administrativos sin operaciones financieras.
+END_BUSQUEDA_091
+
+BUSQUEDA_092
+Empresa de software busca Soporte Aplicativo para atender incidencias de sistemas, reproducir errores, documentar tickets y escalar a desarrollo. Es excluyente experiencia con soporte funcional o aplicativo. Deseable SQL básico, APIs, Postman y conocimiento de procesos de negocio. Híbrido. No avanzar help desk solo hardware ni agentes de atención sin sistemas.
+END_BUSQUEDA_092
+
+BUSQUEDA_093
+Empresa de telecomunicaciones busca Técnico de Campo. Es excluyente experiencia instalando o manteniendo redes, enlaces, routers, antenas, fibra óptica o equipos de telecomunicaciones. Libreta de conducir requerida por traslados. Deseable experiencia con fibra óptica y mediciones. Montevideo/interior. No avanzar sin disponibilidad para viajes o trabajo en campo.
+END_BUSQUEDA_093
+
+BUSQUEDA_094
+Empresa IT busca Coordinador de Mesa de Ayuda para liderar equipo de soporte. Es excluyente experiencia coordinando técnicos, SLAs, tickets, escalamiento, métricas y mejora continua. Deseable ITIL, herramientas ITSM y experiencia con clientes corporativos. Híbrido Montevideo. No avanzar técnicos senior sin liderazgo ni supervisores de call center sin IT.
+END_BUSQUEDA_094
+
+BUSQUEDA_095
+Empresa de servicios busca Analista de Procesos para relevar, documentar y mejorar flujos internos. Es excluyente experiencia mapeando procesos, identificando oportunidades de mejora e implementando cambios. Deseable BPMN, Lean, Six Sigma o herramientas de documentación. Montevideo, híbrido. No avanzar administrativos que solo ejecutan procesos sin mejorarlos.
+END_BUSQUEDA_095
+
+BUSQUEDA_096
+Compañía corporativa busca Auditor Interno. Es excluyente experiencia en auditoría interna, controles, matrices de riesgo, pruebas, documentación y reportes a gerencia. Deseable experiencia Big Four, banca o empresas reguladas. Contador será valorable. Montevideo, híbrido. No avanzar contadores sin experiencia en auditoría o control interno.
+END_BUSQUEDA_096
+
+BUSQUEDA_097
+Empresa de servicios busca Ejecutivo de Alianzas Estratégicas para desarrollar acuerdos B2B, partnerships y oportunidades comerciales. Es excluyente experiencia negociando convenios, contratos, seguimiento de acuerdos y relacionamiento con empresas. Deseable tecnología, servicios financieros o beneficios corporativos. Inglés valorable. Híbrido. No avanzar vendedores individuales sin negociación de alianzas.
+END_BUSQUEDA_097
+
+BUSQUEDA_098
+Empresa con red de locales busca Coordinador de Franquicias. Es excluyente experiencia gestionando franquiciados, estándares operativos, auditorías, capacitación y seguimiento comercial. Deseable retail, gastronomía o operación multisucursal. Montevideo con viajes al interior. Libreta requerida si viaja. No avanzar perfiles sin experiencia en operación de red.
+END_BUSQUEDA_098
+
+BUSQUEDA_099
+Retail importador busca Responsable de Importaciones para coordinar compras internacionales, proveedores, embarques, despachantes, costos, documentación y tiempos de arribo. Es excluyente experiencia en importaciones y comercio exterior. Deseable inglés, análisis de márgenes y experiencia retail. Montevideo, híbrido. No avanzar compradores locales sin operación internacional.
+END_BUSQUEDA_099
+
+BUSQUEDA_100
+Empresa de servicios B2B busca Gerente Comercial para liderar equipo, estrategia, pipeline y cumplimiento de objetivos. Es excluyente experiencia liderando vendedores, negociando cuentas corporativas, armando forecast, diseñando planes comerciales y gestionando procesos consultivos. Deseable experiencia en servicios profesionales, tecnología o soluciones empresariales. Inglés valorable. Montevideo, híbrido. No avanzar vendedores individuales sin liderazgo ni perfiles comerciales solo transaccionales.
+END_BUSQUEDA_100

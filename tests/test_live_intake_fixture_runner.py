@@ -1,0 +1,109 @@
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+RUNNER_PATH = ROOT / "scripts" / "run_live_intake_fixture.py"
+FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_100_busquedas_hr_realistas_sin_role_hint.txt"
+
+spec = importlib.util.spec_from_file_location("run_live_intake_fixture", RUNNER_PATH)
+runner = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+sys.modules[spec.name] = runner
+spec.loader.exec_module(runner)
+
+
+def test_live_intake_parser_reads_exactly_100_real_search_cases():
+    cases = runner.parse_fixture(FIXTURE_PATH)
+
+    runner.validate_case_sequence(cases, 100)
+    assert len(cases) == 100
+    assert cases[0].id == "BUSQUEDA_001"
+    assert cases[-1].id == "BUSQUEDA_100"
+    for case in cases:
+        assert case.source_text.strip()
+        assert "BUSQUEDA_" not in case.source_text
+        assert "END_BUSQUEDA_" not in case.source_text
+        assert "role_hint" not in case.source_text.lower()
+
+
+def test_build_request_sends_only_real_hr_text_and_allowed_payload_fields():
+    case = runner.Case("BUSQUEDA_001", "Necesitamos Analista Contable con Excel.")
+    payload = runner.build_request(case)
+
+    assert set(payload) == {
+        "source_text",
+        "source_filename",
+        "source_mime_type",
+        "recruiter_notes",
+        "locale",
+        "country_context",
+        "candidate_market",
+        "employer_market",
+    }
+    assert payload["source_text"] == "Necesitamos Analista Contable con Excel."
+    assert "role_hint" not in json.dumps(payload, ensure_ascii=False).lower()
+    assert "BUSQUEDA_" not in json.dumps(payload, ensure_ascii=False)
+
+
+def test_runner_writes_outputs_and_continues_after_failed_case(tmp_path):
+    cases = [
+        runner.Case("BUSQUEDA_001", "Buscamos Soporte IT. Excluyente experiencia en tickets."),
+        runner.Case("BUSQUEDA_002", "Buscamos Administrativo. Deseable Excel."),
+    ]
+    calls = []
+
+    def fake_transport(url, api_key, payload, timeout):
+        calls.append(payload["source_text"])
+        if len(calls) == 1:
+            return runner.ResponseRecord(
+                200,
+                {
+                    "ok": True,
+                    "engine": "openai",
+                    "fallback_used": False,
+                    "ai_model": "test-model",
+                    "role_title": "Soporte IT",
+                    "role_family": "support",
+                    "summary": "Soporte IT con tickets.",
+                    "must_have": ["Experiencia en tickets"],
+                    "should_have": [],
+                    "nice_to_have": [],
+                    "blockers": [],
+                    "credentials": {"required": [], "preferred": []},
+                    "location": {"normalized": ""},
+                    "experience": {"minimum_years": None},
+                    "warnings": [],
+                    "confidence": 0.91,
+                },
+                "{}",
+            )
+        return runner.ResponseRecord(0, None, "", "TimeoutError: timed out")
+
+    result = runner.run_fixture(
+        cases,
+        out_dir=tmp_path,
+        url="https://example.test/api/job-intake/analyze",
+        api_key="test-key-not-printed",
+        timeout=0.01,
+        sleep_seconds=0,
+        transport=fake_transport,
+    )
+
+    assert (tmp_path / "requests" / "BUSQUEDA_001.request.json").exists()
+    assert (tmp_path / "responses" / "BUSQUEDA_001.response.json").exists()
+    assert (tmp_path / "requests" / "BUSQUEDA_002.request.json").exists()
+    assert (tmp_path / "responses" / "BUSQUEDA_002.response.json").exists()
+    assert (tmp_path / "summary.json").exists()
+    assert (tmp_path / "summary.csv").exists()
+    assert (tmp_path / "failures.md").exists()
+
+    first_request = json.loads((tmp_path / "requests" / "BUSQUEDA_001.request.json").read_text())
+    assert "role_hint" not in json.dumps(first_request, ensure_ascii=False).lower()
+    assert result["summary"]["total_cases"] == 2
+    assert result["summary"]["pass_count"] == 1
+    assert result["summary"]["fail_count"] == 1
+    assert result["cases"][1]["result_classification"] == "FAIL_TECHNICAL"
+    assert len(calls) == 3
