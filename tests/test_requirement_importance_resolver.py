@@ -163,6 +163,42 @@ class FakeOpenAIClient:
         self.responses = FakeResponses(response)
 
 
+def test_plain_valorable_resolves_to_nice_to_have(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload("Libreta de conducir categoria A valorable para visitas puntuales."),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == []
+    assert data["should_have"] == []
+    assert data["nice_to_have"] == ["Libreta de conducir categoría A"]
+    assert "libreta de conducir categoria a" not in fold(data["credentials"]["required"])
+    assert "libreta de conducir categoria a" in fold(data["credentials"]["preferred"])
+
+
+def test_muy_valorable_resolves_to_should_have(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload("Muy valorable experiencia con Salesforce."),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == []
+    assert data["should_have"] == ["Experiencia con Salesforce"]
+    assert data["nice_to_have"] == []
+
+
 def test_hard_category_soft_local_credential_item_is_not_must_have(monkeypatch):
     monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
     monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
@@ -179,11 +215,13 @@ def test_hard_category_soft_local_credential_item_is_not_must_have(monkeypatch):
     assert response.status_code == 200
     assert data["ok"] is True
     assert data["must_have"] == ["Formación técnica en informática o certificación equivalente"]
+    assert data["should_have"] == []
+    assert data["nice_to_have"] == ["Libreta de conducir categoría A"]
     assert data["credentials"]["required"] == ["Formación técnica en informática o certificación equivalente"]
 
     assert "libreta de conducir categoria a" not in fold(data["must_have"])
+    assert "libreta de conducir categoria a" not in fold(data["should_have"])
     assert "libreta de conducir categoria a" not in fold(data["credentials"]["required"])
-    assert "libreta de conducir categoria a" in fold(data["should_have"] + data["nice_to_have"])
     assert "libreta de conducir categoria a" in fold(data["credentials"]["preferred"])
     assert "capacidad para visitas puntuales" not in fold(data["must_have"])
 
@@ -315,12 +353,14 @@ def test_structured_requirements_are_rebucketed_before_flat_mapping():
         normalized["requirements"]["must_have"]
     )
     assert "libreta de conducir categoria a" not in fold(normalized["requirements"]["must_have"])
-    assert "libreta de conducir categoria a" in fold(normalized["requirements"]["should_have"])
+    assert "libreta de conducir categoria a" not in fold(normalized["requirements"]["should_have"])
+    assert "libreta de conducir categoria a" in fold(normalized["requirements"]["nice_to_have"])
     assert "disponibilidad para viajar" in fold(normalized["requirements"]["must_have"])
     assert "no avanzar si no puede viajar" in fold(normalized["requirements"]["blockers"])
 
     assert "libreta de conducir categoria a" not in fold(flat["must_have"])
-    assert "libreta de conducir categoria a" in fold(flat["should_have"] + flat["nice_to_have"])
+    assert "libreta de conducir categoria a" not in fold(flat["should_have"])
+    assert "libreta de conducir categoria a" in fold(flat["nice_to_have"])
     assert "disponibilidad para viajar" in fold(flat["must_have"])
     assert "disponibilidad para viajar" not in fold(flat["nice_to_have"])
     assert "no avanzar si no puede viajar" in fold(flat["blockers"])
@@ -342,14 +382,13 @@ def test_full_ga_support_request_resolves_item_importance_without_leakage(monkey
     assert data["ok"] is True
 
     must = fold(data["must_have"])
-    should_or_nice = fold(data["should_have"] + data["nice_to_have"])
     credentials_required = fold(data["credentials"]["required"])
     credentials_preferred = fold(data["credentials"]["preferred"])
     blockers = fold(data["blockers"])
 
     assert data["must_have"] == FULL_GA_MUST_HAVE
-    assert data["should_have"] == ["Libreta de conducir categoría A"] + FULL_GA_PREFERRED
-    assert data["nice_to_have"] == []
+    assert data["should_have"] == FULL_GA_PREFERRED
+    assert data["nice_to_have"] == ["Libreta de conducir categoría A"]
     assert_no_orphan_fragments(data["must_have"])
 
     assert "sin experiencia no avanzar" in blockers
@@ -365,9 +404,10 @@ def test_full_ga_support_request_resolves_item_importance_without_leakage(monkey
 
     assert "libreta de conducir categoria a" not in credentials_required
     assert "libreta de conducir categoria a" in credentials_preferred
-    assert "microsoft 365" in should_or_nice
-    assert "active directory" in should_or_nice
-    assert "herramientas de mesa de ayuda" in should_or_nice
+    assert "libreta de conducir categoria a" not in fold(data["should_have"])
+    assert "microsoft 365" in fold(data["should_have"])
+    assert "active directory" in fold(data["should_have"])
+    assert "herramientas de mesa de ayuda" in fold(data["should_have"])
 
 
 def test_full_ga_structured_output_is_normalized_before_schema_validation():
@@ -412,7 +452,6 @@ def test_full_ga_structured_output_is_normalized_before_schema_validation():
     flat = derive_flat_compatibility(payload)
 
     must = fold(flat["must_have"])
-    should_or_nice = fold(flat["should_have"] + flat["nice_to_have"])
     credentials_required = fold(flat["credentials"]["required"])
     credentials_preferred = fold(flat["credentials"]["preferred"])
 
@@ -432,9 +471,11 @@ def test_full_ga_structured_output_is_normalized_before_schema_validation():
     assert "formacion tecnica en informatica o certificacion equivalente" in credentials_required
     assert "formacion tecnica en informatica o certificacion equivalente" not in credentials_preferred
 
-    assert "microsoft 365" in should_or_nice
-    assert "active directory" in should_or_nice
-    assert "herramientas de mesa de ayuda" in should_or_nice
+    assert flat["should_have"] == FULL_GA_PREFERRED
+    assert flat["nice_to_have"] == ["Libreta de conducir categoría A"]
+    assert "microsoft 365" in fold(flat["should_have"])
+    assert "active directory" in fold(flat["should_have"])
+    assert "herramientas de mesa de ayuda" in fold(flat["should_have"])
     assert normalized["requirements"]["should_have"][0]["hard_filter_approved"] is False
     assert normalized["requirements"]["blockers"] == ["Sin experiencia no avanzar para este rol de soporte."]
 
@@ -546,6 +587,8 @@ def test_full_ga_openai_flow_returns_success_after_requirement_normalization():
     assert result["fallback_used"] is False
     assert result["ai_model"] == "gpt-5.4-nano"
     assert result["must_have"] == FULL_GA_MUST_HAVE
+    assert result["should_have"] == FULL_GA_PREFERRED
+    assert result["nice_to_have"] == ["Libreta de conducir categoría A"]
     assert_no_orphan_fragments(result["must_have"])
     ji_must_have = [item["text"] for item in result["job_intelligence"]["requirements"]["must_have"]]
     assert_no_orphan_fragments(ji_must_have)

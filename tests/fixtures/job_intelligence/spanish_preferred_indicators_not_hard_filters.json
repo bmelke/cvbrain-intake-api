@@ -19,9 +19,11 @@
     "must_have_contains": [],
     "should_have_contains": [
       "CRM",
-      "Experiencia",
       "Manejo",
       "Conocimiento"
+    ],
+    "nice_to_have_contains": [
+      "Experiencia"
     ],
     "search_terms_include": [
       "CRM",

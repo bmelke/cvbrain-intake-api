@@ -31,19 +31,33 @@ HARD_PATTERN = re.compile(
     re.I,
 )
 
-SOFT_PATTERN = re.compile(
+STRONG_PREFERENCE_PATTERN = re.compile(
     r"\b("
-    r"deseable|deseables|valorable|valorables|preferid[oa]s?|preferentemente|"
-    r"ideal|plus|se\s+valora|nice\s+to\s+have|would\s+be\s+a\s+plus|preferred|desirable"
+    r"deseable|deseables|preferid[oa]s?|preferentemente|ideal|"
+    r"muy\s+valorad[oa]s?|muy\s+valorables?|"
+    r"se\s+valorar[aá]\s+especialmente|strongly\s+preferred|preferred|desirable"
     r")\b",
+    re.I,
+)
+
+WEAK_PREFERENCE_PATTERN = re.compile(
+    r"\b("
+    r"valorables?|se\s+valora|plus|es\s+un\s+plus|suma|"
+    r"nice\s+to\s+have|would\s+be\s+a\s+plus"
+    r")\b",
+    re.I,
+)
+
+SOFT_PATTERN = re.compile(
+    rf"(?:{STRONG_PREFERENCE_PATTERN.pattern}|{WEAK_PREFERENCE_PATTERN.pattern})",
     re.I,
 )
 
 SECTION_PATTERNS = (
     (re.compile(r"^\s*(credenciales?|requisitos?|formaci[oó]n)\s+(requerid[oa]s?|obligatori[oa]s?|excluyentes?)\s*:", re.I), MUST_HAVE),
     (re.compile(r"^\s*(must\s+have|required|requirements?|requisitos?)\s*:", re.I), MUST_HAVE),
-    (re.compile(r"^\s*(should\s+have|preferid[oa]s?|deseables?|valorables?)\s*:", re.I), PREFERRED),
-    (re.compile(r"^\s*(nice\s+to\s+have|plus|ideal)\s*:", re.I), NICE_TO_HAVE),
+    (re.compile(r"^\s*(should\s+have|preferid[oa]s?|deseables?|ideal|muy\s+valorables?)\s*:", re.I), PREFERRED),
+    (re.compile(r"^\s*(nice\s+to\s+have|plus|valorables?|se\s+valora|suma)\s*:", re.I), NICE_TO_HAVE),
 )
 
 CONNECTOR_SPLIT_PATTERN = re.compile(r"\s+(?:y|e|and)\s+(?=(?:[A-ZÁÉÍÓÚÑ]|[a-záéíóúñ]+(?:\s+)?(?:deseable|valorable|imprescindible|excluyente|obligatorio)))")
@@ -223,8 +237,10 @@ def resolve_importance(text: str, section_default: Importance = PREFERRED) -> Im
 
     if HARD_PATTERN.search(text):
         return MUST_HAVE
-    if SOFT_PATTERN.search(text):
-        return NICE_TO_HAVE if section_default == NICE_TO_HAVE else PREFERRED
+    if STRONG_PREFERENCE_PATTERN.search(text):
+        return PREFERRED
+    if WEAK_PREFERENCE_PATTERN.search(text):
+        return NICE_TO_HAVE
     return section_default or PREFERRED
 
 
@@ -450,8 +466,10 @@ def _has_list_separator(text: str) -> bool:
 def _remove_importance_label(text: str) -> str:
     return re.sub(
         r"^\s*(?:excluyente|excluyentes|imprescindible|obligatori[oa]s?|requerid[oa]s?|"
-        r"indispensable|deseable|deseables|valorable|valorables|preferentemente|ideal|"
-        r"plus|nice\s+to\s+have|preferred|desirable)\s+",
+        r"indispensable|deseable|deseables|muy\s+valorad[oa]s?|muy\s+valorables?|"
+        r"se\s+valorar[aá]\s+especialmente|valorable|valorables|se\s+valora|"
+        r"preferid[oa]s?|preferentemente|ideal|plus|es\s+un\s+plus|suma|"
+        r"nice\s+to\s+have|would\s+be\s+a\s+plus|strongly\s+preferred|preferred|desirable)\s+",
         "",
         text,
         flags=re.I,

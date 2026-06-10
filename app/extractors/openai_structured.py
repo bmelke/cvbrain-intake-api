@@ -47,7 +47,9 @@ Rules:
 - Do not promote preferred or nice-to-have items to must-have.
 - Section/category labels are defaults only; local item modifiers are final authority.
 - Split compound requirement text into individual items before assigning importance.
-- Soft local modifiers such as deseable, valorable, preferred, plus, or nice to have downgrade items even under hard sections.
+- Strong preference modifiers such as deseable, preferentemente, ideal, muy valorable, or strongly preferred map to should_have.
+- Weak preference modifiers such as valorable, se valora, plus, suma, nice to have, or would be a plus map to nice_to_have.
+- Soft local modifiers downgrade items even under hard sections.
 - Hard local modifiers such as excluyente, imprescindible, obligatorio, no presentarse a menos que, or sin X no avanzar upgrade items even under soft sections.
 - Do not turn soft competencies into hard resume filters.
 - Separate requirements from responsibilities.
