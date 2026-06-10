@@ -8,6 +8,7 @@ from app.extractors.openai_structured import OpenAIStructuredExtractor
 from app.main import app
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
 from app.normalization.requirement_importance import normalize_job_intelligence_requirements
+from app.schemas.job_intelligence_v1_contract import validate_job_intelligence_v1
 
 
 client = TestClient(app)
@@ -395,7 +396,10 @@ def test_full_ga_structured_output_is_normalized_before_schema_validation():
                     "hard_filter_approved": True,
                 }
             ],
-            "blockers": ["Sin experiencia no avanzar para este rol de soporte"],
+            "blockers": [
+                "Sin experiencia no avanzar para este rol de soporte.",
+                "Sin experiencia no avanzar para este rol de soporte",
+            ],
         }
     )
     payload["job_profile"]["job_title"] = "Tecnico de Soporte IT Junior"
@@ -432,6 +436,43 @@ def test_full_ga_structured_output_is_normalized_before_schema_validation():
     assert "active directory" in should_or_nice
     assert "herramientas de mesa de ayuda" in should_or_nice
     assert normalized["requirements"]["should_have"][0]["hard_filter_approved"] is False
+    assert normalized["requirements"]["blockers"] == ["Sin experiencia no avanzar para este rol de soporte."]
+
+
+def test_soft_competencies_hard_filter_flags_are_removed_before_schema_validation():
+    payload = minimal_job_intelligence(
+        {
+            "must_have": [
+                requirement_item("Imprescindible buena comunicacion y registro de tickets", "must_have"),
+            ],
+        }
+    )
+    payload["requirements"]["soft_competencies"] = [
+        {
+            **requirement_item("Comunicación", "must_have"),
+            "hard_filter_candidate": True,
+            "hard_filter_approved": True,
+        },
+        {
+            **requirement_item("Registro y documentación mediante tickets", "must_have"),
+            "hard_filter_candidate": True,
+            "hard_filter_approved": True,
+        },
+    ]
+
+    normalized = normalize_job_intelligence_requirements(
+        payload,
+        source_text="Imprescindible buena comunicacion y registro de tickets.",
+    )
+    validate_job_intelligence_v1(normalized)
+    flat = derive_flat_compatibility(normalized)
+
+    assert flat["must_have"] == ["Buena comunicación", "Registro de tickets"]
+    assert "buena comunicacion" in fold(flat["must_have"])
+    assert "registro de tickets" in fold(flat["must_have"])
+    for item in normalized["requirements"]["soft_competencies"]:
+        assert item["hard_filter_candidate"] is False
+        assert item["hard_filter_approved"] is False
 
 
 def test_full_ga_openai_flow_returns_success_after_requirement_normalization():
@@ -469,6 +510,18 @@ def test_full_ga_openai_flow_returns_success_after_requirement_normalization():
             "blockers": ["Sin experiencia no avanzar para este rol de soporte"],
         }
     )
+    payload["requirements"]["soft_competencies"] = [
+        {
+            **requirement_item("Comunicación", "must_have"),
+            "hard_filter_candidate": True,
+            "hard_filter_approved": True,
+        },
+        {
+            **requirement_item("Registro y documentación mediante tickets", "must_have"),
+            "hard_filter_candidate": True,
+            "hard_filter_approved": True,
+        },
+    ]
     payload["job_profile"]["job_title"] = "Tecnico de Soporte IT Junior"
     payload["job_profile"]["normalized_role_title"] = "Tecnico de Soporte IT Junior"
 
@@ -503,3 +556,6 @@ def test_full_ga_openai_flow_returns_success_after_requirement_normalization():
     assert "herramientas de mesa de ayuda" not in fold(result["must_have"])
     assert "libreta de conducir categoria a" not in fold(result["credentials"]["required"])
     assert "libreta de conducir categoria a" in fold(result["credentials"]["preferred"])
+    for item in result["job_intelligence"]["requirements"]["soft_competencies"]:
+        assert item["hard_filter_candidate"] is False
+        assert item["hard_filter_approved"] is False

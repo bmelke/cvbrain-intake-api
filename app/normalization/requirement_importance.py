@@ -184,6 +184,9 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     requirements["nice_to_have"] = nice_to_have
     requirements["credentials"] = _unique_credentials_by_strongest_importance(buckets["credentials"])
     requirements["blockers"] = _unique(blockers)
+    requirements["soft_competencies"] = _normalize_soft_competencies(
+        requirements.get("soft_competencies", [])
+    )
     output["requirements"] = requirements
     return output
 
@@ -343,6 +346,22 @@ def _requirement_item_to_mapping(item: RequirementItem) -> Dict[str, Any]:
         "hard_filter_candidate": item.importance == MUST_HAVE,
         "hard_filter_approved": False,
     }
+
+
+def _normalize_soft_competencies(items: Any) -> List[Dict[str, Any]]:
+    output: List[Dict[str, Any]] = []
+    if not isinstance(items, list):
+        return output
+
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        normalized = dict(item)
+        normalized["hard_filter_candidate"] = False
+        normalized["hard_filter_approved"] = False
+        output.append(normalized)
+
+    return _unique_requirement_items(output)
 
 
 def _expand_coordinated_sentence(sentence: str) -> List[str]:
@@ -507,7 +526,7 @@ def _unique(items: Iterable[str]) -> List[str]:
     output: List[str] = []
     for item in items:
         clean = " ".join(str(item).split())
-        key = _fold(clean)
+        key = _fold(clean.strip(" -:.,;\t\r\n"))
         if clean and key not in seen:
             seen.add(key)
             output.append(clean)
