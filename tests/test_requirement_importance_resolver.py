@@ -182,6 +182,76 @@ def test_plain_valorable_resolves_to_nice_to_have(monkeypatch):
     assert "libreta de conducir categoria a" in fold(data["credentials"]["preferred"])
 
 
+def test_busqueda_001_plus_resolves_to_nice_to_have(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload("Inglés jurídico será un plus."),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == []
+    assert data["should_have"] == []
+    assert data["nice_to_have"] == ["Inglés jurídico"]
+
+
+def test_busqueda_027_suma_resolves_to_nice_to_have_and_preferred_credential(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload("Libreta de conducir suma."),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == []
+    assert data["should_have"] == []
+    assert data["nice_to_have"] == ["Libreta de conducir"]
+    assert "libreta de conducir" not in fold(data["credentials"]["required"])
+    assert "libreta de conducir" in fold(data["credentials"]["preferred"])
+
+
+def test_busqueda_004_deseable_resolves_to_should_have(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload("CRM es deseable."),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == []
+    assert data["should_have"] == ["CRM"]
+    assert data["nice_to_have"] == []
+
+
+def test_no_central_non_naked_modifier_resolves_to_nice_to_have(monkeypatch):
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload("Inglés no central."),
+    )
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["must_have"] == []
+    assert data["should_have"] == []
+    assert data["nice_to_have"] == ["Inglés"]
+
+
 def test_muy_valorable_resolves_to_should_have(monkeypatch):
     monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
     monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "deterministic")
@@ -365,7 +435,7 @@ def test_structured_requirements_are_rebucketed_before_flat_mapping():
     assert "disponibilidad para viajar" not in fold(flat["nice_to_have"])
     assert "no avanzar si no puede viajar" in fold(flat["blockers"])
     assert "libreta de conducir categoria a" not in fold(flat["credentials"]["required"])
-    assert "libreta de conducir categoria a" in fold(flat["credentials"]["preferred"])
+    assert "libreta de conducir categoria a" not in fold(flat["credentials"]["preferred"])
 
 
 def test_full_ga_support_request_resolves_item_importance_without_leakage(monkeypatch):
@@ -467,8 +537,8 @@ def test_full_ga_structured_output_is_normalized_before_schema_validation():
         assert forbidden not in must
 
     assert "libreta de conducir categoria a" not in credentials_required
-    assert "libreta de conducir categoria a" in credentials_preferred
-    assert "formacion tecnica en informatica o certificacion equivalente" in credentials_required
+    assert "libreta de conducir categoria a" not in credentials_preferred
+    assert "formacion tecnica en informatica o certificacion equivalente" not in credentials_required
     assert "formacion tecnica en informatica o certificacion equivalente" not in credentials_preferred
 
     assert flat["should_have"] == FULL_GA_PREFERRED
@@ -598,7 +668,7 @@ def test_full_ga_openai_flow_returns_success_after_requirement_normalization():
     assert "active directory" not in fold(result["must_have"])
     assert "herramientas de mesa de ayuda" not in fold(result["must_have"])
     assert "libreta de conducir categoria a" not in fold(result["credentials"]["required"])
-    assert "libreta de conducir categoria a" in fold(result["credentials"]["preferred"])
+    assert "libreta de conducir categoria a" not in fold(result["credentials"]["preferred"])
     for item in result["job_intelligence"]["requirements"]["soft_competencies"]:
         assert item["hard_filter_candidate"] is False
         assert item["hard_filter_approved"] is False

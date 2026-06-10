@@ -75,11 +75,14 @@ ORPHAN_REQUIREMENTS = {
     "y",
 }
 WEAK_MODIFIER_PATTERN = re.compile(
-    r"\b(valorables?|se\s+valora|plus|es\s+un\s+plus|suma|nice\s+to\s+have|would\s+be\s+a\s+plus)\b",
+    r"\b("
+    r"valorables?|ser[aá]\s+valorables?|se\s+valora|se\s+valorar[aá](?:\s+especialmente)?|"
+    r"plus|es\s+un\s+plus|suma|no\s+central|nice\s+to\s+have|would\s+be\s+a\s+plus"
+    r")\b",
     re.I,
 )
 STRONG_PREFERENCE_PATTERN = re.compile(
-    r"\b(muy\s+valorad[oa]s?|muy\s+valorables?|se\s+valorar[aá]\s+especialmente)\b",
+    r"\b(muy\s+valorad[oa]s?|muy\s+valorables?)\b",
     re.I,
 )
 HARD_MODIFIER_PATTERN = re.compile(
@@ -88,6 +91,10 @@ HARD_MODIFIER_PATTERN = re.compile(
     r"indispensable|m[ií]nim[oa]|sin\s+.+?\s+no\s+avanzar|"
     r"no\s+presentarse\s+si\s+no\s+.+|no\s+avanzar\s+si\s+no\s+.+"
     r")\b",
+    re.I,
+)
+BLOCKER_CLAUSE_PATTERN = re.compile(
+    r"\b(no\s+avanzar|no\s+presentarse\s+si\s+no|no\s+considerar)\b",
     re.I,
 )
 
@@ -370,6 +377,10 @@ def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]
     weak_clauses = modifier_clauses(source_text, WEAK_MODIFIER_PATTERN, exclude=STRONG_PREFERENCE_PATTERN)
     hard_clauses = modifier_clauses(source_text, HARD_MODIFIER_PATTERN)
 
+    for bucket, item in _requirement_and_credential_items(data):
+        if BLOCKER_CLAUSE_PATTERN.search(item):
+            notes.append(f"blocker_leaked_to_requirement:{bucket}:{item}")
+
     for bucket in ("must_have", "should_have"):
         for item in _string_list(data.get(bucket, [])):
             if any(_clause_matches_item(clause, item) for clause in weak_clauses):
@@ -381,6 +392,16 @@ def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]
                 notes.append(f"hard_modifier_under_promoted:{bucket}:{item}")
 
     return notes
+
+
+def _requirement_and_credential_items(data: Mapping[str, Any]) -> List[tuple[str, str]]:
+    output: List[tuple[str, str]] = []
+    for bucket in ("must_have", "should_have", "nice_to_have"):
+        output.extend((bucket, item) for item in _string_list(data.get(bucket, [])))
+    credentials = data.get("credentials", {}) if isinstance(data.get("credentials"), Mapping) else {}
+    output.extend(("credentials.required", item) for item in _string_list(credentials.get("required", [])))
+    output.extend(("credentials.preferred", item) for item in _string_list(credentials.get("preferred", [])))
+    return output
 
 
 def warning_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]:
@@ -477,6 +498,8 @@ def _meaningful_tokens(text: str) -> set[str]:
         "muy",
         "se",
         "valora",
+        "valorara",
+        "valorará",
         "valorable",
         "valorables",
         "deseable",

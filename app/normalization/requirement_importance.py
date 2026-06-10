@@ -35,14 +35,15 @@ STRONG_PREFERENCE_PATTERN = re.compile(
     r"\b("
     r"deseable|deseables|preferid[oa]s?|preferentemente|ideal|"
     r"muy\s+valorad[oa]s?|muy\s+valorables?|"
-    r"se\s+valorar[aá]\s+especialmente|strongly\s+preferred|preferred|desirable"
+    r"strongly\s+preferred|preferred|desirable"
     r")\b",
     re.I,
 )
 
 WEAK_PREFERENCE_PATTERN = re.compile(
     r"\b("
-    r"valorables?|se\s+valora|plus|es\s+un\s+plus|suma|"
+    r"valorables?|ser[aá]\s+valorables?|se\s+valora|se\s+valorar[aá](?:\s+especialmente)?|"
+    r"plus|es\s+un\s+plus|suma|no\s+central|"
     r"nice\s+to\s+have|would\s+be\s+a\s+plus"
     r")\b",
     re.I,
@@ -57,7 +58,7 @@ SECTION_PATTERNS = (
     (re.compile(r"^\s*(credenciales?|requisitos?|formaci[oó]n)\s+(requerid[oa]s?|obligatori[oa]s?|excluyentes?)\s*:", re.I), MUST_HAVE),
     (re.compile(r"^\s*(must\s+have|required|requirements?|requisitos?)\s*:", re.I), MUST_HAVE),
     (re.compile(r"^\s*(should\s+have|preferid[oa]s?|deseables?|ideal|muy\s+valorables?)\s*:", re.I), PREFERRED),
-    (re.compile(r"^\s*(nice\s+to\s+have|plus|valorables?|se\s+valora|suma)\s*:", re.I), NICE_TO_HAVE),
+    (re.compile(r"^\s*(nice\s+to\s+have|plus|valorables?|se\s+valora|se\s+valorar[aá]|suma)\s*:", re.I), NICE_TO_HAVE),
 )
 
 CONNECTOR_SPLIT_PATTERN = re.compile(r"\s+(?:y|e|and)\s+(?=(?:[A-ZÁÉÍÓÚÑ]|[a-záéíóúñ]+(?:\s+)?(?:deseable|valorable|imprescindible|excluyente|obligatorio)))")
@@ -68,7 +69,32 @@ CREDENTIAL_PATTERN = re.compile(
 )
 
 ORPHAN_FRAGMENT_PATTERN = re.compile(
-    r"^(?:y|e|o|and|or)\b|^(?:software|hardware|redes?\s+b[aá]sicas?|soporte\s+remoto)$",
+    r"^(?:y|e|o|and|or)\b|"
+    r"^(?:software|hardware|redes?\s+b[aá]sicas?|soporte\s+remoto)$|"
+    r"^(?:la\s+persona\s+deber[aá]\s+liderar|se\s+requiere\s+base\s+t[eé]cnica\s+en|base\s+t[eé]cnica\s+en)$|"
+    r"^ni\s+perfiles?\s+junior\b.*",
+    re.I,
+)
+
+NO_AVANZAR_PATTERN = re.compile(r"\bno\s+avanzar\b.*", re.I)
+NO_PRESENTARSE_BLOCKER_PATTERN = re.compile(r"\bno\s+presentarse\s+si\s+no\b.*", re.I)
+SIN_NO_AVANZAR_PATTERN = re.compile(r"\bsin\s+.+?\s+no\s+avanzar\b.*", re.I)
+
+MODIFIER_ONLY_FRAGMENT_PATTERNS = (
+    re.compile(r"^no\s+excluyente$", re.I),
+    re.compile(r"^(?:pero\s+)?no\s+debe\s+usarse\s+(?:como|as)\s+filtro(?:\s+excluyente)?$", re.I),
+    re.compile(r"^(?:pero\s+)?no\s+es\s+requisito$", re.I),
+    re.compile(r"^(?:pero\s+)?no\s+central$", re.I),
+    re.compile(r"^(?:pero\s+)?no\s+es\s+excluyente(?:\s+salvo\b.*)?$", re.I),
+    re.compile(r"^deseable$", re.I),
+)
+
+NEGATIVE_FILTER_MODIFIER_PATTERN = re.compile(
+    r"\b("
+    r"no\s+excluyente|"
+    r"no\s+debe\s+usarse\s+(?:como|as)\s+filtro(?:\s+excluyente)?|"
+    r"no\s+es\s+requisito"
+    r")\b",
     re.I,
 )
 
@@ -163,8 +189,12 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
                     blockers.append(blocker)
                     if _is_blocker_only_clause(str(normalized.get("source_text", ""))):
                         continue
+                if section_name == "credentials":
+                    credential = dict(normalized)
+                    buckets["credentials"].append(credential)
+                    continue
                 buckets[target].append(normalized)
-                if section_name == "credentials" or _is_credential_text(_source_and_text(normalized)):
+                if _is_credential_text(_source_and_text(normalized)):
                     credential = dict(normalized)
                     buckets["credentials"].append(credential)
 
@@ -201,6 +231,8 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     requirements["soft_competencies"] = _normalize_soft_competencies(
         requirements.get("soft_competencies", [])
     )
+    requirements = _normalize_blockers_and_negations(requirements, source_text)
+    requirements = _dedupe_requirement_concepts(requirements)
     output["requirements"] = requirements
     return output
 
@@ -217,12 +249,16 @@ def normalize_structured_requirement_item(item: Mapping[str, Any], default_impor
 
     output: List[Dict[str, Any]] = []
     for clause in clauses:
+        if _has_negative_filter_modifier(clause):
+            continue
         importance = resolve_importance(clause, default_importance)
         normalized = dict(item)
         normalized["source_text"] = clause
         normalized["importance"] = importance
         if len(clauses) == 1 and _fold(clause) == _fold(raw) and not blocker_text_for_clause(clause):
-            normalized["text"] = text
+            normalized["text"] = normalize_requirement_text(clause) if (
+                _fold(text) == _fold(clause) and _should_normalize_requirement_text(clause)
+            ) else text
         else:
             normalized["text"] = normalize_requirement_text(clause)
         normalized["hard_filter_candidate"] = importance == MUST_HAVE
@@ -272,6 +308,7 @@ def normalize_requirement_text(text: str) -> str:
         doc = _capitalize_first(_normalize_accents(driver.group(1)))
         return f"{doc} de conducir categoría {driver.group(2).upper()}"
     clean = _remove_importance_label(clean)
+    clean = _remove_trailing_importance_modifier(clean)
     clean = _normalize_accents(clean)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;\t\r\n")
     clean = re.sub(r"\s+para\s+visitas?\s+puntuales?.*$", "", clean, flags=re.I).strip()
@@ -282,8 +319,9 @@ def normalize_requirement_text(text: str) -> str:
 def blocker_text_for_clause(text: str) -> str:
     if re.search(r"no\s+presentarse\s+a\s+menos\s+que\s+pueda\s+viajar", text, re.I):
         return "No avanzar si no puede viajar"
-    if re.search(r"sin\s+.+?\s+no\s+avanzar|no\s+avanzar\s+si\s+no\s+.+|no\s+presentarse\s+si\s+no\s+.+", text, re.I):
-        return normalize_requirement_text(text)
+    blocker = _extract_blocker_fragment(text)
+    if blocker:
+        return _normalize_blocker_text(blocker)
     return ""
 
 
@@ -291,7 +329,13 @@ def _is_blocker_only_clause(text: str) -> bool:
     lowered = _fold(text)
     if "no presentarse a menos que" in lowered:
         return False
-    return bool(re.search(r"\bsin\s+.+?\s+no\s+avanzar\b|\bno\s+avanzar\s+si\s+no\b|\bno\s+considerar\b", lowered))
+    return bool(
+        re.search(
+            r"\bno\s+avanzar\b|\bno\s+presentarse\s+si\s+no\b|"
+            r"\bsin\s+.+?\s+no\s+avanzar\b|\bno\s+considerar\b",
+            lowered,
+        )
+    )
 
 
 def _iter_clauses_with_defaults(text: str) -> Iterable[tuple[str, Importance]]:
@@ -309,6 +353,8 @@ def _iter_clauses_with_defaults(text: str) -> Iterable[tuple[str, Importance]]:
 def _resolve_clause(clause: str, default: Importance) -> Optional[RequirementItem]:
     clean = normalize_requirement_text(clause)
     if not clean:
+        return None
+    if _has_negative_filter_modifier(clause):
         return None
     if _is_orphan_requirement_text(clean):
         return None
@@ -346,6 +392,10 @@ def _has_requirement_signal(source_text: str, normalized_text: str, importance: 
     if importance == MUST_HAVE and blocker_text_for_clause(source):
         return True
     return False
+
+
+def _should_normalize_requirement_text(text: str) -> bool:
+    return bool(HARD_PATTERN.search(text) or SOFT_PATTERN.search(text) or _is_credential_text(text))
 
 
 def _source_requirement_items(text: str) -> List[RequirementItem]:
@@ -465,15 +515,36 @@ def _has_list_separator(text: str) -> bool:
 
 def _remove_importance_label(text: str) -> str:
     return re.sub(
-        r"^\s*(?:excluyente|excluyentes|imprescindible|obligatori[oa]s?|requerid[oa]s?|"
+        r"^\s*(?:(?:es|son)\s+)?(?:excluyente|excluyentes|imprescindible|obligatori[oa]s?|requerid[oa]s?|"
         r"indispensable|deseable|deseables|muy\s+valorad[oa]s?|muy\s+valorables?|"
-        r"se\s+valorar[aá]\s+especialmente|valorable|valorables|se\s+valora|"
+        r"se\s+requiere|se\s+requieren|"
+        r"se\s+valorar[aá](?:\s+especialmente)?|ser[aá]\s+valorable|"
+        r"valorable|valorables|se\s+valora|"
         r"preferid[oa]s?|preferentemente|ideal|plus|es\s+un\s+plus|suma|"
         r"nice\s+to\s+have|would\s+be\s+a\s+plus|strongly\s+preferred|preferred|desirable)\s+",
         "",
         text,
         flags=re.I,
     )
+
+
+def _remove_trailing_importance_modifier(text: str) -> str:
+    clean = text.strip()
+    trailing_patterns = (
+        r"\s+es\s+deseable$",
+        r"\s+ser[aá]\s+valorables?$",
+        r"\s+ser[aá]\s+un\s+plus$",
+        r"\s+es\s+un\s+plus$",
+        r"\s+suma$",
+        r"\s+no\s+central$",
+        r"\s+no\s+excluyente$",
+        r",?\s*(?:pero\s+)?no\s+debe\s+usarse\s+(?:como|as)\s+filtro(?:\s+excluyente)?$",
+        r",?\s*(?:pero\s+)?no\s+es\s+requisito$",
+        r",?\s*(?:pero\s+)?no\s+es\s+excluyente(?:\s+salvo\b.*)?$",
+    )
+    for pattern in trailing_patterns:
+        clean = re.sub(pattern, "", clean, flags=re.I).strip(" -:.,;\t\r\n")
+    return clean
 
 
 def _normalize_accents(text: str) -> str:
@@ -489,6 +560,7 @@ def _normalize_accents(text: str) -> str:
         "categoria": "categoría",
         "titulo": "título",
         "administracion": "administración",
+        "libretta": "libreta",
     }
     clean = f" {text} "
     for source, target in replacements.items():
@@ -506,6 +578,8 @@ def _is_orphan_requirement_text(text: str) -> bool:
     clean = normalize_requirement_text(text)
     folded = _fold(clean.strip(" -:.,;\t\r\n"))
     if not folded:
+        return True
+    if _is_modifier_only_fragment(text) or _is_modifier_only_fragment(clean):
         return True
     if ORPHAN_FRAGMENT_PATTERN.search(folded):
         return True
@@ -537,6 +611,317 @@ def _source_and_text(item: Mapping[str, Any]) -> str:
 
 def _is_credential_text(text: str) -> bool:
     return bool(CREDENTIAL_PATTERN.search(text))
+
+
+def _normalize_blockers_and_negations(requirements: Mapping[str, Any], source_text: str) -> Dict[str, Any]:
+    output: Dict[str, Any] = dict(requirements)
+    blockers = _unique(
+        [str(item).strip() for item in output.get("blockers", []) or [] if str(item).strip()]
+        + _blockers_from_text(source_text)
+    )
+
+    for bucket in ("must_have", "should_have", "nice_to_have"):
+        cleaned, blockers = _clean_requirement_items(output.get(bucket, []), blockers)
+        cleaned = [
+            item
+            for item in cleaned
+            if not _is_attached_source_blocker_fragment(item, blockers)
+        ]
+        output[bucket] = _unique_requirement_items(cleaned)
+
+    cleaned_credentials, blockers = _clean_requirement_items(output.get("credentials", []), blockers)
+    cleaned_credentials = [
+        item
+        for item in cleaned_credentials
+        if not _is_attached_source_blocker_fragment(item, blockers)
+    ]
+    output["credentials"] = _unique_credentials_by_strongest_importance(cleaned_credentials)
+    output["blockers"] = _unique(blockers)
+    return output
+
+
+def _dedupe_requirement_concepts(requirements: Mapping[str, Any]) -> Dict[str, Any]:
+    output: Dict[str, Any] = dict(requirements)
+    blockers = _unique([str(item).strip() for item in output.get("blockers", []) or [] if str(item).strip()])
+    blocker_keys = {_requirement_concept_key(blocker) for blocker in blockers}
+    blocker_keys.discard("")
+
+    selected: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+
+    for bucket in ("must_have", "should_have", "nice_to_have"):
+        for item in output.get(bucket, []) or []:
+            if not isinstance(item, Mapping):
+                continue
+            cleaned = _clean_positive_requirement_item(item)
+            if not cleaned:
+                continue
+            key = _requirement_item_concept_key(cleaned)
+            if not key or key in blocker_keys:
+                continue
+            record = {"bucket": bucket, "item": cleaned}
+            if key not in selected:
+                selected[key] = record
+                order.append(key)
+                continue
+            if _should_replace_duplicate_requirement(selected[key], record):
+                selected[key] = record
+
+    bucketed: Dict[str, List[Dict[str, Any]]] = {
+        "must_have": [],
+        "should_have": [],
+        "nice_to_have": [],
+    }
+    for key in order:
+        record = selected.get(key)
+        if not record:
+            continue
+        bucketed[str(record["bucket"])].append(_strip_internal_fields(record["item"]))
+
+    output["must_have"] = _unique_requirement_items_by_concept(bucketed["must_have"])
+    output["should_have"] = _unique_requirement_items_by_concept(bucketed["should_have"])
+    output["nice_to_have"] = _unique_requirement_items_by_concept(bucketed["nice_to_have"])
+
+    positive_keys = {
+        _requirement_item_concept_key(item)
+        for bucket in ("must_have", "should_have", "nice_to_have")
+        for item in output[bucket]
+    }
+    credentials = []
+    for item in output.get("credentials", []) or []:
+        if not isinstance(item, Mapping):
+            continue
+        cleaned = _clean_positive_requirement_item(item)
+        if not cleaned:
+            continue
+        key = _requirement_item_concept_key(cleaned)
+        if not key or key in blocker_keys or key in positive_keys:
+            continue
+        credentials.append(_strip_internal_fields(cleaned))
+
+    output["credentials"] = _unique_credentials_by_strongest_concept(credentials)
+    output["blockers"] = blockers
+    return output
+
+
+def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
+    text = normalize_requirement_text(str(item.get("text", "")).strip())
+    source_text = str(item.get("source_text", "")).strip()
+    if not text:
+        return {}
+    if _is_orphan_requirement_text(text) or _is_modifier_only_fragment(text) or _is_modifier_only_fragment(source_text):
+        return {}
+    if _has_negative_filter_modifier(text) or _has_negative_filter_modifier(source_text):
+        return {}
+    if blocker_text_for_clause(source_text or text) and _is_blocker_only_clause(source_text or text):
+        return {}
+    cleaned = dict(item)
+    cleaned["text"] = text
+    cleaned["hard_filter_candidate"] = str(cleaned.get("importance", "")) == MUST_HAVE
+    cleaned["hard_filter_approved"] = False
+    return cleaned
+
+
+def _should_replace_duplicate_requirement(existing: Mapping[str, Any], candidate: Mapping[str, Any]) -> bool:
+    existing_item = existing.get("item", {})
+    candidate_item = candidate.get("item", {})
+    if not isinstance(existing_item, Mapping) or not isinstance(candidate_item, Mapping):
+        return False
+
+    existing_text = _source_and_text(existing_item)
+    candidate_text = _source_and_text(candidate_item)
+    existing_hard = _has_local_hard_modifier(existing_text)
+    candidate_hard = _has_local_hard_modifier(candidate_text)
+    existing_soft = _has_local_soft_modifier(existing_text)
+    candidate_soft = _has_local_soft_modifier(candidate_text)
+
+    if candidate_soft and not candidate_hard and not existing_hard:
+        return True
+    if existing_soft and not candidate_hard:
+        return False
+
+    candidate_rank = _importance_rank(str(candidate_item.get("importance", "")))
+    existing_rank = _importance_rank(str(existing_item.get("importance", "")))
+    return candidate_rank < existing_rank
+
+
+def _has_local_hard_modifier(text: str) -> bool:
+    return bool(HARD_PATTERN.search(text))
+
+
+def _has_local_soft_modifier(text: str) -> bool:
+    return bool(SOFT_PATTERN.search(text))
+
+
+def _strip_internal_fields(item: Mapping[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in dict(item).items() if not str(key).startswith("_cvbrain_")}
+
+
+def _unique_requirement_items_by_concept(items: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    seen = set()
+    output: List[Dict[str, Any]] = []
+    for item in items:
+        key = _requirement_item_concept_key(item)
+        if key and key not in seen:
+            seen.add(key)
+            output.append(dict(item))
+    return output
+
+
+def _unique_credentials_by_strongest_concept(items: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    by_key: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    for item in items:
+        key = _requirement_item_concept_key(item)
+        if not key:
+            continue
+        if key not in by_key:
+            by_key[key] = dict(item)
+            order.append(key)
+            continue
+        existing = by_key[key]
+        if _importance_rank(str(item.get("importance", ""))) < _importance_rank(str(existing.get("importance", ""))):
+            by_key[key] = dict(item)
+    return [by_key[key] for key in order]
+
+
+def _requirement_item_concept_key(item: Mapping[str, Any]) -> str:
+    return _requirement_concept_key(str(item.get("text", "")))
+
+
+def _requirement_concept_key(text: str) -> str:
+    clean = _fold(_normalize_accents(str(text)))
+    clean = re.sub(r"\blibretta\b", "libreta", clean)
+    clean = re.sub(r"[\u2018\u2019\u201c\u201d\"'`]", "", clean)
+    clean = re.sub(r"[^a-z0-9áéíóúñü\s/+#.-]+", " ", clean)
+    clean = re.sub(r"\s+", " ", clean).strip(" -:.,;/\t\r\n")
+    if not clean:
+        return ""
+
+    prefix_patterns = (
+        r"^(?:es|son)\s+",
+        r"^(?:excluyente|excluyentes|imprescindible|obligatorio|obligatoria|obligatorios|obligatorias|"
+        r"requerido|requerida|requeridos|requeridas|indispensable)\s+",
+        r"^se\s+requiere\s+",
+        r"^se\s+requieren\s+",
+        r"^deseable\s+",
+        r"^deseables\s+",
+        r"^valorable\s+",
+        r"^valorables\s+",
+        r"^se\s+valorara\s+",
+        r"^se\s+valora\s+",
+        r"^haber\s+",
+        r"^contar\s+con\s+",
+        r"^tener\s+",
+        r"^poseer\s+",
+        r"^experiencia\s+(?:en|con)\s+",
+        r"^manejo\s+de\s+",
+        r"^dominio\s+de\s+",
+        r"^conocimientos?\s+de\s+",
+    )
+    previous = None
+    while previous != clean:
+        previous = clean
+        for pattern in prefix_patterns:
+            clean = re.sub(pattern, "", clean).strip(" -:.,;/\t\r\n")
+
+    clean = re.sub(
+        r"\s+(?:es\s+deseable|sera\s+valorable|sera\s+un\s+plus|es\s+un\s+plus|"
+        r"suma|no\s+central|requerid[oa]s?(?:\s+por\s+.*)?|excluyentes?)$",
+        "",
+        clean,
+    )
+    clean = re.sub(r"\s+", " ", clean).strip(" -:.,;/\t\r\n")
+    return clean
+
+
+def _clean_requirement_items(items: Any, blockers: List[str]) -> tuple[List[Dict[str, Any]], List[str]]:
+    cleaned: List[Dict[str, Any]] = []
+    if not isinstance(items, list):
+        return cleaned, blockers
+
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        text = str(item.get("text", "")).strip()
+        source_text = str(item.get("source_text", "")).strip()
+        combined = f"{source_text} {text}".strip()
+        blocker = blocker_text_for_clause(combined)
+        if blocker:
+            blockers.append(blocker)
+            if _is_blocker_only_clause(combined):
+                continue
+        if (
+            _is_modifier_only_fragment(text)
+            or _is_modifier_only_fragment(source_text)
+            or _has_negative_filter_modifier(text)
+            or _has_negative_filter_modifier(source_text)
+        ):
+            continue
+        cleaned.append(dict(item))
+
+    return cleaned, _unique(blockers)
+
+
+def _blockers_from_text(text: str) -> List[str]:
+    blockers: List[str] = []
+    for sentence in re.split(r"[\n.;]+", text or ""):
+        blocker = blocker_text_for_clause(sentence)
+        if blocker:
+            blockers.append(blocker)
+    return _unique(blockers)
+
+
+def _extract_blocker_fragment(text: str) -> str:
+    clean = re.sub(r"\s+", " ", str(text).strip(" -:.,;\t\r\n"))
+    if not clean:
+        return ""
+
+    matches = []
+    for pattern in (NO_AVANZAR_PATTERN, NO_PRESENTARSE_BLOCKER_PATTERN, SIN_NO_AVANZAR_PATTERN):
+        match = pattern.search(clean)
+        if match:
+            matches.append((match.start(), match.group(0)))
+    if not matches:
+        return ""
+    return min(matches, key=lambda item: item[0])[1].strip(" -:.,;\t\r\n")
+
+
+def _normalize_blocker_text(text: str) -> str:
+    clean = _normalize_accents(str(text))
+    clean = re.sub(r"\s+", " ", clean).strip(" -:.,;\t\r\n")
+    return _capitalize_first(clean)
+
+
+def _is_modifier_only_fragment(text: str) -> bool:
+    clean = _fold(str(text)).strip(" -:.,;\t\r\n")
+    if not clean:
+        return True
+    return any(pattern.match(clean) for pattern in MODIFIER_ONLY_FRAGMENT_PATTERNS)
+
+
+def _has_negative_filter_modifier(text: str) -> bool:
+    clean = str(text).strip()
+    return bool(clean and NEGATIVE_FILTER_MODIFIER_PATTERN.search(clean))
+
+
+def _is_attached_source_blocker_fragment(item: Mapping[str, Any], blockers: Iterable[str]) -> bool:
+    text = str(item.get("text", "")).strip()
+    if not text:
+        return True
+    item_key = _fold(text).strip(" -:.,;\t\r\n")
+    if not item_key:
+        return True
+
+    for blocker in blockers:
+        blocker_key = _fold(blocker)
+        if item_key not in blocker_key:
+            continue
+        if re.search(r"\bsin\b", item_key):
+            return True
+        if re.search(rf"(?:,\s+|;\s+|\bni\s+){re.escape(item_key)}\b", blocker_key):
+            return True
+    return False
 
 
 def _unique(items: Iterable[str]) -> List[str]:

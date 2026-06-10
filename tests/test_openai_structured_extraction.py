@@ -1,6 +1,7 @@
 import json
 import logging
 import sys
+import unicodedata
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -65,6 +66,95 @@ def analyze_payload(text):
         "country_context": "UY",
         "candidate_market": "UY",
         "employer_market": "UY",
+    }
+
+
+def fold(value):
+    text = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else str(value)
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch)).casefold()
+
+
+def requirement_item(text, importance):
+    return {
+        "text": text,
+        "source_text": text,
+        "importance": importance,
+        "explicit": True,
+        "hard_filter_candidate": importance == "must_have",
+        "hard_filter_approved": False,
+    }
+
+
+def dirty_post_ai_payload():
+    return {
+        "schema_version": "cvbrain_job_intelligence_v1",
+        "job_profile": {
+            "job_title": "Coordinador Legal",
+            "normalized_role_title": "Coordinador Legal",
+            "role_family": "legal",
+            "seniority": "",
+            "summary": "Sanitized dirty AI payload for post-AI normalization guard.",
+            "primary_industries": [],
+            "work_modality": None,
+        },
+        "location_intelligence": {
+            "raw": "",
+            "normalized": "",
+            "country_code": "UY",
+            "remote_allowed": None,
+            "hybrid_allowed": None,
+            "onsite_required": None,
+            "country_context_mismatch": False,
+            "hard_filter_candidate": False,
+            "hard_filter_approved": False,
+            "warnings": [],
+        },
+        "requirements": {
+            "must_have": [
+                requirement_item("No avanzar perfiles puramente litigiosos sin experiencia corporativa", "must_have"),
+                requirement_item("No excluyente", "must_have"),
+                requirement_item("Manejo de Excel", "must_have"),
+                requirement_item("Excel", "must_have"),
+            ],
+            "should_have": [
+                requirement_item("Deseable", "preferred"),
+            ],
+            "nice_to_have": [
+                requirement_item("Inglés jurídico será un plus", "nice_to_have"),
+            ],
+            "credentials": [
+                requirement_item("No avanzar perfiles sin título habilitante", "must_have"),
+                requirement_item("Título habilitante requerido", "must_have"),
+            ],
+            "blockers": [],
+            "experience": {"minimum_years": None, "seniority": ""},
+            "soft_competencies": [],
+        },
+        "search_strategy": {
+            "target_titles": ["Coordinador Legal"],
+            "search_terms": ["Coordinador Legal", "Excel"],
+            "semantic_terms": [],
+            "negative_terms": [],
+        },
+        "missing_information": [],
+        "company_clarification_questions": [],
+        "candidate_screening_questions": [],
+        "search_readiness": {
+            "status": "ready",
+            "proceed_allowed": True,
+            "recommended_action": "continue_anyway",
+            "recruiter_decision_required": False,
+            "continued_with_missing_information": False,
+            "recruiter_override_reason": None,
+            "decision_options": ["continue_anyway", "use_manual_search", "cancel"],
+        },
+        "quality_control": {
+            "warnings": [],
+            "confidence": 0.91,
+            "contains_candidate_data": False,
+            "contains_candidate_pii": False,
+        },
     }
 
 
@@ -152,6 +242,62 @@ def test_ai_mode_with_mocked_openai_success_derives_flat_contract(monkeypatch):
     assert call["text"]["format"]["name"] == "cvbrain_job_intelligence_v1"
     assert call["text"]["format"]["schema"]["additionalProperties"] is False
     assert call["input"][0]["role"] == "system"
+
+
+def test_analyze_endpoint_ai_path_normalizes_dirty_parsed_payload_before_response(monkeypatch):
+    fake_client = FakeOpenAIClient(response={"output_parsed": dirty_post_ai_payload()})
+
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "ai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-used")
+    monkeypatch.setenv("CVBRAIN_OPENAI_MODEL", "test-model-not-used")
+    monkeypatch.setenv("CVBRAIN_AI_FALLBACK_ENABLED", "false")
+    monkeypatch.setattr(OpenAIStructuredExtractor, "_default_client", lambda self: fake_client)
+
+    response = client.post(
+        "/api/job-intake/analyze",
+        json=analyze_payload("Sanitized legal coordinator request with mixed post-AI cleanup cases."),
+    )
+
+    data = response.json()
+    requirements = data["job_intelligence"]["requirements"]
+    positive_lists = (
+        data["must_have"]
+        + data["should_have"]
+        + data["nice_to_have"]
+        + data["credentials"]["required"]
+        + data["credentials"]["preferred"]
+    )
+    positive = fold(positive_lists)
+    blockers = fold(data["blockers"])
+
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["engine"] == "openai"
+    assert data["fallback_used"] is False
+    assert data["ai_model"] == "test-model-not-used"
+
+    assert "no avanzar" not in positive
+    assert "perfiles puramente litigiosos" in blockers
+    assert "perfiles sin titulo habilitante" in blockers
+    assert "no excluyente" not in positive
+    assert '"deseable"' not in positive
+
+    assert "ingles juridico" in fold(data["nice_to_have"])
+    assert "titulo habilitante requerido" in fold(data["credentials"]["required"])
+    assert fold(data["must_have"]).count("excel") == 1
+    assert fold(data["must_have"] + data["should_have"] + data["nice_to_have"]).count("excel") == 1
+
+    assert data["must_have"] == [item["text"] for item in requirements["must_have"]]
+    assert data["should_have"] == [item["text"] for item in requirements["should_have"]]
+    assert data["nice_to_have"] == [item["text"] for item in requirements["nice_to_have"]]
+    assert data["blockers"] == requirements["blockers"]
+    assert data["credentials"]["required"] == [
+        item["text"] for item in requirements["credentials"] if item.get("importance") == "must_have"
+    ]
+    assert data["credentials"]["preferred"] == [
+        item["text"] for item in requirements["credentials"] if item.get("importance") != "must_have"
+    ]
 
 
 def test_openai_schema_avoids_free_form_strict_schema_traps():

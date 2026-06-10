@@ -107,3 +107,93 @@ def test_runner_writes_outputs_and_continues_after_failed_case(tmp_path):
     assert result["summary"]["fail_count"] == 1
     assert result["cases"][1]["result_classification"] == "FAIL_TECHNICAL"
     assert len(calls) == 3
+
+
+def successful_record(**overrides):
+    data = {
+        "ok": True,
+        "engine": "openai",
+        "fallback_used": False,
+        "ai_model": "test-model",
+        "role_title": "Sanitized Role",
+        "role_family": "",
+        "summary": "Sanitized recruiter request.",
+        "must_have": [],
+        "should_have": [],
+        "nice_to_have": [],
+        "blockers": [],
+        "credentials": {"required": [], "preferred": []},
+        "location": {"normalized": ""},
+        "experience": {"minimum_years": None},
+        "warnings": [],
+        "confidence": 0.91,
+    }
+    data.update(overrides)
+    return runner.ResponseRecord(200, data, "{}")
+
+
+def test_runner_accepts_busqueda_001_plus_as_nice_to_have_not_under_promoted():
+    classification, notes = runner.classify_result(
+        "Inglés jurídico será un plus.",
+        successful_record(nice_to_have=["Inglés jurídico"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_accepts_busqueda_027_suma_as_nice_to_have_not_under_promoted():
+    classification, notes = runner.classify_result(
+        "Libreta de conducir suma.",
+        successful_record(
+            nice_to_have=["Libreta de conducir"],
+            credentials={"required": [], "preferred": ["Libreta de conducir"]},
+        ),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_accepts_busqueda_004_deseable_as_should_have():
+    classification, notes = runner.classify_result(
+        "CRM es deseable.",
+        successful_record(should_have=["CRM"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_fails_when_no_avanzar_leaks_into_requirements():
+    classification, notes = runner.classify_result(
+        "No avanzar perfiles puramente litigiosos sin experiencia corporativa.",
+        successful_record(must_have=["No avanzar perfiles puramente litigiosos sin experiencia corporativa"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_IMPORTANCE
+    assert any(note.startswith("blocker_leaked_to_requirement:must_have:") for note in notes)
+
+
+def test_runner_keeps_ai_schema_validation_failed_as_schema_failure():
+    classification, notes = runner.classify_result(
+        "Sanitized request.",
+        runner.ResponseRecord(
+            200,
+            {
+                "ok": False,
+                "warnings": ["ai_schema_validation_failed"],
+                "engine": "openai",
+                "fallback_used": False,
+            },
+            "{}",
+        ),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_SCHEMA
+    assert notes == ["ai_schema_validation_failed"]
