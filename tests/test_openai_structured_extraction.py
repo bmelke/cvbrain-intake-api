@@ -406,11 +406,19 @@ def test_schema_failure_logs_safe_internal_diagnostics(caplog):
     )
     invalid_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
     invalid_payload["search_readiness"]["status"] = "not_a_valid_status"
+    invalid_payload["candidate_screening_questions"] = ["sk-test-secret-should-not-log"]
+    invalid_payload["job_profile"]["summary"] = "unsafe sk-test-secret-should-not-log " + ("x" * 900)
     extractor = OpenAIStructuredExtractor(
         api_key="sk-test-secret-should-not-log",
         model="test-model-not-used",
         fallback_enabled=False,
-        client=FakeOpenAIClient(response={"output_parsed": invalid_payload}),
+        client=FakeOpenAIClient(
+            response={
+                "id": "resp_test_schema_failure",
+                "request_id": "req_test_schema_failure",
+                "output_parsed": invalid_payload,
+            }
+        ),
     )
     router = ExtractorRouter(
         env={
@@ -426,10 +434,25 @@ def test_schema_failure_logs_safe_internal_diagnostics(caplog):
         result = router.extract(request(source_text))
 
     log_output = "\n".join(record.getMessage() for record in caplog.records)
+    diagnostics_log = next(
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("cvbrain.ai_schema_validation_failed ")
+    )
+    diagnostics = json.loads(diagnostics_log.split("cvbrain.ai_schema_validation_failed ", 1)[1])
     assert result["ok"] is False
     assert result["warnings"] == ["ai_schema_validation_failed"]
     assert "cvbrain.ai_schema_validation_failed" in log_output
     assert "search_readiness.status" in log_output
+    assert diagnostics["validation_stage"] == "job_intelligence_v1_validation"
+    assert diagnostics["parse_path"] == "output_parsed"
+    assert diagnostics["validation_errors"][0]["path"] == "search_readiness.status"
+    assert "search_readiness.status is invalid" in diagnostics["validation_errors"][0]["message"]
+    assert diagnostics["openai_response_id"] == "resp_test_schema_failure"
+    assert diagnostics["openai_request_id"] == "req_test_schema_failure"
+    assert len(diagnostics["sanitized_raw_output_sha256"]) == 64
+    assert len(diagnostics["sanitized_raw_output_preview"]) <= 500
+    assert "[redacted-api-key]" in diagnostics["sanitized_raw_output_preview"]
     assert "validation_error_count" in log_output
     assert "parsed_top_level_keys" in log_output
     assert "job_intelligence_top_level_keys" in log_output

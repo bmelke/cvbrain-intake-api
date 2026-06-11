@@ -7,6 +7,7 @@ injected client.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -24,6 +25,7 @@ from app.schemas.job_intelligence_v1_contract import (
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_MAX_INPUT_CHARS = 12000
 DEFAULT_MAX_OUTPUT_TOKENS = 4096
+RAW_OUTPUT_PREVIEW_CHARS = 500
 OPENAI_API_SHAPE = "responses.create:text.format.json_schema"
 LOGGER = logging.getLogger("cvbrain.openai_structured")
 
@@ -121,6 +123,7 @@ class OpenAIStructuredExtractor:
         ai_payload = self.build_payload(request)
         parsed_job_intelligence: Optional[Dict[str, Any]] = None
         job_intelligence: Optional[Dict[str, Any]] = None
+        response: Optional[Any] = None
 
         self._log_event(
             "request_start",
@@ -144,6 +147,7 @@ class OpenAIStructuredExtractor:
             self._log_schema_validation_failure(
                 error,
                 request_payload=ai_payload,
+                response=response,
                 parsed_job_intelligence=parsed_job_intelligence,
                 job_intelligence=job_intelligence,
             )
@@ -327,14 +331,20 @@ class OpenAIStructuredExtractor:
         self,
         error: JobIntelligenceValidationError,
         request_payload: Mapping[str, Any],
+        response: Optional[Any],
         parsed_job_intelligence: Optional[Mapping[str, Any]],
         job_intelligence: Optional[Mapping[str, Any]],
     ) -> None:
         message = str(error)
+        raw_output = _raw_output_for_diagnostics(response, parsed_job_intelligence)
+        sanitized_raw_output = _sanitize_text(raw_output, limit=20000)
         diagnostics = {
             "event": "cvbrain.ai_schema_validation_failed",
             "exception_class": error.__class__.__name__,
             "sanitized_exception_message": _sanitize_text(message),
+            "validation_stage": "job_intelligence_v1_validation",
+            "parse_path": _response_parse_path(response),
+            "validation_errors": _validation_errors(message),
             "validation_error_fields": _validation_error_fields(message),
             "validation_error_count": _validation_error_count(message),
             "parsed_top_level_keys": _safe_keys(parsed_job_intelligence or {}),
@@ -346,6 +356,10 @@ class OpenAIStructuredExtractor:
             "extractor_mode": self.extractor_mode,
             "strict_schema_enabled": self.strict_schema_enabled,
             "fallback_enabled": self.fallback_enabled,
+            "openai_response_id": _sanitize_text(str(_get_response_value(response, "id") or "")),
+            "openai_request_id": _sanitize_text(str(_get_response_value(response, "request_id") or "")),
+            "sanitized_raw_output_sha256": _sha256_hex(sanitized_raw_output),
+            "sanitized_raw_output_preview": _sanitize_text(raw_output, limit=RAW_OUTPUT_PREVIEW_CHARS),
             "locale": request_payload.get("locale"),
             "country_context": request_payload.get("country_context"),
             "candidate_market": request_payload.get("candidate_market"),
@@ -722,6 +736,19 @@ def _validation_error_count(message: str) -> int:
     return len(parts) if parts else 0
 
 
+def _validation_errors(message: str) -> list[Dict[str, str]]:
+    output = []
+    for part in [chunk.strip() for chunk in str(message).split(";") if chunk.strip()]:
+        fields = _validation_error_fields(part)
+        output.append(
+            {
+                "path": fields[0] if fields else "",
+                "message": _sanitize_text(part, 240),
+            }
+        )
+    return output
+
+
 def _validation_error_fields(message: str) -> list[str]:
     fields = []
     for part in [chunk.strip() for chunk in str(message).split(";") if chunk.strip()]:
@@ -733,6 +760,42 @@ def _validation_error_fields(message: str) -> list[str]:
         if top_level:
             fields.append(top_level.group(1))
     return list(dict.fromkeys(fields))
+
+
+def _response_parse_path(response: Any) -> str:
+    if response is None:
+        return "response_unavailable"
+    if _get_response_value(response, "output_parsed") is not None:
+        return "output_parsed"
+    if _get_response_value(response, "output_text"):
+        return "output_text"
+    if _output_text_from_output_items(_get_response_value(response, "output")):
+        return "output_array.output_text"
+    if _get_response_value(response, "refusal"):
+        return "refusal"
+    return "unknown"
+
+
+def _raw_output_for_diagnostics(response: Any, parsed_payload: Optional[Mapping[str, Any]]) -> str:
+    output_text = _get_response_value(response, "output_text")
+    if output_text:
+        return str(output_text)
+
+    output_items_text = _output_text_from_output_items(_get_response_value(response, "output"))
+    if output_items_text:
+        return output_items_text
+
+    if parsed_payload is not None:
+        try:
+            return json.dumps(parsed_payload, ensure_ascii=False, sort_keys=True, default=str)
+        except (TypeError, ValueError):
+            return str(parsed_payload)
+
+    return ""
+
+
+def _sha256_hex(value: str) -> str:
+    return hashlib.sha256(str(value).encode("utf-8")).hexdigest()
 
 
 def _requirements_bucket_counts(job_intelligence: Optional[Mapping[str, Any]]) -> Dict[str, int]:
