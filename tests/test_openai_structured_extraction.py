@@ -4,6 +4,7 @@ import sys
 import unicodedata
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.extractors import ExtractorRequest, ExtractorRouter
@@ -158,6 +159,21 @@ def dirty_post_ai_payload():
     }
 
 
+def role_title_payload(ai_title):
+    payload = dirty_post_ai_payload()
+    payload["job_profile"]["job_title"] = ai_title
+    payload["job_profile"]["normalized_role_title"] = ai_title
+    payload["search_strategy"]["target_titles"] = [ai_title]
+    payload["search_strategy"]["search_terms"] = [ai_title]
+    payload["search_strategy"]["semantic_terms"] = []
+    payload["requirements"]["must_have"] = []
+    payload["requirements"]["should_have"] = []
+    payload["requirements"]["nice_to_have"] = []
+    payload["requirements"]["credentials"] = []
+    payload["requirements"]["blockers"] = []
+    return payload
+
+
 def test_deterministic_default_does_not_construct_openai_client(monkeypatch):
     monkeypatch.delenv("CVBRAIN_EXTRACTOR_MODE", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -298,6 +314,61 @@ def test_analyze_endpoint_ai_path_normalizes_dirty_parsed_payload_before_respons
     assert data["credentials"]["preferred"] == [
         item["text"] for item in requirements["credentials"] if item.get("importance") != "must_have"
     ]
+
+
+@pytest.mark.parametrize(
+    ("source_text", "ai_title", "expected_title"),
+    [
+        (
+            "Empresa de servicios B2B busca Gerente Comercial para liderar equipo y estrategia.",
+            "Commercial Manager",
+            "Gerente Comercial",
+        ),
+        (
+            "Retail importador busca Gerente de Importaciones / Comercio Exterior para coordinar compras internacionales.",
+            "Importations Manager / International Trade",
+            "Gerente de Importaciones / Comercio Exterior",
+        ),
+        (
+            "Empresa de servicios tecnológicos busca Ejecutivo Comercial B2B para vender soluciones a empresas.",
+            "B2B Sales Executive",
+            "Ejecutivo Comercial B2B",
+        ),
+        (
+            "Empresa de software busca Soporte Aplicativo para atender incidencias de sistemas.",
+            "Application Support",
+            "Soporte Aplicativo",
+        ),
+    ],
+)
+def test_spanish_source_preserves_spanish_primary_role_title(source_text, ai_title, expected_title):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(ai_title)}),
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["role_title"] == expected_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == expected_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == expected_title
+    assert expected_title in result["search_terms"]
+    assert ai_title in result["search_terms"] or ai_title in result["semantic_terms"]
+
+
+def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it():
+    source_text = "Compañía tecnológica busca Data Engineer Semi Senior para construir pipelines de datos."
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload("Data Engineer")}),
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["role_title"] == "Data Engineer"
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == "Data Engineer"
 
 
 def test_openai_schema_avoids_free_form_strict_schema_traps():

@@ -16,6 +16,7 @@ from typing import Any, Dict, Mapping, Optional
 from app.extractors.base import ExtractorError, ExtractorRequest
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
 from app.normalization.requirement_importance import normalize_job_intelligence_requirements
+from app.normalization.role_title import normalize_role_title_for_source
 from app.schemas.job_intelligence_v1_contract import (
     JobIntelligenceValidationError,
     validate_job_intelligence_v1,
@@ -135,6 +136,7 @@ class OpenAIStructuredExtractor:
             response = self._responses_parse(ai_payload)
             parsed_job_intelligence = self._extract_payload(response)
             job_intelligence = normalize_job_intelligence_requirements(parsed_job_intelligence, source_text=request.source_text)
+            job_intelligence = normalize_role_title_for_source(job_intelligence, source_text=request.source_text)
             validate_job_intelligence_v1(job_intelligence)
         except ExtractorError as error:
             self._log_exception(

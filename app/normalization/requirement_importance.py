@@ -72,13 +72,16 @@ ORPHAN_FRAGMENT_PATTERN = re.compile(
     r"^(?:y|e|o|and|or)\b|"
     r"^(?:software|hardware|redes?\s+b[aá]sicas?|soporte\s+remoto)$|"
     r"^(?:la\s+persona\s+deber[aá]\s+liderar|se\s+requiere\s+base\s+t[eé]cnica\s+en|base\s+t[eé]cnica\s+en)$|"
-    r"^ni\s+perfiles?\s+junior\b.*",
+    r"^(?:se\s+requiere|se\s+requieren|es\s+excluyente|son\s+excluyentes|"
+    r"experiencia\s+(?:en|con)|manejo\s+de|dominio\s+de|conocimientos?\s+de)$",
     re.I,
 )
 
 NO_AVANZAR_PATTERN = re.compile(r"\bno\s+avanzar\b.*", re.I)
 NO_PRESENTARSE_BLOCKER_PATTERN = re.compile(r"\bno\s+presentarse\s+si\s+no\b.*", re.I)
 SIN_NO_AVANZAR_PATTERN = re.compile(r"\bsin\s+.+?\s+no\s+avanzar\b.*", re.I)
+NO_SOLO_BLOCKER_PATTERN = re.compile(r"\bno\s+(?:solo|solamente)\b.*", re.I)
+NI_NEGATIVE_FRAGMENT_PATTERN = re.compile(r"^\s*ni\s+(.+)", re.I)
 
 MODIFIER_ONLY_FRAGMENT_PATTERNS = (
     re.compile(r"^no\s+excluyente$", re.I),
@@ -174,7 +177,7 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
         "nice_to_have": [],
         "credentials": [],
     }
-    blockers = [str(item).strip() for item in requirements.get("blockers", []) or [] if str(item).strip()]
+    blockers = _normalize_blocker_list(requirements.get("blockers", []) or [])
     source_text = source_text or ""
 
     for section_name, default in (
@@ -232,7 +235,7 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     requirements["should_have"] = should_have
     requirements["nice_to_have"] = nice_to_have
     requirements["credentials"] = _unique_credentials_by_strongest_importance(buckets["credentials"])
-    requirements["blockers"] = _unique(blockers)
+    requirements["blockers"] = _normalize_blocker_list(blockers)
     requirements["soft_competencies"] = _normalize_soft_competencies(
         requirements.get("soft_competencies", [])
     )
@@ -330,6 +333,9 @@ def normalize_requirement_text(text: str) -> str:
 def blocker_text_for_clause(text: str) -> str:
     if re.search(r"no\s+presentarse\s+a\s+menos\s+que\s+pueda\s+viajar", text, re.I):
         return "No avanzar si no puede viajar"
+    ni_fragment = NI_NEGATIVE_FRAGMENT_PATTERN.match(str(text).strip())
+    if ni_fragment:
+        return _normalize_blocker_text(f"No avanzar {ni_fragment.group(1)}")
     blocker = _extract_blocker_fragment(text)
     if blocker:
         return _normalize_blocker_text(blocker)
@@ -343,7 +349,8 @@ def _is_blocker_only_clause(text: str) -> bool:
     return bool(
         re.search(
             r"\bno\s+avanzar\b|\bno\s+presentarse\s+si\s+no\b|"
-            r"\bsin\s+.+?\s+no\s+avanzar\b|\bno\s+considerar\b",
+            r"\bsin\s+.+?\s+no\s+avanzar\b|\bno\s+considerar\b|"
+            r"\bno\s+(?:solo|solamente)\b|^\s*ni\s+",
             lowered,
         )
     )
@@ -627,10 +634,8 @@ def _is_credential_text(text: str) -> bool:
 
 def _normalize_blockers_and_negations(requirements: Mapping[str, Any], source_text: str) -> Dict[str, Any]:
     output: Dict[str, Any] = dict(requirements)
-    blockers = _unique(
-        [str(item).strip() for item in output.get("blockers", []) or [] if str(item).strip()]
-        + _blockers_from_text(source_text)
-    )
+    blockers = _normalize_blocker_list(output.get("blockers", []) or [])
+    blockers = _normalize_blocker_list(blockers + _blockers_from_text(source_text))
 
     for bucket in ("must_have", "should_have", "nice_to_have"):
         cleaned, blockers = _clean_requirement_items(output.get(bucket, []), blockers)
@@ -648,13 +653,13 @@ def _normalize_blockers_and_negations(requirements: Mapping[str, Any], source_te
         if not _is_attached_source_blocker_fragment(item, blockers)
     ]
     output["credentials"] = _unique_credentials_by_strongest_importance(cleaned_credentials)
-    output["blockers"] = _unique(blockers)
+    output["blockers"] = _normalize_blocker_list(blockers)
     return output
 
 
 def _dedupe_requirement_concepts(requirements: Mapping[str, Any]) -> Dict[str, Any]:
     output: Dict[str, Any] = dict(requirements)
-    blockers = _unique([str(item).strip() for item in output.get("blockers", []) or [] if str(item).strip()])
+    blockers = _normalize_blocker_list(output.get("blockers", []) or [])
     blocker_keys = {_requirement_concept_key(blocker) for blocker in blockers}
     blocker_keys.discard("")
 
@@ -938,7 +943,12 @@ def _extract_blocker_fragment(text: str) -> str:
         return ""
 
     matches = []
-    for pattern in (NO_AVANZAR_PATTERN, NO_PRESENTARSE_BLOCKER_PATTERN, SIN_NO_AVANZAR_PATTERN):
+    for pattern in (
+        NO_AVANZAR_PATTERN,
+        NO_PRESENTARSE_BLOCKER_PATTERN,
+        SIN_NO_AVANZAR_PATTERN,
+        NO_SOLO_BLOCKER_PATTERN,
+    ):
         match = pattern.search(clean)
         if match:
             matches.append((match.start(), match.group(0)))
@@ -948,9 +958,43 @@ def _extract_blocker_fragment(text: str) -> str:
 
 
 def _normalize_blocker_text(text: str) -> str:
-    clean = _normalize_accents(str(text))
+    raw = str(text)
+    had_final_period = raw.strip().endswith(".")
+    clean = _normalize_accents(raw)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;\t\r\n")
+    clean = _dedupe_repeated_no_avanzar_segments(clean)
+    if _fold(clean) == "no avanzar":
+        return ""
+    if had_final_period and clean and not clean.endswith("."):
+        clean = f"{clean}."
     return _capitalize_first(clean)
+
+
+def _normalize_blocker_list(items: Iterable[str]) -> List[str]:
+    return _unique(_normalize_blocker_text(str(item)) for item in items if str(item).strip())
+
+
+def _dedupe_repeated_no_avanzar_segments(text: str) -> str:
+    if len(re.findall(r"\bno\s+avanzar\b", text, re.I)) < 2:
+        return text
+
+    segments = [
+        segment.strip(" -:.,;\t\r\n")
+        for segment in re.split(r"(?=\bno\s+avanzar\b)", text, flags=re.I)
+        if segment.strip(" -:.,;\t\r\n")
+    ]
+    if len(segments) <= 1:
+        return text
+
+    output: List[str] = []
+    seen = set()
+    for segment in segments:
+        key = _fold(segment)
+        if key == "no avanzar" or key in seen:
+            continue
+        seen.add(key)
+        output.append(segment)
+    return ". ".join(output) if output else ""
 
 
 def _is_modifier_only_fragment(text: str) -> bool:
@@ -976,8 +1020,14 @@ def _is_attached_source_blocker_fragment(item: Mapping[str, Any], blockers: Iter
     for blocker in blockers:
         blocker_key = _fold(blocker)
         if item_key not in blocker_key:
+            if item_key.startswith("ni "):
+                item_without_ni = item_key[3:].strip()
+                if item_without_ni and item_without_ni in blocker_key:
+                    return True
             continue
         if re.search(r"\bsin\b", item_key):
+            return True
+        if item_key.startswith("ni "):
             return True
         if re.search(rf"(?:,\s+|;\s+|\bni\s+){re.escape(item_key)}\b", blocker_key):
             return True

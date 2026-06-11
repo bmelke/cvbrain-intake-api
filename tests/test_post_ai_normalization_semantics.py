@@ -472,6 +472,126 @@ def test_cleanup_preserves_legitimate_short_skill_tokens():
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_busqueda_016_ni_wordpress_fragment_is_blocker_not_should_have():
+    blocker_source = "No avanzar maquetadores sin lógica frontend ni perfiles WordPress puros"
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia en aplicaciones web reales"),
+                requirement_item("No solamente implementaciones WordPress sin desarrollo a medida"),
+            ],
+            "should_have": [
+                requirement_item("Ni perfiles WordPress puros", "preferred", source_text=blocker_source),
+            ],
+        },
+        source_text=blocker_source,
+    )
+
+    assert_not_in_requirements_or_credentials(
+        normalized,
+        flat,
+        "Ni perfiles WordPress puros",
+        "No solamente implementaciones WordPress",
+    )
+    assert_blockers_contain(normalized, flat, "maquetadores", "lógica frontend", "WordPress", "no solamente")
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+@pytest.mark.parametrize(
+    ("case_label", "fragment", "preserved_skill"),
+    [
+        ("BUSQUEDA_025", "Se requiere", "SQL"),
+        ("BUSQUEDA_032", "Experiencia con", "Docker"),
+        ("BUSQUEDA_055", "Conocimiento de", "Git"),
+        ("BUSQUEDA_061", "Es excluyente", "Excel"),
+        ("BUSQUEDA_061", "Experiencia en", "Excel"),
+        ("BUSQUEDA_061", "Manejo de", "Excel"),
+    ],
+)
+def test_prefix_only_orphan_fragments_are_dropped_but_short_skills_remain(
+    case_label,
+    fragment,
+    preserved_skill,
+):
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item(fragment),
+                requirement_item(preserved_skill),
+            ],
+        }
+    )
+
+    assert case_label
+    assert_not_in_requirements_or_credentials(normalized, flat, fragment)
+    assert preserved_skill in flat["must_have"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_busqueda_050_ni_cobradores_fragment_is_blocker_not_must_have():
+    blocker_source = "No avanzar cobradores sin experiencia corporativa ni cobradores solo de consumo individual"
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia en cobranzas corporativas"),
+                requirement_item("Ni cobradores solo de consumo individual", source_text=blocker_source),
+            ],
+        },
+        source_text=blocker_source,
+    )
+
+    assert_not_in_requirements_or_credentials(
+        normalized,
+        flat,
+        "Ni cobradores solo de consumo individual",
+        "consumo individual",
+    )
+    assert_blockers_contain(normalized, flat, "cobradores", "experiencia corporativa", "consumo individual")
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_no_solo_and_no_solamente_qualification_clauses_are_not_must_have():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("No solo tareas administrativas"),
+                requirement_item("No solamente soporte operativo"),
+                requirement_item("Experiencia comercial B2B"),
+            ],
+        }
+    )
+
+    assert_not_in_requirements_or_credentials(
+        normalized,
+        flat,
+        "No solo tareas administrativas",
+        "No solamente soporte operativo",
+    )
+    assert flat["must_have"] == ["Experiencia comercial B2B"]
+    assert_blockers_contain(normalized, flat, "no solo tareas administrativas", "no solamente soporte operativo")
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_blocker_text_dedupes_repeated_no_avanzar_and_drops_naked_blocker():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia comercial B2B"),
+            ],
+            "blockers": [
+                "No avanzar perfiles sin experiencia. No avanzar perfiles sin experiencia",
+                "No avanzar",
+            ],
+        }
+    )
+
+    blockers = flat["blockers"]
+    assert blockers == ["No avanzar perfiles sin experiencia"]
+    assert fold(blockers).count("no avanzar") == 1
+    assert "no avanzar" != fold(blockers[0]).strip(" .")
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_alternative_healthcare_commercial_experience_stays_one_composite_requirement():
     phrase = "experiencia comercial en salud, laboratorios, equipamiento médico, dispositivos médicos o servicios vinculados al sector"
     normalized, flat = normalize_and_flatten(
