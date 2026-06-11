@@ -43,9 +43,15 @@ SOURCE_ROLE_LEAD_PATTERN = re.compile(
     re.I | re.S,
 )
 
+TITLE_SENTENCE_TAIL_PATTERN = re.compile(
+    r"(?:[.;:]\s*)?\b(?:es\s+excluyente|excluyente|la\s+persona|se\s+requiere|debe|deseable|valorable)\b.*$",
+    re.I | re.S,
+)
+
 SPANISH_ROLE_PATTERN = re.compile(
     rf"\b(?:{'|'.join(SPANISH_TITLE_START)})\b"
-    r"(?:\s+(?!(?:para|con|que|deber[aá]|debe|busca|buscamos|necesita)\b)"
+    r"(?:\s+(?!(?:para|con|que|deber[aá]|debe|busca|buscamos|necesita|"
+    r"es|excluyente|la|se|deseable|valorable)\b)"
     r"[A-Za-zÁÉÍÓÚáéíóúÑñ0-9/+.-]+){0,7}",
     re.I,
 )
@@ -65,8 +71,14 @@ def normalize_role_title_for_source(payload: Mapping[str, Any], source_text: str
     if not current_title:
         return output
 
+    cleaned_current_title = _clean_role_title(current_title)
     source_title = _source_role_title(source_text)
     if not source_title:
+        if cleaned_current_title and _fold(cleaned_current_title) != _fold(current_title):
+            job_profile["job_title"] = cleaned_current_title
+            job_profile["normalized_role_title"] = cleaned_current_title
+            output["job_profile"] = job_profile
+            _preserve_role_title_terms(output, cleaned_current_title, [current_title])
         return output
 
     if _fold(source_title) == _fold(current_title):
@@ -112,10 +124,15 @@ def _preserved_english_title_from_source(source: str) -> str:
 
 
 def _spanish_title_from_text(text: str) -> str:
-    match = SPANISH_ROLE_PATTERN.search(text)
+    match = SPANISH_ROLE_PATTERN.search(_clean_role_title(text))
     if not match:
         return ""
-    title = match.group(0).strip(" -:.,;\t\r\n")
+    return _clean_role_title(match.group(0))
+
+
+def _clean_role_title(text: str) -> str:
+    title = TITLE_SENTENCE_TAIL_PATTERN.sub("", str(text or ""))
+    title = title.strip(" -:.,;\t\r\n")
     title = re.sub(r"\s*/\s*", " / ", title)
     title = re.sub(r"\s+", " ", title).strip()
     return title

@@ -381,6 +381,45 @@ def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it
     assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == "Data Engineer"
 
 
+@pytest.mark.parametrize(
+    ("source_text", "dirty_ai_title", "expected_title"),
+    [
+        (
+            "Rol: Técnico de Soporte IT Junior. Excluyente experiencia de al menos 1 año.",
+            "Técnico de Soporte IT Junior. Excluyente experiencia de",
+            "Técnico de Soporte IT Junior",
+        ),
+        (
+            "Empresa de servicios busca Responsable de Recursos Humanos generalista. La persona deberá gestionar selección.",
+            "Responsable de Recursos Humanos generalista. La persona",
+            "Responsable de Recursos Humanos generalista",
+        ),
+        (
+            "Importadora busca Encargado de Depósito. La persona deberá liderar equipo operativo.",
+            "Encargado de Depósito. La persona",
+            "Encargado de Depósito",
+        ),
+        (
+            "Empresa de telecomunicaciones busca Técnico de Campo. Es excluyente experiencia instalando o manteniendo redes.",
+            "Técnico de Campo. Es excluyente experiencia instalando o",
+            "Técnico de Campo",
+        ),
+    ],
+)
+def test_role_title_sentence_tail_contamination_is_clipped(source_text, dirty_ai_title, expected_title):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(dirty_ai_title)}),
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["role_title"] == expected_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == expected_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == expected_title
+
+
 def test_openai_schema_avoids_free_form_strict_schema_traps():
     schema = job_intelligence_v1_response_schema()
 

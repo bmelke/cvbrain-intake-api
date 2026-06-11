@@ -157,6 +157,17 @@ def test_runner_accepts_busqueda_027_suma_as_nice_to_have_not_under_promoted():
     assert notes == []
 
 
+def test_runner_accepts_se_valorara_and_puede_sumar_as_nice_to_have():
+    classification, notes = runner.classify_result(
+        "Se valorará experiencia con TMS, WMS y Excel. Libreta profesional puede sumar.",
+        successful_record(nice_to_have=["TMS", "WMS", "Excel", "Libreta profesional"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
 def test_runner_accepts_busqueda_004_deseable_as_should_have():
     classification, notes = runner.classify_result(
         "CRM es deseable.",
@@ -168,6 +179,28 @@ def test_runner_accepts_busqueda_004_deseable_as_should_have():
     assert notes == []
 
 
+def test_runner_accepts_idealmente_as_should_have_without_importance_failure():
+    classification, notes = runner.classify_result(
+        "Idealmente experiencia en empresas de servicios.",
+        successful_record(should_have=["Experiencia en empresas de servicios"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_fails_when_weak_preference_is_promoted_to_should_have():
+    classification, notes = runner.classify_result(
+        "Libreta profesional puede sumar.",
+        successful_record(should_have=["Libreta profesional"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_IMPORTANCE
+    assert any(note.startswith("weak_modifier_over_promoted:should_have:") for note in notes)
+
+
 def test_runner_fails_when_no_avanzar_leaks_into_requirements():
     classification, notes = runner.classify_result(
         "No avanzar perfiles puramente litigiosos sin experiencia corporativa.",
@@ -177,6 +210,17 @@ def test_runner_fails_when_no_avanzar_leaks_into_requirements():
 
     assert classification == runner.FAIL_IMPORTANCE
     assert any(note.startswith("blocker_leaked_to_requirement:must_have:") for note in notes)
+
+
+def test_runner_fails_when_naked_no_avanzar_leaks_into_requirements():
+    classification, notes = runner.classify_result(
+        "No avanzar perfiles no calificados.",
+        successful_record(nice_to_have=["No avanzar"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_IMPORTANCE
+    assert any(note.startswith("blocker_leaked_to_requirement:nice_to_have:") for note in notes)
 
 
 def test_runner_keeps_ai_schema_validation_failed_as_schema_failure():

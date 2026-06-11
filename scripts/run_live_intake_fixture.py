@@ -77,7 +77,7 @@ ORPHAN_REQUIREMENTS = {
 WEAK_MODIFIER_PATTERN = re.compile(
     r"\b("
     r"valorables?|ser[aá]\s+valorables?|se\s+valora|se\s+valorar[aá](?:\s+especialmente)?|"
-    r"plus|es\s+un\s+plus|suma|no\s+central|nice\s+to\s+have|would\s+be\s+a\s+plus"
+    r"plus|es\s+un\s+plus|suma|puede\s+sumar|no\s+central|nice\s+to\s+have|would\s+be\s+a\s+plus"
     r")\b",
     re.I,
 )
@@ -369,6 +369,8 @@ def orphan_fragment_notes(data: Mapping[str, Any]) -> List[str]:
             folded = _fold(item.strip(" -:.,;\t\r\n"))
             if folded in {_fold(value) for value in ORPHAN_REQUIREMENTS}:
                 notes.append(f"orphan_fragment:{bucket}:{item}")
+            if _is_incomplete_para_tail(item):
+                notes.append(f"orphan_fragment:{bucket}:{item}")
     return notes
 
 
@@ -518,6 +520,28 @@ def _meaningful_tokens(text: str) -> set[str]:
         for token in re.findall(r"[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]+", _fold(text))
         if len(token) > 2 and token not in stopwords
     }
+
+
+def _is_incomplete_para_tail(text: str) -> bool:
+    folded = _fold(str(text).strip(" -:.,;\t\r\n"))
+    if not folded.startswith("para "):
+        return False
+    skill_tokens = {
+        "sql",
+        "git",
+        "docker",
+        "excel",
+        "crm",
+        "erp",
+        "sap",
+        "odoo",
+        "tms",
+        "wms",
+        "power bi",
+        "microsoft 365",
+        "active directory",
+    }
+    return not any(skill in folded for skill in skill_tokens)
 
 
 def search_readiness_status(data: Mapping[str, Any]) -> str:

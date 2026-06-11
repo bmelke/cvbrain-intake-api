@@ -592,6 +592,90 @@ def test_blocker_text_dedupes_repeated_no_avanzar_and_drops_naked_blocker():
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+@pytest.mark.parametrize(
+    ("case_label", "bucket"),
+    [
+        ("BUSQUEDA_047", "must_have"),
+        ("BUSQUEDA_048", "must_have"),
+        ("BUSQUEDA_069", "nice_to_have"),
+    ],
+)
+def test_naked_no_avanzar_requirement_is_dropped_without_creating_empty_blocker(case_label, bucket):
+    requirements = {
+        "must_have": [requirement_item("Experiencia comprobable")],
+        bucket: [requirement_item("No avanzar", "nice_to_have" if bucket == "nice_to_have" else "must_have")],
+    }
+    normalized, flat = normalize_and_flatten(requirements)
+
+    assert case_label
+    assert_not_in_requirements_or_credentials(normalized, flat, "No avanzar")
+    assert flat["blockers"] == []
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+@pytest.mark.parametrize(
+    ("case_label", "tail"),
+    [
+        ("BUSQUEDA_020", "Para coordinar operaciones de importación"),
+        ("BUSQUEDA_072", "Para atención telefónica"),
+    ],
+)
+def test_incomplete_para_phrase_tails_are_dropped(case_label, tail):
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item(tail, "preferred"),
+                requirement_item("Inglés deseable", "preferred"),
+            ],
+        }
+    )
+
+    assert case_label
+    assert_not_in_requirements_or_credentials(normalized, flat, tail)
+    assert flat["should_have"] == ["Inglés"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_busqueda_006_weak_preferences_stay_nice_to_have_after_source_normalization():
+    source_text = (
+        "Se valorará experiencia con TMS, WMS, Excel y tableros de indicadores. "
+        "Libreta profesional puede sumar, pero no es requisito."
+    )
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item("TMS", "preferred", source_text="Se valorará experiencia con TMS"),
+                requirement_item("WMS", "preferred", source_text="Se valorará experiencia con WMS"),
+                requirement_item("Excel", "preferred", source_text="Se valorará experiencia con Excel"),
+                requirement_item(
+                    "Tableros de indicadores",
+                    "preferred",
+                    source_text="Se valorará experiencia con tableros de indicadores",
+                ),
+            ],
+            "must_have": [
+                requirement_item(
+                    "Libreta profesional",
+                    "must_have",
+                    source_text="Libreta profesional puede sumar, pero no es requisito",
+                ),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert "tms" not in fold(flat["must_have"] + flat["should_have"])
+    assert "wms" not in fold(flat["must_have"] + flat["should_have"])
+    assert "excel" not in fold(flat["must_have"] + flat["should_have"])
+    assert "tableros de indicadores" not in fold(flat["must_have"] + flat["should_have"])
+    assert "libreta profesional" not in fold(flat["must_have"] + flat["should_have"])
+    nice = fold(flat["nice_to_have"])
+    for expected in ("tms", "wms", "excel", "tableros de indicadores", "libreta profesional"):
+        assert expected in nice
+    assert "libreta profesional" not in fold(flat["credentials"]["required"])
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_alternative_healthcare_commercial_experience_stays_one_composite_requirement():
     phrase = "experiencia comercial en salud, laboratorios, equipamiento médico, dispositivos médicos o servicios vinculados al sector"
     normalized, flat = normalize_and_flatten(

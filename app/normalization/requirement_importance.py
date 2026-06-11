@@ -33,7 +33,7 @@ HARD_PATTERN = re.compile(
 
 STRONG_PREFERENCE_PATTERN = re.compile(
     r"\b("
-    r"deseable|deseables|preferid[oa]s?|preferentemente|ideal|"
+    r"deseable|deseables|preferid[oa]s?|preferentemente|ideal(?:mente)?|"
     r"muy\s+valorad[oa]s?|muy\s+valorables?|"
     r"strongly\s+preferred|preferred|desirable"
     r")\b",
@@ -43,7 +43,7 @@ STRONG_PREFERENCE_PATTERN = re.compile(
 WEAK_PREFERENCE_PATTERN = re.compile(
     r"\b("
     r"valorables?|ser[aá]\s+valorables?|se\s+valora|se\s+valorar[aá](?:\s+especialmente)?|"
-    r"plus|es\s+un\s+plus|suma|no\s+central|"
+    r"plus|es\s+un\s+plus|suma|puede\s+sumar|no\s+central|"
     r"nice\s+to\s+have|would\s+be\s+a\s+plus"
     r")\b",
     re.I,
@@ -103,6 +103,14 @@ NEGATIVE_FILTER_MODIFIER_PATTERN = re.compile(
 
 ALTERNATIVE_MARKER_PATTERN = re.compile(
     r"\b(?:o|u|similares?|afines?|equivalentes?|vinculad[oa]s?)\b",
+    re.I,
+)
+
+STANDALONE_SKILL_PATTERN = re.compile(
+    r"\b("
+    r"sql|git|docker|excel|crm|erp|sap|odoo|tms|wms|power\s+bi|"
+    r"microsoft\s+365|active\s+directory|itil|scrum|pmp|python|react|typescript"
+    r")\b",
     re.I,
 )
 
@@ -487,6 +495,20 @@ def _expand_coordinated_sentence(sentence: str) -> List[str]:
             prefix = "Dominio de"
         return [f"{prefix} {_normalize_accents(item)}" for item in _split_coordinated_list(knowledge.group(2))]
 
+    valued_experience = re.match(
+        r"^(?P<modifier>deseable|idealmente|ideal|valorable|se\s+valora|se\s+valorar[aá]|"
+        r"ser[aá]\s+valorable|preferentemente|plus|suma|puede\s+sumar)\s+"
+        r"experiencia\s+con\s+(?P<items>.+)$",
+        clean,
+        re.I,
+    )
+    if valued_experience and _has_list_separator(valued_experience.group("items")):
+        modifier = valued_experience.group("modifier")
+        return [
+            f"{modifier} experiencia con {_normalize_accents(item)}"
+            for item in _split_coordinated_list(valued_experience.group("items"))
+        ]
+
     english_knowledge = re.match(
         r"^(?:preferred\s+|desirable\s+|nice\s+to\s+have\s+)?(?:knowledge|experience)\s+(?:of|with)\s+(.+)$",
         clean,
@@ -538,7 +560,7 @@ def _remove_importance_label(text: str) -> str:
         r"se\s+requiere|se\s+requieren|"
         r"se\s+valorar[aá](?:\s+especialmente)?|ser[aá]\s+valorable|"
         r"valorable|valorables|se\s+valora|"
-        r"preferid[oa]s?|preferentemente|ideal|plus|es\s+un\s+plus|suma|"
+        r"preferid[oa]s?|preferentemente|ideal(?:mente)?|plus|es\s+un\s+plus|suma|puede\s+sumar|"
         r"nice\s+to\s+have|would\s+be\s+a\s+plus|strongly\s+preferred|preferred|desirable)\s+",
         "",
         text,
@@ -550,9 +572,11 @@ def _remove_trailing_importance_modifier(text: str) -> str:
     clean = text.strip()
     trailing_patterns = (
         r"\s+es\s+deseable$",
+        r"\s+deseables?$",
         r"\s+ser[aá]\s+valorables?$",
         r"\s+ser[aá]\s+un\s+plus$",
         r"\s+es\s+un\s+plus$",
+        r"\s+puede\s+sumar(?:,?\s*(?:pero\s+)?no\s+es\s+requisito)?$",
         r"\s+suma$",
         r"\s+no\s+central$",
         r"\s+no\s+excluyente$",
@@ -598,13 +622,26 @@ def _is_orphan_requirement_text(text: str) -> bool:
     folded = _fold(clean.strip(" -:.,;\t\r\n"))
     if not folded:
         return True
+    if folded == "no avanzar":
+        return True
     if _is_modifier_only_fragment(text) or _is_modifier_only_fragment(clean):
         return True
     if ORPHAN_FRAGMENT_PATTERN.search(folded):
         return True
+    if _is_incomplete_para_tail(clean):
+        return True
     if folded in {"excluyente experiencia de al menos 1 ano resolviendo incidentes de", "experiencia de al menos 1 ano resolviendo incidentes de"}:
         return True
     return False
+
+
+def _is_incomplete_para_tail(text: str) -> bool:
+    folded = _fold(str(text).strip(" -:.,;\t\r\n"))
+    if not folded.startswith("para "):
+        return False
+    if _is_credential_text(text) or STANDALONE_SKILL_PATTERN.search(text):
+        return False
+    return True
 
 
 def _strip_section_heading(text: str) -> str:
@@ -892,7 +929,7 @@ def _requirement_concept_key(text: str) -> str:
 
     clean = re.sub(
         r"\s+(?:es\s+deseable|sera\s+valorable|sera\s+un\s+plus|es\s+un\s+plus|"
-        r"suma|no\s+central|requerid[oa]s?(?:\s+por\s+.*)?|excluyentes?)$",
+        r"suma|puede\s+sumar|no\s+central|requerid[oa]s?(?:\s+por\s+.*)?|excluyentes?)$",
         "",
         clean,
     )
@@ -1006,7 +1043,9 @@ def _is_modifier_only_fragment(text: str) -> bool:
 
 def _has_negative_filter_modifier(text: str) -> bool:
     clean = str(text).strip()
-    return bool(clean and NEGATIVE_FILTER_MODIFIER_PATTERN.search(clean))
+    if not clean or not NEGATIVE_FILTER_MODIFIER_PATTERN.search(clean):
+        return False
+    return not bool(SOFT_PATTERN.search(clean))
 
 
 def _is_attached_source_blocker_fragment(item: Mapping[str, Any], blockers: Iterable[str]) -> bool:
