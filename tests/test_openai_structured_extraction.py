@@ -19,8 +19,8 @@ client = TestClient(app)
 
 
 class FakeResponses:
-    def __init__(self, response=None, error=None):
-        self.response = response
+    def __init__(self, response=None, responses=None, error=None):
+        self.response_queue = list(responses) if responses is not None else [response]
         self.error = error
         self.calls = []
 
@@ -31,12 +31,14 @@ class FakeResponses:
         self.calls.append(kwargs)
         if self.error:
             raise self.error
-        return self.response
+        if len(self.response_queue) > 1:
+            return self.response_queue.pop(0)
+        return self.response_queue[0]
 
 
 class FakeOpenAIClient:
-    def __init__(self, response=None, error=None):
-        self.responses = FakeResponses(response=response, error=error)
+    def __init__(self, response=None, responses=None, error=None):
+        self.responses = FakeResponses(response=response, responses=responses, error=error)
 
 
 def load_output(name):
@@ -250,8 +252,10 @@ def test_ai_mode_with_mocked_openai_success_derives_flat_contract(monkeypatch):
     assert "CRM" in data["should_have"]
     assert "dispositivos médicos" in json.dumps(data["search_terms"], ensure_ascii=False)
     assert "job_intelligence" in data
+    assert "ai_schema_repaired" not in data["warnings"]
     for blocked in ["Argentina", "Buenos Aires", "CABA", "GBA"]:
         assert blocked not in serialized
+    assert len(fake_client.responses.calls) == 1
     call = fake_client.responses.calls[0]
     assert "response_format" not in call
     assert call["text"]["format"]["type"] == "json_schema"
@@ -441,6 +445,142 @@ def test_ai_parses_responses_output_array_text():
     assert result["fallback_used"] is False
     assert result["role_title"] == "Account Manager Semi Senior"
     assert result["location"]["normalized"] == "Montevideo"
+
+
+def test_ai_schema_validation_repair_success_returns_openai_result_with_marker():
+    invalid_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    invalid_payload["search_readiness"]["status"] = "not_a_valid_status"
+    repaired_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"output_parsed": invalid_payload},
+            {"output_parsed": repaired_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request(repaired_payload["source"]["input_concept"]))
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert "ai_schema_repaired" in result["warnings"]
+    assert len(fake_client.responses.calls) == 2
+    repair_call = fake_client.responses.calls[1]
+    assert repair_call["input"][0]["content"].startswith("Repair CVBrain Job Intelligence v1 JSON")
+    assert "not_a_valid_status" in repair_call["input"][1]["content"]
+    assert repair_call["text"]["format"]["name"] == "cvbrain_job_intelligence_v1"
+
+
+def test_ai_invalid_json_repair_success_returns_openai_result_with_marker():
+    repaired_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"output_text": "{not valid json"},
+            {"output_parsed": repaired_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request(repaired_payload["source"]["input_concept"]))
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert "ai_schema_repaired" in result["warnings"]
+    assert len(fake_client.responses.calls) == 2
+    assert "{not valid json" in fake_client.responses.calls[1]["input"][1]["content"]
+
+
+def test_ai_schema_validation_repair_failure_returns_schema_error_once(caplog):
+    invalid_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    invalid_payload.pop("requirements")
+    repair_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    repair_payload["search_readiness"]["status"] = "not_a_valid_status"
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"id": "resp_initial_invalid", "output_parsed": invalid_payload},
+            {"id": "resp_repair_invalid", "output_parsed": repair_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+    router = ExtractorRouter(
+        env={
+            "CVBRAIN_EXTRACTOR_MODE": "ai",
+            "OPENAI_API_KEY": "test-key-not-used",
+            "CVBRAIN_OPENAI_MODEL": "test-model-not-used",
+            "CVBRAIN_AI_FALLBACK_ENABLED": "true",
+        },
+        ai_extractor=extractor,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="cvbrain.openai_structured"):
+        result = router.extract(request())
+
+    assert result["ok"] is False
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert result["warnings"] == ["ai_schema_validation_failed"]
+    assert len(fake_client.responses.calls) == 2
+    assert "resp_repair_invalid" in "\n".join(record.getMessage() for record in caplog.records)
+
+
+def test_ai_schema_validation_repair_logs_do_not_expose_fake_secrets(caplog):
+    invalid_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    invalid_payload["job_profile"]["summary"] = "unsafe sk-test-secret-should-not-log " + ("x" * 900)
+    invalid_payload["candidate_screening_questions"] = ["sk-test-secret-should-not-log"]
+    repair_payload = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    repair_payload["quality_control"]["confidence"] = "invalid-confidence"
+    repair_payload["job_profile"]["summary"] = "unsafe sk-test-secret-should-not-log " + ("x" * 900)
+    repair_payload["candidate_screening_questions"] = ["sk-test-secret-should-not-log"]
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"output_parsed": invalid_payload},
+            {"output_parsed": repair_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="sk-test-secret-should-not-log",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+    router = ExtractorRouter(
+        env={
+            "CVBRAIN_EXTRACTOR_MODE": "ai",
+            "OPENAI_API_KEY": "sk-test-secret-should-not-log",
+            "CVBRAIN_OPENAI_MODEL": "test-model-not-used",
+            "CVBRAIN_AI_FALLBACK_ENABLED": "false",
+        },
+        ai_extractor=extractor,
+    )
+
+    with caplog.at_level(logging.INFO, logger="cvbrain.openai_structured"):
+        result = router.extract(request())
+
+    log_output = "\n".join(record.getMessage() for record in caplog.records)
+    assert result["ok"] is False
+    assert result["warnings"] == ["ai_schema_validation_failed"]
+    assert len(fake_client.responses.calls) == 2
+    assert "schema_repair_start" in log_output
+    assert "cvbrain.ai_schema_validation_failed" in log_output
+    assert "sk-test-secret-should-not-log" not in log_output
+    assert "[redacted-api-key]" in log_output
 
 
 def test_ai_schema_failure_returns_clean_error_when_fallback_disabled():

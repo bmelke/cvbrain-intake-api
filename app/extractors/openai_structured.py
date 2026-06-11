@@ -69,6 +69,14 @@ Rules:
 - Do not include candidate PII.
 """
 
+REPAIR_INSTRUCTIONS = """Repair CVBrain Job Intelligence v1 JSON.
+
+The previous model response did not validate. Return only corrected JSON that
+matches the CVBrain Job Intelligence v1 schema. Do not add commentary, markdown,
+or extra keys. Preserve the original source facts. Do not invent missing facts.
+Do not include candidate data or candidate PII.
+"""
+
 
 class OpenAIStructuredExtractor:
     """OpenAI-backed extractor that returns the existing flat contract."""
@@ -125,6 +133,7 @@ class OpenAIStructuredExtractor:
         parsed_job_intelligence: Optional[Dict[str, Any]] = None
         job_intelligence: Optional[Dict[str, Any]] = None
         response: Optional[Any] = None
+        repaired = False
 
         self._log_event(
             "request_start",
@@ -134,10 +143,35 @@ class OpenAIStructuredExtractor:
 
         try:
             response = self._responses_parse(ai_payload)
-            parsed_job_intelligence = self._extract_payload(response)
-            job_intelligence = normalize_job_intelligence_requirements(parsed_job_intelligence, source_text=request.source_text)
-            job_intelligence = normalize_role_title_for_source(job_intelligence, source_text=request.source_text)
-            validate_job_intelligence_v1(job_intelligence)
+            try:
+                parsed_job_intelligence, job_intelligence = self._parse_normalize_validate_response(response, request)
+            except JobIntelligenceValidationError as error:
+                response, parsed_job_intelligence, job_intelligence = self._repair_schema_once(
+                    ai_payload=ai_payload,
+                    request=request,
+                    failed_response=response,
+                    failed_parsed_payload=parsed_job_intelligence,
+                    failed_job_intelligence=job_intelligence,
+                    error=error,
+                )
+                repaired = True
+            except ExtractorError as error:
+                if error.code != "ai_invalid_json":
+                    raise
+                try:
+                    response, parsed_job_intelligence, job_intelligence = self._repair_schema_once(
+                        ai_payload=ai_payload,
+                        request=request,
+                        failed_response=response,
+                        failed_parsed_payload=parsed_job_intelligence,
+                        failed_job_intelligence=job_intelligence,
+                        error=error,
+                    )
+                    repaired = True
+                except ExtractorError as repair_error:
+                    if self.fallback_enabled and repair_error.code == "ai_schema_validation_failed":
+                        raise error from repair_error
+                    raise
         except ExtractorError as error:
             self._log_exception(
                 error.code,
@@ -158,11 +192,7 @@ class OpenAIStructuredExtractor:
                 error,
                 request_payload=ai_payload,
             )
-            raise ExtractorError(
-                "ai_schema_validation_failed",
-                "OpenAI output failed CVBrain Job Intelligence v1 validation.",
-                warnings=["ai_schema_validation_failed"],
-            ) from error
+            raise _schema_validation_failed_error() from error
         except TimeoutError as error:
             self._log_exception(
                 "timeout",
@@ -198,7 +228,86 @@ class OpenAIStructuredExtractor:
         flat["fallback_used"] = False
         flat["ai_model"] = self.model
         flat["job_intelligence"] = job_intelligence
+        if repaired:
+            warnings = list(flat.get("warnings", []))
+            warnings.append("ai_schema_repaired")
+            flat["warnings"] = list(dict.fromkeys(warnings))
         return flat
+
+    def _parse_normalize_validate_response(
+        self,
+        response: Any,
+        request: ExtractorRequest,
+    ) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        parsed_job_intelligence = self._extract_payload(response)
+        job_intelligence = normalize_job_intelligence_requirements(
+            parsed_job_intelligence,
+            source_text=request.source_text,
+        )
+        job_intelligence = normalize_role_title_for_source(job_intelligence, source_text=request.source_text)
+        validate_job_intelligence_v1(job_intelligence)
+        return parsed_job_intelligence, job_intelligence
+
+    def _repair_schema_once(
+        self,
+        ai_payload: Mapping[str, Any],
+        request: ExtractorRequest,
+        failed_response: Any,
+        failed_parsed_payload: Optional[Mapping[str, Any]],
+        failed_job_intelligence: Optional[Mapping[str, Any]],
+        error: BaseException,
+    ) -> tuple[Any, Dict[str, Any], Dict[str, Any]]:
+        invalid_output = _raw_output_for_diagnostics(failed_response, failed_parsed_payload)
+        self._log_event(
+            "schema_repair_start",
+            request_payload=ai_payload,
+            parse_path=_response_parse_path(failed_response),
+            exception_class=error.__class__.__name__,
+            sanitized_exception_message=_sanitize_text(str(error)),
+            validation_error_fields=_validation_error_fields(str(error)),
+            sanitized_raw_output_sha256=_sha256_hex(_sanitize_text(invalid_output, limit=20000)),
+        )
+
+        repair_response: Optional[Any] = None
+        repair_parsed_payload: Optional[Dict[str, Any]] = None
+        repair_job_intelligence: Optional[Dict[str, Any]] = None
+        try:
+            repair_response = self._responses_repair(ai_payload, invalid_output, error)
+            repair_parsed_payload, repair_job_intelligence = self._parse_normalize_validate_response(
+                repair_response,
+                request,
+            )
+        except JobIntelligenceValidationError as repair_error:
+            self._log_schema_validation_failure(
+                repair_error,
+                request_payload=ai_payload,
+                response=repair_response,
+                parsed_job_intelligence=repair_parsed_payload,
+                job_intelligence=repair_job_intelligence,
+            )
+            raise _schema_validation_failed_error() from repair_error
+        except ExtractorError as repair_error:
+            self._log_exception(
+                "schema_repair_failed",
+                repair_error,
+                request_payload=ai_payload,
+            )
+            raise _schema_validation_failed_error() from repair_error
+        except Exception as repair_error:
+            self._log_exception(
+                "schema_repair_failed",
+                repair_error,
+                request_payload=ai_payload,
+            )
+            raise _schema_validation_failed_error() from repair_error
+
+        self._log_event(
+            "schema_repair_success",
+            request_payload=ai_payload,
+            parse_path=_response_parse_path(repair_response),
+            parsed_json_keys=sorted(repair_job_intelligence.keys()),
+        )
+        return repair_response, repair_parsed_payload, repair_job_intelligence
 
     def _responses_parse(self, ai_payload: Mapping[str, Any]) -> Any:
         client = self._client()
@@ -219,6 +328,42 @@ class OpenAIStructuredExtractor:
                     "type": "json_schema",
                     "name": "cvbrain_job_intelligence_v1",
                     "description": "CVBrain Job Intelligence v1 extraction output.",
+                    "schema": job_intelligence_v1_response_schema(),
+                    "strict": self.strict_schema_enabled,
+                }
+            },
+            max_output_tokens=self.max_output_tokens,
+        )
+
+    def _responses_repair(
+        self,
+        ai_payload: Mapping[str, Any],
+        invalid_output: str,
+        error: BaseException,
+    ) -> Any:
+        client = self._client()
+        input_messages = [
+            {"role": "system", "content": REPAIR_INSTRUCTIONS},
+            {
+                "role": "user",
+                "content": "Repair this invalid CVBrain Job Intelligence v1 response.\n"
+                "Validation error:\n"
+                + _sanitize_text(str(error), limit=1200)
+                + "\n\nOriginal sanitized intake payload:\n"
+                + json.dumps(ai_payload, ensure_ascii=False, sort_keys=True)
+                + "\n\nInvalid output to repair:\n"
+                + str(invalid_output),
+            },
+        ]
+
+        return client.responses.create(
+            model=self.model,
+            input=input_messages,
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "cvbrain_job_intelligence_v1",
+                    "description": "Repaired CVBrain Job Intelligence v1 extraction output.",
                     "schema": job_intelligence_v1_response_schema(),
                     "strict": self.strict_schema_enabled,
                 }
@@ -634,6 +779,14 @@ def job_intelligence_v1_response_schema() -> Dict[str, Any]:
     }
 
 
+def _schema_validation_failed_error() -> ExtractorError:
+    return ExtractorError(
+        "ai_schema_validation_failed",
+        "OpenAI output failed CVBrain Job Intelligence v1 validation.",
+        warnings=["ai_schema_validation_failed"],
+    )
+
+
 def _coerce_payload(value: Any) -> Dict[str, Any]:
     if isinstance(value, dict):
         return value
@@ -786,6 +939,13 @@ def _raw_output_for_diagnostics(response: Any, parsed_payload: Optional[Mapping[
     output_items_text = _output_text_from_output_items(_get_response_value(response, "output"))
     if output_items_text:
         return output_items_text
+
+    output_parsed = _get_response_value(response, "output_parsed")
+    if output_parsed is not None:
+        try:
+            return json.dumps(_coerce_payload(output_parsed), ensure_ascii=False, sort_keys=True, default=str)
+        except (TypeError, ValueError):
+            return str(output_parsed)
 
     if parsed_payload is not None:
         try:

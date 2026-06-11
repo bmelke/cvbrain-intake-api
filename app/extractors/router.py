@@ -113,6 +113,8 @@ class ExtractorRouter:
         return payload
 
     def _fallback_or_error(self, request: ExtractorRequest, error: ExtractorError) -> Dict[str, Any]:
+        if error.code == "ai_schema_validation_failed":
+            return self._error_response(error)
         if self.fallback_enabled():
             return self._deterministic(request, fallback_used=True, warning=error.code)
         return self._error_response(error)
