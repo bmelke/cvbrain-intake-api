@@ -528,6 +528,51 @@ def test_prefix_only_orphan_fragments_are_dropped_but_short_skills_remain(
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+@pytest.mark.parametrize("fragment", ["Experiencia", "Debe manejar"])
+def test_remaining_orphan_requirement_artifacts_are_dropped(fragment):
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item(fragment),
+                requirement_item("SQL"),
+            ],
+            "should_have": [
+                requirement_item(fragment, "preferred"),
+            ],
+        }
+    )
+
+    assert_not_in_requirements_or_credentials(normalized, flat, fragment)
+    assert flat["must_have"] == ["SQL"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_blocker_metadata_artifacts_are_dropped():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia comercial B2B"),
+            ],
+            "blockers": [
+                "source_text_span_hint_not_provided",
+                "hard_filter_candidate_as_written",
+                "hard_filter_approved_as_written",
+                "No avanzar perfiles sin experiencia comercial",
+            ],
+        }
+    )
+
+    assert flat["blockers"] == ["No avanzar perfiles sin experiencia comercial"]
+    assert_not_in_requirements_or_credentials(
+        normalized,
+        flat,
+        "source_text_span_hint_not_provided",
+        "hard_filter_candidate_as_written",
+        "hard_filter_approved_as_written",
+    )
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_busqueda_050_ni_cobradores_fragment_is_blocker_not_must_have():
     blocker_source = "No avanzar cobradores sin experiencia corporativa ni cobradores solo de consumo individual"
     normalized, flat = normalize_and_flatten(

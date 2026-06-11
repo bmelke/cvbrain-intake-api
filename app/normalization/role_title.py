@@ -13,6 +13,10 @@ PRESERVED_ENGLISH_TITLES = (
     "DevOps Engineer",
     "QA Tester",
     "Business Analyst",
+    "BI Analyst",
+    "Full Stack Developer",
+    "Backend Developer",
+    "Frontend Developer",
 )
 
 SPANISH_TITLE_START = (
@@ -22,29 +26,49 @@ SPANISH_TITLE_START = (
     "Asistente",
     "Coordinador",
     "Coordinadora",
+    "Consultor",
+    "Consultora",
+    "Desarrollador",
+    "Desarrolladora",
     "Ejecutivo",
     "Ejecutiva",
     "Encargado",
     "Encargada",
     "Gerente",
+    "Ingeniero",
+    "Ingeniera",
     "Jefe",
     "Jefa",
     "Responsable",
+    "Secretaria",
+    "Secretario",
     "Soporte",
     "Supervisor",
     "Supervisora",
     "Tecnico",
     "Técnico",
+    "Visitador",
+    "Visitadora",
+    "Auditor",
+    "Auditora",
 )
 
-SOURCE_ROLE_LEAD_PATTERN = re.compile(
-    r"\b(?:busca|buscamos|necesita|sumar|incorporar|rol\s*:)\s+"
-    r"(?:un|una|el|la)?\s*(?P<tail>.{0,140})",
-    re.I | re.S,
+SOURCE_ROLE_LEAD_PATTERNS = (
+    re.compile(
+        r"\b(?:busca|buscamos|seleccionamos|necesita|sumar|incorporar|incorpora|rol\s*:|"
+        r"se\s+busca|nos\s+encontramos\s+en\s+b[uú]squeda\s+de)\s+"
+        r"(?:un|una|el|la)?\s*(?P<tail>.{0,160})",
+        re.I | re.S,
+    ),
+    re.compile(
+        r"\bpara\s+empresa\b.{0,140}?\bbuscamos\s+(?:un|una|el|la)?\s*(?P<tail>.{0,160})",
+        re.I | re.S,
+    ),
 )
 
 TITLE_SENTENCE_TAIL_PATTERN = re.compile(
-    r"(?:[.;:]\s*)?\b(?:es\s+excluyente|excluyente|la\s+persona|se\s+requiere|debe|deseable|valorable)\b.*$",
+    r"(?:[.;:]\s*)?\b(?:es\s+excluyente|excluyente|la\s+persona|se\s+requiere|debe|"
+    r"deseable|valorable|ser[aá]\s+valorable|no\s+avanzar|para)\b.*$",
     re.I | re.S,
 )
 
@@ -52,12 +76,21 @@ SPANISH_ROLE_PATTERN = re.compile(
     rf"\b(?:{'|'.join(SPANISH_TITLE_START)})\b"
     r"(?:\s+(?!(?:para|con|que|deber[aá]|debe|busca|buscamos|necesita|"
     r"es|excluyente|la|se|deseable|valorable)\b)"
-    r"[A-Za-zÁÉÍÓÚáéíóúÑñ0-9/+.-]+){0,7}",
+    r"[A-Za-zÁÉÍÓÚÜáéíóúüÑñ0-9/+.-]+){0,7}",
     re.I,
 )
 
 SPANISH_SOURCE_MARKER_PATTERN = re.compile(
-    r"\b(?:empresa|busca|buscamos|experiencia|deseable|excluyente|modalidad|montevideo|uruguay)\b",
+    r"\b(?:empresa|busca|buscamos|seleccionamos|experiencia|deseable|excluyente|"
+    r"modalidad|montevideo|uruguay|b[uú]squeda|se\s+busca)\b",
+    re.I,
+)
+
+SPANISH_TITLE_MARKER_PATTERN = re.compile(
+    r"\b(?:de|del|m[eé]dico|m[eé]dica|biling[uü]e|recepcionista|interno|interna|"
+    r"planta|dep[oó]sito|rrhh|campo|comercial|legales?|datos?|soporte|"
+    r"desarrollador|desarrolladora|ingeniero|ingeniera|visitador|visitadora|"
+    r"secretaria|secretario|auditor|auditora|consultor|consultora|analista|gerente)\b",
     re.I,
 )
 
@@ -67,35 +100,57 @@ def normalize_role_title_for_source(payload: Mapping[str, Any], source_text: str
 
     output: Dict[str, Any] = dict(payload)
     job_profile = dict(output.get("job_profile", {}))
-    current_title = str(job_profile.get("normalized_role_title") or job_profile.get("job_title") or "").strip()
+    job_title = _clean_role_title(str(job_profile.get("job_title") or "").strip())
+    normalized_title = _clean_role_title(str(job_profile.get("normalized_role_title") or "").strip())
+    current_title = normalized_title or job_title
     if not current_title:
         return output
 
-    cleaned_current_title = _clean_role_title(current_title)
     source_title = _source_role_title(source_text)
-    if not source_title:
-        if cleaned_current_title and _fold(cleaned_current_title) != _fold(current_title):
-            job_profile["job_title"] = cleaned_current_title
-            job_profile["normalized_role_title"] = cleaned_current_title
-            output["job_profile"] = job_profile
-            _preserve_role_title_terms(output, cleaned_current_title, [current_title])
+    source_is_spanish = _looks_spanish_source(source_text)
+    previous_titles = _unique(
+        [
+            str(job_profile.get("normalized_role_title") or "").strip(),
+            str(job_profile.get("job_title") or "").strip(),
+        ]
+    )
+
+    canonical_title = ""
+    if source_title and _is_preserved_english_title(source_title):
+        canonical_title = source_title
+    elif source_title:
+        canonical_title = source_title
+    elif source_is_spanish and _looks_spanish_title(job_title):
+        canonical_title = job_title
+    elif _looks_spanish_title(job_title) and _looks_english_title(normalized_title):
+        canonical_title = job_title
+    elif current_title:
+        canonical_title = current_title
+
+    if not canonical_title:
         return output
 
-    if _fold(source_title) == _fold(current_title):
+    if (
+        _fold(canonical_title) == _fold(str(job_profile.get("job_title") or ""))
+        and _fold(canonical_title) == _fold(str(job_profile.get("normalized_role_title") or ""))
+    ):
         return output
 
-    if not _looks_spanish_source(source_text) and not _is_preserved_english_title(source_title):
-        return output
-
-    previous_titles = [
-        str(job_profile.get("normalized_role_title") or "").strip(),
-        str(job_profile.get("job_title") or "").strip(),
-    ]
-    job_profile["job_title"] = source_title
-    job_profile["normalized_role_title"] = source_title
+    job_profile["job_title"] = canonical_title
+    job_profile["normalized_role_title"] = canonical_title
     output["job_profile"] = job_profile
-    _preserve_role_title_terms(output, source_title, previous_titles)
+    _preserve_role_title_terms(output, canonical_title, previous_titles)
     return output
+
+
+def display_role_title_from_job_profile(job_profile: Mapping[str, Any]) -> str:
+    """Return the canonical display title from a normalized job_profile."""
+
+    job_title = _clean_role_title(str(job_profile.get("job_title") or "").strip())
+    normalized_title = _clean_role_title(str(job_profile.get("normalized_role_title") or "").strip())
+    if job_title and _looks_spanish_title(job_title) and _looks_english_title(normalized_title):
+        return job_title
+    return normalized_title or job_title
 
 
 def _source_role_title(source_text: str) -> str:
@@ -107,10 +162,11 @@ def _source_role_title(source_text: str) -> str:
     if preserved:
         return preserved
 
-    for lead in SOURCE_ROLE_LEAD_PATTERN.finditer(source):
-        title = _spanish_title_from_text(lead.group("tail"))
-        if title:
-            return title
+    for pattern in SOURCE_ROLE_LEAD_PATTERNS:
+        for lead in pattern.finditer(source):
+            title = _spanish_title_from_text(lead.group("tail"))
+            if title:
+                return title
 
     return _spanish_title_from_text(source)
 
@@ -140,6 +196,20 @@ def _clean_role_title(text: str) -> str:
 
 def _looks_spanish_source(source_text: str) -> bool:
     return bool(SPANISH_SOURCE_MARKER_PATTERN.search(source_text or ""))
+
+
+def _looks_spanish_title(title: str) -> bool:
+    clean = _clean_role_title(title)
+    return bool(clean and SPANISH_ROLE_PATTERN.match(clean) and SPANISH_TITLE_MARKER_PATTERN.search(clean))
+
+
+def _looks_english_title(title: str) -> bool:
+    clean = _clean_role_title(title)
+    if not clean:
+        return False
+    if _is_preserved_english_title(clean):
+        return True
+    return bool(re.search(r"\b(?:manager|engineer|developer|representative|receptionist|auditor|assistant|analyst|visitor)\b", clean, re.I))
 
 
 def _is_preserved_english_title(title: str) -> bool:

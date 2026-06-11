@@ -73,7 +73,7 @@ ORPHAN_FRAGMENT_PATTERN = re.compile(
     r"^(?:software|hardware|redes?\s+b[aá]sicas?|soporte\s+remoto)$|"
     r"^(?:la\s+persona\s+deber[aá]\s+liderar|se\s+requiere\s+base\s+t[eé]cnica\s+en|base\s+t[eé]cnica\s+en)$|"
     r"^(?:se\s+requiere|se\s+requieren|es\s+excluyente|son\s+excluyentes|"
-    r"experiencia\s+(?:en|con)|manejo\s+de|dominio\s+de|conocimientos?\s+de)$",
+    r"experiencia|experiencia\s+(?:en|con)|debe\s+manejar|manejo\s+de|dominio\s+de|conocimientos?\s+de)$",
     re.I,
 )
 
@@ -113,6 +113,12 @@ STANDALONE_SKILL_PATTERN = re.compile(
     r")\b",
     re.I,
 )
+
+BLOCKER_METADATA_ARTIFACTS = {
+    "source_text_span_hint_not_provided",
+    "hard_filter_candidate_as_written",
+    "hard_filter_approved_as_written",
+}
 
 
 @dataclass(frozen=True)
@@ -1000,7 +1006,7 @@ def _normalize_blocker_text(text: str) -> str:
     clean = _normalize_accents(raw)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;\t\r\n")
     clean = _dedupe_repeated_no_avanzar_segments(clean)
-    if _fold(clean) == "no avanzar":
+    if _fold(clean) == "no avanzar" or _fold(clean) in BLOCKER_METADATA_ARTIFACTS:
         return ""
     if had_final_period and clean and not clean.endswith("."):
         clean = f"{clean}."

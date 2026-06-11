@@ -1,3 +1,4 @@
+import copy
 import json
 import re
 import sys
@@ -113,6 +114,16 @@ def test_uruguay_account_manager_fixture_has_no_argentina_leakage():
     assert "dispositivos medicos" in normalize(flat["search_terms"])
     for blocked in ["Argentina", "Buenos Aires", "CABA", "GBA"]:
         assert normalize(blocked) not in serialized
+
+
+def test_flat_mapper_prefers_nested_spanish_job_title_over_english_normalized_title():
+    fixture = copy.deepcopy(load_fixture("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json"))
+    fixture["job_profile"]["job_title"] = "Ingeniero de Planta"
+    fixture["job_profile"]["normalized_role_title"] = "Plant Engineer"
+
+    flat = derive_flat_compatibility(fixture)
+
+    assert flat["role_title"] == "Ingeniero de Planta"
 
 
 def test_argentina_account_manager_fixture_has_no_uruguay_leakage():

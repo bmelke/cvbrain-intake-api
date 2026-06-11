@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Mapping
 
 from app.normalization.requirement_importance import normalize_job_intelligence_requirements
+from app.normalization.role_title import display_role_title_from_job_profile
 from app.schemas.job_intelligence_v1_contract import validate_job_intelligence_v1
 
 
@@ -36,7 +37,7 @@ def derive_flat_compatibility(payload: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "ok": True,
         "version": FLAT_VERSION,
-        "role_title": job_profile.get("normalized_role_title") or job_profile.get("job_title", ""),
+        "role_title": display_role_title_from_job_profile(job_profile),
         "role_family": job_profile.get("role_family", ""),
         "summary": job_profile.get("summary", ""),
         "must_have": _requirement_texts(requirements.get("must_have", [])),

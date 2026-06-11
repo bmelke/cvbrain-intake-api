@@ -176,6 +176,30 @@ def role_title_payload(ai_title):
     return payload
 
 
+def desynced_role_title_payload(nested_title, normalized_title):
+    payload = role_title_payload(normalized_title)
+    payload["job_profile"]["job_title"] = nested_title
+    payload["job_profile"]["normalized_role_title"] = normalized_title
+    payload["search_strategy"]["target_titles"] = [normalized_title]
+    payload["search_strategy"]["search_terms"] = [normalized_title]
+    payload["flat_compatibility"] = {
+        "role_title": normalized_title,
+        "must_have": [],
+        "should_have": [],
+        "nice_to_have": [],
+        "blockers": [],
+        "credentials": {"required": [], "preferred": []},
+        "experience": {"minimum_years": None, "seniority": ""},
+        "location": {"normalized": ""},
+        "search_terms": [normalized_title],
+        "semantic_terms": [],
+        "recruiter_questions": [],
+        "warnings": [],
+        "confidence": 0.91,
+    }
+    return payload
+
+
 def test_deterministic_default_does_not_construct_openai_client(monkeypatch):
     monkeypatch.delenv("CVBRAIN_EXTRACTOR_MODE", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -321,6 +345,68 @@ def test_analyze_endpoint_ai_path_normalizes_dirty_parsed_payload_before_respons
 
 
 @pytest.mark.parametrize(
+    ("source_text", "nested_title", "english_title"),
+    [
+        ("Empresa industrial necesita sumar un Ingeniero de Planta para producción.", "Ingeniero de Planta", "Plant Engineer"),
+        (
+            "Startup tecnológica busca Desarrollador Backend Python para trabajar en APIs.",
+            "Desarrollador Backend Python",
+            "Backend Developer (Python)",
+        ),
+        ("Se busca Visitador Médico para gestionar agenda de visitas.", "Visitador Médico", "Medical Sales Representative / Medical Visitor"),
+        (
+            "Empresa internacional busca Secretaria Recepcionista Bilingüe.",
+            "Secretaria Recepcionista Bilingüe",
+            "Bilingual Receptionist & Administrative Assistant",
+        ),
+        ("Seleccionamos Auditor Interno para controles y reportes.", "Auditor Interno", "Internal Auditor"),
+    ],
+)
+def test_nested_spanish_job_title_wins_over_english_normalized_title(source_text, nested_title, english_title):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": desynced_role_title_payload(nested_title, english_title)}),
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["role_title"] == nested_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == nested_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == nested_title
+    assert english_title in result["search_terms"] or english_title in result["semantic_terms"]
+
+
+def test_analyze_endpoint_syncs_top_level_and_nested_spanish_role_title(monkeypatch):
+    source_text = "Startup tecnológica busca Desarrollador Backend Python para trabajar en APIs."
+    fake_client = FakeOpenAIClient(
+        response={
+            "output_parsed": desynced_role_title_payload(
+                "Desarrollador Backend Python",
+                "Backend Developer (Python)",
+            )
+        }
+    )
+
+    monkeypatch.delenv("CVBRAIN_INTAKE_API_KEY", raising=False)
+    monkeypatch.setenv("CVBRAIN_EXTRACTOR_MODE", "ai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-used")
+    monkeypatch.setenv("CVBRAIN_OPENAI_MODEL", "test-model-not-used")
+    monkeypatch.setenv("CVBRAIN_AI_FALLBACK_ENABLED", "false")
+    monkeypatch.setattr(OpenAIStructuredExtractor, "_default_client", lambda self: fake_client)
+
+    response = client.post("/api/job-intake/analyze", json=analyze_payload(source_text))
+
+    data = response.json()
+    assert response.status_code == 200
+    assert data["ok"] is True
+    assert data["role_title"] == "Desarrollador Backend Python"
+    assert data["job_intelligence"]["job_profile"]["job_title"] == "Desarrollador Backend Python"
+    assert data["job_intelligence"]["job_profile"]["normalized_role_title"] == "Desarrollador Backend Python"
+    assert data["role_title"] == data["job_intelligence"]["job_profile"]["job_title"]
+
+
+@pytest.mark.parametrize(
     ("source_text", "ai_title", "expected_title"),
     [
         (
@@ -348,6 +434,21 @@ def test_analyze_endpoint_ai_path_normalizes_dirty_parsed_payload_before_respons
             "Corporate Legal Manager",
             "Gerente Corporativo de Legales",
         ),
+        (
+            "Seleccionamos Auditor Interno para compañía corporativa.",
+            "Internal Auditor",
+            "Auditor Interno",
+        ),
+        (
+            "Se busca Visitador Médico para laboratorio de salud.",
+            "Medical Sales Representative",
+            "Visitador Médico",
+        ),
+        (
+            "Para empresa de servicios buscamos Gerente Comercial para liderar equipo.",
+            "Commercial Manager",
+            "Gerente Comercial",
+        ),
     ],
 )
 def test_spanish_source_preserves_spanish_primary_role_title(source_text, ai_title, expected_title):
@@ -366,19 +467,45 @@ def test_spanish_source_preserves_spanish_primary_role_title(source_text, ai_tit
     assert ai_title in result["search_terms"] or ai_title in result["semantic_terms"]
 
 
-def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it():
-    source_text = "Compañía tecnológica busca Data Engineer Semi Senior para construir pipelines de datos."
+@pytest.mark.parametrize("english_title", ["Data Engineer", "Product Manager", "QA Tester"])
+def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it(english_title):
+    source_text = f"Compañía tecnológica busca {english_title} Semi Senior para producto digital."
     extractor = OpenAIStructuredExtractor(
         api_key="test-key-not-used",
         model="test-model-not-used",
-        client=FakeOpenAIClient(response={"output_parsed": role_title_payload("Data Engineer")}),
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(english_title)}),
     )
 
     result = extractor.extract(request(source_text))
 
-    assert result["role_title"] == "Data Engineer"
-    assert result["job_intelligence"]["job_profile"]["job_title"] == "Data Engineer"
-    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == "Data Engineer"
+    assert result["role_title"] == english_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == english_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == english_title
+
+
+@pytest.mark.parametrize(
+    ("source_text", "ai_title", "expected_title"),
+    [
+        ("Buscamos Desarrollador Backend Python para APIs.", "Backend Developer (Python)", "Desarrollador Backend Python"),
+        ("Buscamos Analista BI para reportes e indicadores.", "Business Intelligence Analyst", "Analista BI"),
+        ("Buscamos Consultor SAP para proyectos de implementación.", "SAP Consultant", "Consultor SAP"),
+    ],
+)
+def test_spanish_role_title_normalization_preserves_technical_tokens(source_text, ai_title, expected_title):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(ai_title)}),
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["role_title"] == expected_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == expected_title
+    assert "Pitón" not in json.dumps(result, ensure_ascii=False)
+    for token in expected_title.split():
+        if token.isupper() or token in {"Python", "SAP"}:
+            assert token in result["role_title"]
 
 
 @pytest.mark.parametrize(
@@ -402,6 +529,31 @@ def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it
         (
             "Empresa de telecomunicaciones busca Técnico de Campo. Es excluyente experiencia instalando o manteniendo redes.",
             "Técnico de Campo. Es excluyente experiencia instalando o",
+            "Técnico de Campo",
+        ),
+        (
+            "Empresa busca Responsable de RRHH. La persona deberá gestionar selección.",
+            "Responsable de RRHH. La persona deberá",
+            "Responsable de RRHH",
+        ),
+        (
+            "Importadora busca Encargado de Depósito. Se requiere experiencia liderando personal.",
+            "Encargado de Depósito. Se requiere",
+            "Encargado de Depósito",
+        ),
+        (
+            "Empresa busca Analista BI. Será valorable experiencia con Power BI.",
+            "Analista BI. Será valorable experiencia",
+            "Analista BI",
+        ),
+        (
+            "Empresa busca Ejecutivo Comercial. No avanzar perfiles sin ventas.",
+            "Ejecutivo Comercial. No avanzar perfiles",
+            "Ejecutivo Comercial",
+        ),
+        (
+            "Empresa busca Técnico de Campo. Para visitas a clientes.",
+            "Técnico de Campo. Para visitas",
             "Técnico de Campo",
         ),
     ],
