@@ -77,6 +77,20 @@ or extra keys. Preserve the original source facts. Do not invent missing facts.
 Do not include candidate data or candidate PII.
 """
 
+LANGUAGE_CONTRACT = """Language contract:
+- Source text language detected as: {source_language}.
+- All user-facing output fields must be in the same language as source_text.
+- User-facing fields include role_title, requirements, blockers, recruiter/company questions, candidate questions, warnings, notes, seniority labels, role family labels where applicable, summaries, missing information, and job profile fields.
+- If source_text is Spanish, write those user-facing fields in Spanish.
+- If source_text is English, write those user-facing fields in English.
+- Do not translate technologies, product names, acronyms, certifications, platforms, frameworks, or titles explicitly written in English by the recruiter.
+- Preserve terms such as Python, Java, React, SQL, AWS, Azure, GCP, SAP, Salesforce, CRM, ERP, TMS, WMS, BI, QA, UX, UI, DevOps, B2B, and B2C.
+- Preserve explicitly English role titles when source_text uses them, such as Data Engineer, Product Manager, DevOps Engineer, QA Tester, and Account Manager.
+- The primary role_title must not be translated away from the source language.
+- For Spanish source_text, prefer the exact Spanish title phrase from source_text when present, for example Arquitecto de Software, Vendedor Técnico, Liquidador de Siniestros, or Periodista.
+- For Spanish source_text that explicitly uses an English title such as Data Engineer, Product Manager, DevOps Engineer, QA Tester, Account Manager, Business Analyst, BI Analyst, Full Stack Developer, Backend Developer, or Frontend Developer, preserve that English title.
+"""
+
 
 class OpenAIStructuredExtractor:
     """OpenAI-backed extractor that returns the existing flat contract."""
@@ -312,7 +326,7 @@ class OpenAIStructuredExtractor:
     def _responses_parse(self, ai_payload: Mapping[str, Any]) -> Any:
         client = self._client()
         input_messages = [
-            {"role": "system", "content": SYSTEM_INSTRUCTIONS},
+            {"role": "system", "content": _system_instructions_for_payload(ai_payload)},
             {
                 "role": "user",
                 "content": "Extract CVBrain Job Intelligence v1 JSON from this sanitized intake payload:\n"
@@ -343,7 +357,7 @@ class OpenAIStructuredExtractor:
     ) -> Any:
         client = self._client()
         input_messages = [
-            {"role": "system", "content": REPAIR_INSTRUCTIONS},
+            {"role": "system", "content": _repair_instructions_for_payload(ai_payload)},
             {
                 "role": "user",
                 "content": "Repair this invalid CVBrain Job Intelligence v1 response.\n"
@@ -520,6 +534,45 @@ class OpenAIStructuredExtractor:
             "cvbrain.ai_schema_validation_failed %s",
             json.dumps(diagnostics, ensure_ascii=False, sort_keys=True),
         )
+
+
+def detect_source_language(source_text: str) -> str:
+    """Detect the recruiter source language at the level needed for prompts."""
+
+    text = str(source_text or "")
+    if not text.strip():
+        return "English"
+    spanish_markers = re.findall(
+        r"\b(?:empresa|busca|buscamos|seleccionamos|experiencia|deseable|excluyente|"
+        r"imprescindible|requerido|requerida|modalidad|ubicaci[oó]n|montevideo|uruguay|"
+        r"b[uú]squeda|se\s+busca|para|de|con|sin|debe|manejo|conocimiento|"
+        r"licencia|libreta|t[ií]tulo|formaci[oó]n|h[ií]brido|presencial|remoto)\b",
+        text,
+        flags=re.I,
+    )
+    english_markers = re.findall(
+        r"\b(?:company|hiring|requires|required|preferred|experience|location|remote|"
+        r"hybrid|onsite|must|should|nice\s+to\s+have|degree|certification)\b",
+        text,
+        flags=re.I,
+    )
+    spanish_chars = re.findall(r"[áéíóúñüÁÉÍÓÚÑÜ]", text)
+    if spanish_chars or len(spanish_markers) > len(english_markers):
+        return "Spanish"
+    return "English"
+
+
+def _language_contract_for_payload(ai_payload: Mapping[str, Any]) -> str:
+    language = detect_source_language(str(ai_payload.get("source_text", "")))
+    return LANGUAGE_CONTRACT.format(source_language=language)
+
+
+def _system_instructions_for_payload(ai_payload: Mapping[str, Any]) -> str:
+    return SYSTEM_INSTRUCTIONS.rstrip() + "\n\n" + _language_contract_for_payload(ai_payload).strip() + "\n"
+
+
+def _repair_instructions_for_payload(ai_payload: Mapping[str, Any]) -> str:
+    return REPAIR_INSTRUCTIONS.rstrip() + "\n\n" + _language_contract_for_payload(ai_payload).strip() + "\n"
 
 
 def job_intelligence_v1_response_schema() -> Dict[str, Any]:

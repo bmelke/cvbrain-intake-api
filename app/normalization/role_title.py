@@ -12,6 +12,7 @@ PRESERVED_ENGLISH_TITLES = (
     "Product Manager",
     "DevOps Engineer",
     "QA Tester",
+    "Account Manager",
     "Business Analyst",
     "BI Analyst",
     "Full Stack Developer",
@@ -23,6 +24,8 @@ SPANISH_TITLE_START = (
     "Administrador",
     "Administradora",
     "Analista",
+    "Arquitecto",
+    "Arquitecta",
     "Asistente",
     "Coordinador",
     "Coordinadora",
@@ -39,6 +42,9 @@ SPANISH_TITLE_START = (
     "Ingeniera",
     "Jefe",
     "Jefa",
+    "Liquidador",
+    "Liquidadora",
+    "Periodista",
     "Responsable",
     "Secretaria",
     "Secretario",
@@ -47,6 +53,8 @@ SPANISH_TITLE_START = (
     "Supervisora",
     "Tecnico",
     "Técnico",
+    "Vendedor",
+    "Vendedora",
     "Visitador",
     "Visitadora",
     "Auditor",
@@ -86,14 +94,6 @@ SPANISH_SOURCE_MARKER_PATTERN = re.compile(
     re.I,
 )
 
-SPANISH_TITLE_MARKER_PATTERN = re.compile(
-    r"\b(?:de|del|m[eé]dico|m[eé]dica|biling[uü]e|recepcionista|interno|interna|"
-    r"planta|dep[oó]sito|rrhh|campo|comercial|legales?|datos?|soporte|"
-    r"desarrollador|desarrolladora|ingeniero|ingeniera|visitador|visitadora|"
-    r"secretaria|secretario|auditor|auditora|consultor|consultora|analista|gerente)\b",
-    re.I,
-)
-
 
 def normalize_role_title_for_source(payload: Mapping[str, Any], source_text: str) -> Dict[str, Any]:
     """Prefer the role title phrase used by Spanish recruiter source text."""
@@ -117,7 +117,10 @@ def normalize_role_title_for_source(payload: Mapping[str, Any], source_text: str
 
     canonical_title = ""
     if source_title and _is_preserved_english_title(source_title):
-        canonical_title = source_title
+        if current_title and _fold(current_title).startswith(_fold(source_title)):
+            canonical_title = current_title
+        else:
+            canonical_title = source_title
     elif source_title:
         canonical_title = source_title
     elif source_is_spanish and _looks_spanish_title(job_title):
@@ -200,7 +203,7 @@ def _looks_spanish_source(source_text: str) -> bool:
 
 def _looks_spanish_title(title: str) -> bool:
     clean = _clean_role_title(title)
-    return bool(clean and SPANISH_ROLE_PATTERN.match(clean) and SPANISH_TITLE_MARKER_PATTERN.search(clean))
+    return bool(clean and not _is_preserved_english_title(clean) and SPANISH_ROLE_PATTERN.match(clean))
 
 
 def _looks_english_title(title: str) -> bool:

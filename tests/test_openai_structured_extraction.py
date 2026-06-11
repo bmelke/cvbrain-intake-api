@@ -344,6 +344,43 @@ def test_analyze_endpoint_ai_path_normalizes_dirty_parsed_payload_before_respons
     ]
 
 
+def test_openai_structured_prompt_includes_global_language_contract_for_spanish_source():
+    fake_client = FakeOpenAIClient(response={"output_parsed": role_title_payload("Arquitecto de Software")})
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Empresa tecnológica busca Arquitecto de Software para plataforma SaaS."))
+
+    system_prompt = fake_client.responses.calls[0]["input"][0]["content"]
+    assert result["role_title"] == "Arquitecto de Software"
+    assert "Language contract:" in system_prompt
+    assert "Source text language detected as: Spanish" in system_prompt
+    assert "All user-facing output fields must be in the same language as source_text." in system_prompt
+    assert "If source_text is Spanish, write those user-facing fields in Spanish." in system_prompt
+    assert "Do not translate technologies, product names, acronyms" in system_prompt
+    assert "Python, Java, React, SQL, AWS, Azure, GCP, SAP, Salesforce" in system_prompt
+    assert "The primary role_title must not be translated away from the source language." in system_prompt
+
+
+def test_openai_structured_prompt_detects_english_source_language():
+    fake_client = FakeOpenAIClient(response={"output_parsed": role_title_payload("Software Architect")})
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Company is hiring a Software Architect for a SaaS platform."))
+
+    system_prompt = fake_client.responses.calls[0]["input"][0]["content"]
+    assert result["role_title"] == "Software Architect"
+    assert "Source text language detected as: English" in system_prompt
+    assert "If source_text is English, write those user-facing fields in English." in system_prompt
+
+
 @pytest.mark.parametrize(
     ("source_text", "nested_title", "english_title"),
     [
@@ -377,6 +414,48 @@ def test_nested_spanish_job_title_wins_over_english_normalized_title(source_text
     assert english_title in result["search_terms"] or english_title in result["semantic_terms"]
 
 
+@pytest.mark.parametrize(
+    ("source_text", "ai_title", "expected_title"),
+    [
+        (
+            "Empresa tecnológica busca Arquitecto de Software para plataforma SaaS.",
+            "Software Architect",
+            "Arquitecto de Software",
+        ),
+        (
+            "Empresa proveedora busca Vendedor Técnico para soluciones industriales.",
+            "Technical Sales Representative",
+            "Vendedor Técnico",
+        ),
+        (
+            "Aseguradora busca Liquidador de Siniestros para gestión de reclamos.",
+            "Claims Adjuster",
+            "Liquidador de Siniestros",
+        ),
+        (
+            "Medio digital busca Periodista para cobertura de actualidad.",
+            "Journalist",
+            "Periodista",
+        ),
+    ],
+)
+def test_spanish_source_title_extraction_overrides_english_ai_title_without_translation_mapping(
+    source_text, ai_title, expected_title
+):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(ai_title)}),
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["role_title"] == expected_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == expected_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == expected_title
+    assert ai_title in result["search_terms"] or ai_title in result["semantic_terms"]
+
+
 def test_analyze_endpoint_syncs_top_level_and_nested_spanish_role_title(monkeypatch):
     source_text = "Startup tecnológica busca Desarrollador Backend Python para trabajar en APIs."
     fake_client = FakeOpenAIClient(
@@ -406,67 +485,6 @@ def test_analyze_endpoint_syncs_top_level_and_nested_spanish_role_title(monkeypa
     assert data["role_title"] == data["job_intelligence"]["job_profile"]["job_title"]
 
 
-@pytest.mark.parametrize(
-    ("source_text", "ai_title", "expected_title"),
-    [
-        (
-            "Empresa de servicios B2B busca Gerente Comercial para liderar equipo y estrategia.",
-            "Commercial Manager",
-            "Gerente Comercial",
-        ),
-        (
-            "Retail importador busca Gerente de Importaciones / Comercio Exterior para coordinar compras internacionales.",
-            "Importations Manager / International Trade",
-            "Gerente de Importaciones / Comercio Exterior",
-        ),
-        (
-            "Empresa de servicios tecnológicos busca Ejecutivo Comercial B2B para vender soluciones a empresas.",
-            "B2B Sales Executive",
-            "Ejecutivo Comercial B2B",
-        ),
-        (
-            "Empresa de software busca Soporte Aplicativo para atender incidencias de sistemas.",
-            "Application Support",
-            "Soporte Aplicativo",
-        ),
-        (
-            "Nuestro cliente busca incorporar un Gerente Corporativo de Legales para ordenar la función legal interna.",
-            "Corporate Legal Manager",
-            "Gerente Corporativo de Legales",
-        ),
-        (
-            "Seleccionamos Auditor Interno para compañía corporativa.",
-            "Internal Auditor",
-            "Auditor Interno",
-        ),
-        (
-            "Se busca Visitador Médico para laboratorio de salud.",
-            "Medical Sales Representative",
-            "Visitador Médico",
-        ),
-        (
-            "Para empresa de servicios buscamos Gerente Comercial para liderar equipo.",
-            "Commercial Manager",
-            "Gerente Comercial",
-        ),
-    ],
-)
-def test_spanish_source_preserves_spanish_primary_role_title(source_text, ai_title, expected_title):
-    extractor = OpenAIStructuredExtractor(
-        api_key="test-key-not-used",
-        model="test-model-not-used",
-        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(ai_title)}),
-    )
-
-    result = extractor.extract(request(source_text))
-
-    assert result["role_title"] == expected_title
-    assert result["job_intelligence"]["job_profile"]["job_title"] == expected_title
-    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == expected_title
-    assert expected_title in result["search_terms"]
-    assert ai_title in result["search_terms"] or ai_title in result["semantic_terms"]
-
-
 @pytest.mark.parametrize("english_title", ["Data Engineer", "Product Manager", "QA Tester"])
 def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it(english_title):
     source_text = f"Compañía tecnológica busca {english_title} Semi Senior para producto digital."
@@ -481,6 +499,61 @@ def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it
     assert result["role_title"] == english_title
     assert result["job_intelligence"]["job_profile"]["job_title"] == english_title
     assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == english_title
+
+
+@pytest.mark.parametrize(
+    ("source_text", "english_title"),
+    [
+        ("Empresa tecnológica busca Data Engineer para plataforma de datos.", "Data Engineer"),
+        ("Startup busca Product Manager para producto digital.", "Product Manager"),
+        ("Empresa busca QA Tester para pruebas manuales.", "QA Tester"),
+    ],
+)
+def test_language_contract_preserves_explicit_english_titles_inside_spanish_source(source_text, english_title):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(english_title)}),
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["role_title"] == english_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == english_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == english_title
+
+
+@pytest.mark.parametrize("english_title", ["Software Architect", "Technical Sales Representative"])
+def test_english_source_keeps_english_primary_role_title(english_title):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(english_title)}),
+    )
+
+    result = extractor.extract(request(f"Company is hiring a {english_title} for a SaaS platform."))
+
+    assert result["role_title"] == english_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == english_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == english_title
+
+
+def test_spanish_source_without_clear_explicit_title_does_not_invent_dictionary_translation():
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload("Technical Sales Representative")}),
+    )
+
+    result = extractor.extract(
+        request(
+            "Empresa del sector industrial necesita incorporar persona para desarrollar clientes y preparar cotizaciones."
+        )
+    )
+
+    assert result["role_title"] == "Technical Sales Representative"
+    assert result["job_intelligence"]["job_profile"]["job_title"] == "Technical Sales Representative"
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == "Technical Sales Representative"
 
 
 @pytest.mark.parametrize(
@@ -672,6 +745,40 @@ def test_ai_schema_validation_repair_success_returns_openai_result_with_marker()
     assert repair_call["input"][0]["content"].startswith("Repair CVBrain Job Intelligence v1 JSON")
     assert "not_a_valid_status" in repair_call["input"][1]["content"]
     assert repair_call["text"]["format"]["name"] == "cvbrain_job_intelligence_v1"
+
+
+def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_title():
+    invalid_payload = role_title_payload("Software Architect")
+    invalid_payload["search_readiness"]["status"] = "not_a_valid_status"
+    repaired_payload = role_title_payload("Software Architect")
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"output_parsed": invalid_payload},
+            {"output_parsed": repaired_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Empresa tecnológica busca Arquitecto de Software para plataforma SaaS."))
+
+    repair_prompt = fake_client.responses.calls[1]["input"][0]["content"]
+    repair_user_prompt = fake_client.responses.calls[1]["input"][1]["content"]
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert "ai_schema_repaired" in result["warnings"]
+    assert result["role_title"] == "Arquitecto de Software"
+    assert result["job_intelligence"]["job_profile"]["job_title"] == "Arquitecto de Software"
+    assert "Language contract:" in repair_prompt
+    assert "Source text language detected as: Spanish" in repair_prompt
+    assert "All user-facing output fields must be in the same language as source_text." in repair_prompt
+    assert "If source_text is Spanish, write those user-facing fields in Spanish." in repair_prompt
+    assert "Software Architect" in repair_user_prompt
 
 
 def test_ai_invalid_json_repair_success_returns_openai_result_with_marker():
