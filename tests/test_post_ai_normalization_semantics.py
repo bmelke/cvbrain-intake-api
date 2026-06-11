@@ -472,6 +472,73 @@ def test_cleanup_preserves_legitimate_short_skill_tokens():
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_alternative_healthcare_commercial_experience_stays_one_composite_requirement():
+    phrase = "experiencia comercial en salud, laboratorios, equipamiento médico, dispositivos médicos o servicios vinculados al sector"
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia comercial en salud", source_text=phrase),
+                requirement_item("Laboratorios", source_text=phrase),
+                requirement_item("Equipamiento médico", source_text=phrase),
+                requirement_item("Dispositivos médicos", source_text=phrase),
+                requirement_item("Servicios vinculados al sector", source_text=phrase),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == [
+        "Experiencia comercial en salud, laboratorios, equipamiento médico, dispositivos médicos o servicios vinculados al sector"
+    ]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_alternative_regulated_industry_list_stays_one_composite_requirement():
+    phrase = "laboratorio, industria farmacéutica, alimentos, química o ambiente regulado"
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Laboratorio", source_text=phrase),
+                requirement_item("Industria farmacéutica", source_text=phrase),
+                requirement_item("Alimentos", source_text=phrase),
+                requirement_item("Química", source_text=phrase),
+                requirement_item("Ambiente regulado", source_text=phrase),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == ["Laboratorio, industria farmacéutica, alimentos, química o ambiente regulado"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_alternative_telecom_equipment_phrase_stays_one_composite_requirement():
+    phrase = "fibra óptica o equipos de telecomunicaciones"
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Fibra óptica", source_text=phrase),
+                requirement_item("Equipos de telecomunicaciones", source_text=phrase),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == ["Fibra óptica o equipos de telecomunicaciones"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_unrelated_must_have_requirements_remain_separate():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia comercial B2B"),
+                requirement_item("Manejo de CRM"),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == ["Experiencia comercial B2B", "Manejo de CRM"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_flat_top_level_fields_and_nested_requirements_stay_synchronized_after_normalization():
     normalized, flat = normalize_and_flatten(
         {

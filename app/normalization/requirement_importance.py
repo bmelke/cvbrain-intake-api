@@ -98,6 +98,11 @@ NEGATIVE_FILTER_MODIFIER_PATTERN = re.compile(
     re.I,
 )
 
+ALTERNATIVE_MARKER_PATTERN = re.compile(
+    r"\b(?:o|u|similares?|afines?|equivalentes?|vinculad[oa]s?)\b",
+    re.I,
+)
+
 
 @dataclass(frozen=True)
 class RequirementItem:
@@ -257,7 +262,8 @@ def normalize_structured_requirement_item(item: Mapping[str, Any], default_impor
         normalized["importance"] = importance
         if len(clauses) == 1 and _fold(clause) == _fold(raw) and not blocker_text_for_clause(clause):
             normalized["text"] = normalize_requirement_text(clause) if (
-                _fold(text) == _fold(clause) and _should_normalize_requirement_text(clause)
+                _is_alternative_requirement_text(clause)
+                or (_fold(text) == _fold(clause) and _should_normalize_requirement_text(clause))
             ) else text
         else:
             normalized["text"] = normalize_requirement_text(clause)
@@ -286,6 +292,11 @@ def split_requirement_clauses(text: str) -> List[str]:
     chunks: List[str] = []
     for sentence in re.split(r"[\n.;]+", text):
         sentence = _strip_section_heading(sentence)
+        if _is_alternative_requirement_text(sentence):
+            clean = sentence.strip(" -:\t\r\n")
+            if clean:
+                chunks.append(clean)
+            continue
         expanded = _expand_coordinated_sentence(sentence)
         if expanded:
             chunks.extend(expanded)
@@ -561,6 +572,7 @@ def _normalize_accents(text: str) -> str:
         "titulo": "título",
         "administracion": "administración",
         "libretta": "libreta",
+        "telecomunicaciónes": "telecomunicaciones",
     }
     clean = f" {text} "
     for source, target in replacements.items():
@@ -667,6 +679,8 @@ def _dedupe_requirement_concepts(requirements: Mapping[str, Any]) -> Dict[str, A
             if _should_replace_duplicate_requirement(selected[key], record):
                 selected[key] = record
 
+    _remove_alternative_fragment_duplicates(selected, order)
+
     bucketed: Dict[str, List[Dict[str, Any]]] = {
         "must_have": [],
         "should_have": [],
@@ -702,6 +716,52 @@ def _dedupe_requirement_concepts(requirements: Mapping[str, Any]) -> Dict[str, A
     output["credentials"] = _unique_credentials_by_strongest_concept(credentials)
     output["blockers"] = blockers
     return output
+
+
+def _remove_alternative_fragment_duplicates(
+    selected: Dict[str, Dict[str, Any]],
+    order: List[str],
+) -> None:
+    composite_keys = [
+        key
+        for key in order
+        if key in selected
+        and isinstance(selected[key].get("item"), Mapping)
+        and _is_alternative_requirement_text(str(selected[key]["item"].get("text", "")))
+    ]
+    if not composite_keys:
+        return
+
+    for key in list(order):
+        if key not in selected or key in composite_keys:
+            continue
+        if any(_is_alternative_fragment_key(key, composite_key) for composite_key in composite_keys):
+            del selected[key]
+
+
+def _is_alternative_fragment_key(fragment_key: str, composite_key: str) -> bool:
+    if not fragment_key or not composite_key or fragment_key == composite_key:
+        return False
+    tokens = fragment_key.split()
+    if len(tokens) > 5:
+        return False
+    return re.search(rf"\b{re.escape(fragment_key)}\b", composite_key) is not None
+
+
+def _is_alternative_requirement_text(text: str) -> bool:
+    clean = re.sub(r"\s+", " ", str(text).strip(" -:.,;\t\r\n"))
+    if not clean:
+        return False
+    folded = _fold(clean)
+    if not ALTERNATIVE_MARKER_PATTERN.search(folded):
+        return False
+    if re.search(r"\b(?:o|u)\b", folded):
+        return True
+    if re.search(r"\b(?:similares?|afines?|equivalentes?)\b", folded):
+        return _has_list_separator(clean) or bool(re.search(r"\b(?:experiencia|formaci[oó]n|conocimientos?|manejo|dominio)\b", folded))
+    if re.search(r"\bvinculad[oa]s?\b", folded):
+        return _has_list_separator(clean) or bool(re.search(r"\b(?:sector|rubro|industria)\b", folded))
+    return False
 
 
 def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
