@@ -343,6 +343,11 @@ def test_analyze_endpoint_ai_path_normalizes_dirty_parsed_payload_before_respons
             "Application Support",
             "Soporte Aplicativo",
         ),
+        (
+            "Nuestro cliente busca incorporar un Gerente Corporativo de Legales para ordenar la función legal interna.",
+            "Corporate Legal Manager",
+            "Gerente Corporativo de Legales",
+        ),
     ],
 )
 def test_spanish_source_preserves_spanish_primary_role_title(source_text, ai_title, expected_title):
@@ -372,6 +377,7 @@ def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it
     result = extractor.extract(request(source_text))
 
     assert result["role_title"] == "Data Engineer"
+    assert result["job_intelligence"]["job_profile"]["job_title"] == "Data Engineer"
     assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == "Data Engineer"
 
 
