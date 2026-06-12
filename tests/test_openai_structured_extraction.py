@@ -363,6 +363,10 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Do not translate technologies, product names, acronyms" in system_prompt
     assert "Python, Java, React, SQL, AWS, Azure, GCP, SAP, Salesforce" in system_prompt
     assert "The primary role_title must not be translated away from the source language." in system_prompt
+    assert "Case contract:" in system_prompt
+    assert "For output, incoming source case wins." in system_prompt
+    assert "Do not title-case Spanish titles unless the source itself is title-cased." in system_prompt
+    assert "QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP" in system_prompt
 
 
 def test_openai_structured_prompt_detects_english_source_language():
@@ -397,6 +401,7 @@ def test_openai_structured_prompt_detects_english_source_language():
             "Bilingual Receptionist & Administrative Assistant",
         ),
         ("Seleccionamos Auditor Interno para controles y reportes.", "Auditor Interno", "Internal Auditor"),
+        ("Consultora selecciona Reclutador IT para búsquedas técnicas.", "Reclutador IT", "Consultora"),
     ],
 )
 def test_nested_spanish_job_title_wins_over_english_normalized_title(source_text, nested_title, english_title):
@@ -436,6 +441,11 @@ def test_nested_spanish_job_title_wins_over_english_normalized_title(source_text
             "Medio digital busca Periodista para cobertura de actualidad.",
             "Journalist",
             "Periodista",
+        ),
+        (
+            "Agencia digital busca Redactor UX para contenidos de producto.",
+            "UX Writer",
+            "Redactor UX",
         ),
     ],
 )
@@ -507,6 +517,8 @@ def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it
         ("Empresa tecnológica busca Data Engineer para plataforma de datos.", "Data Engineer"),
         ("Startup busca Product Manager para producto digital.", "Product Manager"),
         ("Empresa busca QA Tester para pruebas manuales.", "QA Tester"),
+        ("Startup busca UX/UI Designer para producto digital.", "UX/UI Designer"),
+        ("Agencia busca Community Manager Senior para redes sociales.", "Community Manager Senior"),
     ],
 )
 def test_language_contract_preserves_explicit_english_titles_inside_spanish_source(source_text, english_title):
@@ -536,6 +548,30 @@ def test_english_source_keeps_english_primary_role_title(english_title):
     assert result["role_title"] == english_title
     assert result["job_intelligence"]["job_profile"]["job_title"] == english_title
     assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == english_title
+
+
+@pytest.mark.parametrize(
+    "source_title",
+    [
+        "Coordinador de logística",
+        "Liquidador de siniestros",
+        "Ejecutivo de licitaciones",
+        "Arquitecto de Software",
+    ],
+)
+def test_explicit_source_title_casing_wins_for_top_level_and_nested_titles(source_title):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload(source_title.title())}),
+    )
+
+    result = extractor.extract(request(f"Empresa busca {source_title} para operación local."))
+
+    assert result["role_title"] == source_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == source_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == source_title
+    assert result["role_title"] == result["job_intelligence"]["job_profile"]["job_title"]
 
 
 def test_spanish_source_without_clear_explicit_title_does_not_invent_dictionary_translation():
@@ -739,12 +775,47 @@ def test_ai_schema_validation_repair_success_returns_openai_result_with_marker()
     assert result["ok"] is True
     assert result["engine"] == "openai"
     assert result["fallback_used"] is False
-    assert "ai_schema_repaired" in result["warnings"]
+    assert result["ai_schema_repaired"] is True
+    assert "ai_schema_repaired" not in result["warnings"]
     assert len(fake_client.responses.calls) == 2
     repair_call = fake_client.responses.calls[1]
     assert repair_call["input"][0]["content"].startswith("Repair CVBrain Job Intelligence v1 JSON")
     assert "not_a_valid_status" in repair_call["input"][1]["content"]
+    assert "Repair attempt: 1 of 2" in repair_call["input"][1]["content"]
     assert repair_call["text"]["format"]["name"] == "cvbrain_job_intelligence_v1"
+
+
+def test_busqueda_036_like_schema_repair_second_attempt_preserves_spanish_title():
+    invalid_payload = role_title_payload("Software Architect")
+    invalid_payload["search_readiness"]["status"] = "not_a_valid_status"
+    repair_payload = role_title_payload("Software Architect")
+    repair_payload["quality_control"]["confidence"] = "invalid-confidence"
+    final_payload = role_title_payload("Software Architect")
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"id": "resp_initial_invalid", "output_parsed": invalid_payload},
+            {"id": "resp_repair_invalid", "output_parsed": repair_payload},
+            {"id": "resp_repair_valid", "output_parsed": final_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Empresa tecnológica busca Arquitecto de Software para plataforma SaaS."))
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert result["ai_schema_repaired"] is True
+    assert "ai_schema_repaired" not in result["warnings"]
+    assert result["role_title"] == "Arquitecto de Software"
+    assert result["job_intelligence"]["job_profile"]["job_title"] == "Arquitecto de Software"
+    assert len(fake_client.responses.calls) == 3
+    assert "Repair attempt: 2 of 2" in fake_client.responses.calls[2]["input"][1]["content"]
 
 
 def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_title():
@@ -771,13 +842,16 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert result["ok"] is True
     assert result["engine"] == "openai"
     assert result["fallback_used"] is False
-    assert "ai_schema_repaired" in result["warnings"]
+    assert result["ai_schema_repaired"] is True
+    assert "ai_schema_repaired" not in result["warnings"]
     assert result["role_title"] == "Arquitecto de Software"
     assert result["job_intelligence"]["job_profile"]["job_title"] == "Arquitecto de Software"
     assert "Language contract:" in repair_prompt
     assert "Source text language detected as: Spanish" in repair_prompt
     assert "All user-facing output fields must be in the same language as source_text." in repair_prompt
     assert "If source_text is Spanish, write those user-facing fields in Spanish." in repair_prompt
+    assert "Case contract:" in repair_prompt
+    assert "For output, incoming source case wins." in repair_prompt
     assert "Software Architect" in repair_user_prompt
 
 
@@ -801,7 +875,8 @@ def test_ai_invalid_json_repair_success_returns_openai_result_with_marker():
     assert result["ok"] is True
     assert result["engine"] == "openai"
     assert result["fallback_used"] is False
-    assert "ai_schema_repaired" in result["warnings"]
+    assert result["ai_schema_repaired"] is True
+    assert "ai_schema_repaired" not in result["warnings"]
     assert len(fake_client.responses.calls) == 2
     assert "{not valid json" in fake_client.responses.calls[1]["input"][1]["content"]
 
@@ -840,7 +915,7 @@ def test_ai_schema_validation_repair_failure_returns_schema_error_once(caplog):
     assert result["engine"] == "openai"
     assert result["fallback_used"] is False
     assert result["warnings"] == ["ai_schema_validation_failed"]
-    assert len(fake_client.responses.calls) == 2
+    assert len(fake_client.responses.calls) == 3
     assert "resp_repair_invalid" in "\n".join(record.getMessage() for record in caplog.records)
 
 
@@ -880,7 +955,7 @@ def test_ai_schema_validation_repair_logs_do_not_expose_fake_secrets(caplog):
     log_output = "\n".join(record.getMessage() for record in caplog.records)
     assert result["ok"] is False
     assert result["warnings"] == ["ai_schema_validation_failed"]
-    assert len(fake_client.responses.calls) == 2
+    assert len(fake_client.responses.calls) == 3
     assert "schema_repair_start" in log_output
     assert "cvbrain.ai_schema_validation_failed" in log_output
     assert "sk-test-secret-should-not-log" not in log_output

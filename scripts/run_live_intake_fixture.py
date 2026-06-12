@@ -390,6 +390,8 @@ def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]
 
     for bucket in ("should_have", "nice_to_have"):
         for item in _string_list(data.get(bucket, [])):
+            if any(_clause_matches_item(clause, item) for clause in weak_clauses):
+                continue
             if any(_clause_matches_item(clause, item) for clause in hard_clauses):
                 notes.append(f"hard_modifier_under_promoted:{bucket}:{item}")
 
@@ -408,17 +410,9 @@ def _requirement_and_credential_items(data: Mapping[str, Any]) -> List[tuple[str
 
 def warning_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]:
     notes: List[str] = []
-    warnings = _string_list(data.get("warnings", []))
-    if any("search_readiness" in warning for warning in warnings):
-        notes.append("search_readiness_warning")
     confidence = data.get("confidence")
     if isinstance(confidence, (int, float)) and float(confidence) < 0.5:
         notes.append(f"low_confidence:{confidence}")
-    questions = _string_list(data.get("recruiter_questions", []))
-    if questions:
-        notes.append(f"recruiter_questions:{len(questions)}")
-    if data.get("role_title") and _looks_english(str(data.get("role_title"))) and _looks_spanish(str(data.get("summary", ""))):
-        notes.append("role_title_english_review")
     notes.extend(semantic_review_notes(source_text, data))
     return notes
 
@@ -559,11 +553,15 @@ def search_readiness_status(data: Mapping[str, Any]) -> str:
 def build_summary(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     classification_counts = Counter(str(row["result_classification"]) for row in rows)
     warning_counts: Counter[str] = Counter()
+    diagnostic_counts: Counter[str] = Counter()
     note_counts: Counter[str] = Counter()
     for row in rows:
         for warning in str(row.get("warnings", "")).split("|"):
             if warning:
-                warning_counts[warning] += 1
+                if _is_diagnostic_warning(warning):
+                    diagnostic_counts[warning] += 1
+                else:
+                    warning_counts[warning] += 1
         for note in str(row.get("notes", "")).split("; "):
             if note:
                 note_counts[note.split(":", 1)[0]] += 1
@@ -575,8 +573,16 @@ def build_summary(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         "fail_count": sum(count for key, count in classification_counts.items() if key.startswith("FAIL_")),
         "classification_counts": dict(sorted(classification_counts.items())),
         "top_warnings": warning_counts.most_common(20),
+        "top_diagnostics": diagnostic_counts.most_common(20),
         "top_notes": note_counts.most_common(20),
     }
+
+
+def _is_diagnostic_warning(warning: str) -> bool:
+    return bool(
+        warning == "ai_schema_repaired"
+        or warning.startswith("search_readiness_")
+    )
 
 
 def write_summary_csv(path: Path, rows: List[Dict[str, Any]]) -> None:
@@ -624,6 +630,10 @@ def write_failures_md(path: Path, summary: Mapping[str, Any], rows: List[Dict[st
     lines.extend(["", "## Top Recurring Warnings", ""])
     for warning, count in summary.get("top_warnings", []):
         lines.append(f"- {warning}: {count}")
+
+    lines.extend(["", "## Top Recurring Diagnostics", ""])
+    for diagnostic, count in summary.get("top_diagnostics", []):
+        lines.append(f"- {diagnostic}: {count}")
 
     lines.extend(["", "## Top Recurring Notes", ""])
     for note, count in summary.get("top_notes", []):

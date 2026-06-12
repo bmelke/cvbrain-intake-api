@@ -190,6 +190,47 @@ def test_runner_accepts_idealmente_as_should_have_without_importance_failure():
     assert notes == []
 
 
+def test_runner_accepts_openai_api_valorable_as_nice_to_have():
+    classification, notes = runner.classify_result(
+        "Experiencia con OpenAI APIs será valorable.",
+        successful_record(nice_to_have=["Experiencia con OpenAI APIs"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_treats_repair_and_readiness_as_diagnostics_not_warn(tmp_path):
+    cases = [
+        runner.Case("BUSQUEDA_001", "Find all clerk applications."),
+    ]
+
+    def fake_transport(url, api_key, payload, timeout):
+        return successful_record(
+            role_title="Clerk",
+            warnings=["ai_schema_repaired", "search_readiness_exploratory"],
+            recruiter_questions=["What industry should be searched?"],
+            ai_schema_repaired=True,
+        )
+
+    result = runner.run_fixture(
+        cases,
+        out_dir=tmp_path,
+        url="https://example.test/api/job-intake/analyze",
+        api_key="test-key-not-printed",
+        timeout=0.01,
+        sleep_seconds=0,
+        transport=fake_transport,
+    )
+
+    assert result["cases"][0]["result_classification"] == runner.PASS
+    assert result["summary"]["warn_count"] == 0
+    assert result["summary"]["top_warnings"] == []
+    assert ("ai_schema_repaired", 1) in result["summary"]["top_diagnostics"]
+    assert ("search_readiness_exploratory", 1) in result["summary"]["top_diagnostics"]
+
+
 def test_runner_fails_when_weak_preference_is_promoted_to_should_have():
     classification, notes = runner.classify_result(
         "Libreta profesional puede sumar.",

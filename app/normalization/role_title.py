@@ -11,8 +11,13 @@ PRESERVED_ENGLISH_TITLES = (
     "Data Engineer",
     "Product Manager",
     "DevOps Engineer",
+    "QA Automation Engineer",
     "QA Tester",
     "Account Manager",
+    "Customer Success Manager",
+    "UX/UI Designer",
+    "Community Manager Senior",
+    "Community Manager",
     "Business Analyst",
     "BI Analyst",
     "Full Stack Developer",
@@ -46,6 +51,10 @@ SPANISH_TITLE_START = (
     "Liquidadora",
     "Periodista",
     "Responsable",
+    "Redactor",
+    "Redactora",
+    "Reclutador",
+    "Reclutadora",
     "Secretaria",
     "Secretario",
     "Soporte",
@@ -63,9 +72,23 @@ SPANISH_TITLE_START = (
 
 SOURCE_ROLE_LEAD_PATTERNS = (
     re.compile(
-        r"\b(?:busca|buscamos|seleccionamos|necesita|sumar|incorporar|incorpora|rol\s*:|"
-        r"se\s+busca|nos\s+encontramos\s+en\s+b[uú]squeda\s+de)\s+"
-        r"(?:un|una|el|la)?\s*(?P<tail>.{0,160})",
+        r"\b(?:busca|buscamos|seleccionamos|selecciona|necesita|necesitamos|"
+        r"sumar|incorporar|incorpora|incorporamos|contrata|requiere|"
+        r"queremos\s+incorporar|rol\s*:|se\s+busca|nos\s+encontramos\s+en\s+b[uú]squeda\s+de)\s+"
+        r"(?:(?:un|una|el|la|un/a)\s+)?(?P<tail>.{0,180})",
+        re.I | re.S,
+    ),
+    re.compile(
+        r"\b(?:posici[oó]n|puesto|perfil|vacante)\s+de\s+"
+        r"(?:(?:un|una|el|la|un/a)\s+)?(?P<tail>.{0,180})",
+        re.I | re.S,
+    ),
+    re.compile(
+        r"\bpara\s+cubrir\s+(?:(?:un|una|el|la|un/a)\s+)?(?P<tail>.{0,180})",
+        re.I | re.S,
+    ),
+    re.compile(
+        r"\bsumar\s+(?:a\s+)?(?:(?:un|una|el|la|un/a)\s+)?(?P<tail>.{0,180})",
         re.I | re.S,
     ),
     re.compile(
@@ -91,6 +114,21 @@ SPANISH_ROLE_PATTERN = re.compile(
 SPANISH_SOURCE_MARKER_PATTERN = re.compile(
     r"\b(?:empresa|busca|buscamos|seleccionamos|experiencia|deseable|excluyente|"
     r"modalidad|montevideo|uruguay|b[uú]squeda|se\s+busca)\b",
+    re.I,
+)
+
+REJECTED_TITLE_EXACT = {
+    "agencia",
+    "consultora",
+    "empresa",
+    "empresa tecnologica",
+    "empresa tecnológica",
+    "startup",
+    "multinacional",
+}
+
+REJECTED_TITLE_PREFIX_PATTERN = re.compile(
+    r"^(?:soporte\s+a|responsable\s+de|gesti[oó]n\s+de|empresa\s+|startup\s+|agencia\s+|multinacional\s+)",
     re.I,
 )
 
@@ -134,8 +172,8 @@ def normalize_role_title_for_source(payload: Mapping[str, Any], source_text: str
         return output
 
     if (
-        _fold(canonical_title) == _fold(str(job_profile.get("job_title") or ""))
-        and _fold(canonical_title) == _fold(str(job_profile.get("normalized_role_title") or ""))
+        canonical_title == str(job_profile.get("job_title") or "").strip()
+        and canonical_title == str(job_profile.get("normalized_role_title") or "").strip()
     ):
         return output
 
@@ -176,7 +214,7 @@ def _source_role_title(source_text: str) -> str:
 
 def _preserved_english_title_from_source(source: str) -> str:
     for title in PRESERVED_ENGLISH_TITLES:
-        match = re.search(rf"\b{re.escape(title)}\b", source, re.I)
+        match = re.search(rf"(?<![A-Za-z0-9/+.-]){re.escape(title)}(?![A-Za-z0-9/+.-])", source, re.I)
         if match:
             return source[match.start() : match.end()]
     return ""
@@ -186,13 +224,15 @@ def _spanish_title_from_text(text: str) -> str:
     match = SPANISH_ROLE_PATTERN.search(_clean_role_title(text))
     if not match:
         return ""
-    return _clean_role_title(match.group(0))
+    title = _clean_role_title(match.group(0))
+    if _is_rejected_title(title):
+        return ""
+    return title
 
 
 def _clean_role_title(text: str) -> str:
     title = TITLE_SENTENCE_TAIL_PATTERN.sub("", str(text or ""))
     title = title.strip(" -:.,;\t\r\n")
-    title = re.sub(r"\s*/\s*", " / ", title)
     title = re.sub(r"\s+", " ", title).strip()
     return title
 
@@ -203,7 +243,12 @@ def _looks_spanish_source(source_text: str) -> bool:
 
 def _looks_spanish_title(title: str) -> bool:
     clean = _clean_role_title(title)
-    return bool(clean and not _is_preserved_english_title(clean) and SPANISH_ROLE_PATTERN.match(clean))
+    return bool(
+        clean
+        and not _is_preserved_english_title(clean)
+        and not _is_rejected_title(clean)
+        and SPANISH_ROLE_PATTERN.match(clean)
+    )
 
 
 def _looks_english_title(title: str) -> bool:
@@ -218,6 +263,15 @@ def _looks_english_title(title: str) -> bool:
 def _is_preserved_english_title(title: str) -> bool:
     folded = _fold(title)
     return any(_fold(preserved) == folded for preserved in PRESERVED_ENGLISH_TITLES)
+
+
+def _is_rejected_title(title: str) -> bool:
+    folded = _fold(_clean_role_title(title))
+    if not folded:
+        return True
+    if folded in {_fold(value) for value in REJECTED_TITLE_EXACT}:
+        return True
+    return bool(REJECTED_TITLE_PREFIX_PATTERN.search(folded))
 
 
 def _preserve_role_title_terms(output: Dict[str, Any], source_title: str, previous_titles: list[str]) -> None:

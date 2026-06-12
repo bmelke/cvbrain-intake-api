@@ -26,6 +26,7 @@ from app.schemas.job_intelligence_v1_contract import (
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_MAX_INPUT_CHARS = 12000
 DEFAULT_MAX_OUTPUT_TOKENS = 4096
+DEFAULT_SCHEMA_REPAIR_ATTEMPTS = 2
 RAW_OUTPUT_PREVIEW_CHARS = 500
 OPENAI_API_SHAPE = "responses.create:text.format.json_schema"
 LOGGER = logging.getLogger("cvbrain.openai_structured")
@@ -85,10 +86,18 @@ LANGUAGE_CONTRACT = """Language contract:
 - If source_text is English, write those user-facing fields in English.
 - Do not translate technologies, product names, acronyms, certifications, platforms, frameworks, or titles explicitly written in English by the recruiter.
 - Preserve terms such as Python, Java, React, SQL, AWS, Azure, GCP, SAP, Salesforce, CRM, ERP, TMS, WMS, BI, QA, UX, UI, DevOps, B2B, and B2C.
-- Preserve explicitly English role titles when source_text uses them, such as Data Engineer, Product Manager, DevOps Engineer, QA Tester, and Account Manager.
+- Preserve explicitly English role titles when source_text uses them, such as Data Engineer, Product Manager, DevOps Engineer, QA Automation Engineer, QA Tester, Account Manager, Customer Success Manager, UX/UI Designer, Community Manager Senior, and Community Manager.
 - The primary role_title must not be translated away from the source language.
 - For Spanish source_text, prefer the exact Spanish title phrase from source_text when present, for example Arquitecto de Software, Vendedor Técnico, Liquidador de Siniestros, or Periodista.
-- For Spanish source_text that explicitly uses an English title such as Data Engineer, Product Manager, DevOps Engineer, QA Tester, Account Manager, Business Analyst, BI Analyst, Full Stack Developer, Backend Developer, or Frontend Developer, preserve that English title.
+- For Spanish source_text that explicitly uses an English title such as Data Engineer, Product Manager, DevOps Engineer, QA Automation Engineer, QA Tester, Account Manager, Customer Success Manager, UX/UI Designer, Community Manager Senior, Community Manager, Business Analyst, BI Analyst, Full Stack Developer, Backend Developer, or Frontend Developer, preserve that English title.
+
+Case contract:
+- For matching and validation purposes, upper/lower case differences should usually be ignored.
+- For output, incoming source case wins.
+- If the recruiter source contains an explicit role title span, preserve that source span's casing and punctuation in role_title, job_profile.job_title, and job_profile.normalized_role_title.
+- Do not title-case Spanish titles unless the source itself is title-cased.
+- Do not lowercase acronyms or technical abbreviations.
+- Preserve acronyms, products, and technologies exactly where possible: QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP, Salesforce, B2B, B2C, and SaaS.
 """
 
 
@@ -160,7 +169,7 @@ class OpenAIStructuredExtractor:
             try:
                 parsed_job_intelligence, job_intelligence = self._parse_normalize_validate_response(response, request)
             except JobIntelligenceValidationError as error:
-                response, parsed_job_intelligence, job_intelligence = self._repair_schema_once(
+                response, parsed_job_intelligence, job_intelligence = self._repair_schema(
                     ai_payload=ai_payload,
                     request=request,
                     failed_response=response,
@@ -173,7 +182,7 @@ class OpenAIStructuredExtractor:
                 if error.code != "ai_invalid_json":
                     raise
                 try:
-                    response, parsed_job_intelligence, job_intelligence = self._repair_schema_once(
+                    response, parsed_job_intelligence, job_intelligence = self._repair_schema(
                         ai_payload=ai_payload,
                         request=request,
                         failed_response=response,
@@ -243,9 +252,7 @@ class OpenAIStructuredExtractor:
         flat["ai_model"] = self.model
         flat["job_intelligence"] = job_intelligence
         if repaired:
-            warnings = list(flat.get("warnings", []))
-            warnings.append("ai_schema_repaired")
-            flat["warnings"] = list(dict.fromkeys(warnings))
+            flat["ai_schema_repaired"] = True
         return flat
 
     def _parse_normalize_validate_response(
@@ -262,7 +269,7 @@ class OpenAIStructuredExtractor:
         validate_job_intelligence_v1(job_intelligence)
         return parsed_job_intelligence, job_intelligence
 
-    def _repair_schema_once(
+    def _repair_schema(
         self,
         ai_payload: Mapping[str, Any],
         request: ExtractorRequest,
@@ -271,57 +278,79 @@ class OpenAIStructuredExtractor:
         failed_job_intelligence: Optional[Mapping[str, Any]],
         error: BaseException,
     ) -> tuple[Any, Dict[str, Any], Dict[str, Any]]:
-        invalid_output = _raw_output_for_diagnostics(failed_response, failed_parsed_payload)
-        self._log_event(
-            "schema_repair_start",
-            request_payload=ai_payload,
-            parse_path=_response_parse_path(failed_response),
-            exception_class=error.__class__.__name__,
-            sanitized_exception_message=_sanitize_text(str(error)),
-            validation_error_fields=_validation_error_fields(str(error)),
-            sanitized_raw_output_sha256=_sha256_hex(_sanitize_text(invalid_output, limit=20000)),
-        )
+        current_response = failed_response
+        current_parsed_payload = failed_parsed_payload
+        current_job_intelligence = failed_job_intelligence
+        current_error: BaseException = error
 
-        repair_response: Optional[Any] = None
-        repair_parsed_payload: Optional[Dict[str, Any]] = None
-        repair_job_intelligence: Optional[Dict[str, Any]] = None
-        try:
-            repair_response = self._responses_repair(ai_payload, invalid_output, error)
-            repair_parsed_payload, repair_job_intelligence = self._parse_normalize_validate_response(
-                repair_response,
-                request,
-            )
-        except JobIntelligenceValidationError as repair_error:
-            self._log_schema_validation_failure(
-                repair_error,
+        for attempt in range(1, DEFAULT_SCHEMA_REPAIR_ATTEMPTS + 1):
+            invalid_output = _raw_output_for_diagnostics(current_response, current_parsed_payload)
+            self._log_event(
+                "schema_repair_start",
                 request_payload=ai_payload,
-                response=repair_response,
-                parsed_job_intelligence=repair_parsed_payload,
-                job_intelligence=repair_job_intelligence,
+                parse_path=_response_parse_path(current_response),
+                repair_attempt=attempt,
+                exception_class=current_error.__class__.__name__,
+                sanitized_exception_message=_sanitize_text(str(current_error)),
+                validation_error_fields=_validation_error_fields(str(current_error)),
+                sanitized_raw_output_sha256=_sha256_hex(_sanitize_text(invalid_output, limit=20000)),
             )
-            raise _schema_validation_failed_error() from repair_error
-        except ExtractorError as repair_error:
-            self._log_exception(
-                "schema_repair_failed",
-                repair_error,
-                request_payload=ai_payload,
-            )
-            raise _schema_validation_failed_error() from repair_error
-        except Exception as repair_error:
-            self._log_exception(
-                "schema_repair_failed",
-                repair_error,
-                request_payload=ai_payload,
-            )
-            raise _schema_validation_failed_error() from repair_error
 
-        self._log_event(
-            "schema_repair_success",
-            request_payload=ai_payload,
-            parse_path=_response_parse_path(repair_response),
-            parsed_json_keys=sorted(repair_job_intelligence.keys()),
-        )
-        return repair_response, repair_parsed_payload, repair_job_intelligence
+            repair_response: Optional[Any] = None
+            repair_parsed_payload: Optional[Dict[str, Any]] = None
+            repair_job_intelligence: Optional[Dict[str, Any]] = None
+            try:
+                repair_response = self._responses_repair(ai_payload, invalid_output, current_error, attempt=attempt)
+                repair_parsed_payload, repair_job_intelligence = self._parse_normalize_validate_response(
+                    repair_response,
+                    request,
+                )
+            except JobIntelligenceValidationError as repair_error:
+                self._log_schema_validation_failure(
+                    repair_error,
+                    request_payload=ai_payload,
+                    response=repair_response,
+                    parsed_job_intelligence=repair_parsed_payload,
+                    job_intelligence=repair_job_intelligence,
+                )
+                current_response = repair_response
+                current_parsed_payload = repair_parsed_payload
+                current_job_intelligence = repair_job_intelligence
+                current_error = repair_error
+                continue
+            except ExtractorError as repair_error:
+                self._log_exception(
+                    "schema_repair_failed",
+                    repair_error,
+                    request_payload=ai_payload,
+                )
+                current_response = repair_response
+                current_parsed_payload = repair_parsed_payload
+                current_job_intelligence = repair_job_intelligence
+                current_error = repair_error
+                continue
+            except Exception as repair_error:
+                self._log_exception(
+                    "schema_repair_failed",
+                    repair_error,
+                    request_payload=ai_payload,
+                )
+                current_response = repair_response
+                current_parsed_payload = repair_parsed_payload
+                current_job_intelligence = repair_job_intelligence
+                current_error = repair_error
+                continue
+
+            self._log_event(
+                "schema_repair_success",
+                request_payload=ai_payload,
+                parse_path=_response_parse_path(repair_response),
+                repair_attempt=attempt,
+                parsed_json_keys=sorted(repair_job_intelligence.keys()),
+            )
+            return repair_response, repair_parsed_payload, repair_job_intelligence
+
+        raise _schema_validation_failed_error() from current_error
 
     def _responses_parse(self, ai_payload: Mapping[str, Any]) -> Any:
         client = self._client()
@@ -354,6 +383,7 @@ class OpenAIStructuredExtractor:
         ai_payload: Mapping[str, Any],
         invalid_output: str,
         error: BaseException,
+        attempt: int,
     ) -> Any:
         client = self._client()
         input_messages = [
@@ -361,6 +391,7 @@ class OpenAIStructuredExtractor:
             {
                 "role": "user",
                 "content": "Repair this invalid CVBrain Job Intelligence v1 response.\n"
+                f"Repair attempt: {attempt} of {DEFAULT_SCHEMA_REPAIR_ATTEMPTS}.\n"
                 "Validation error:\n"
                 + _sanitize_text(str(error), limit=1200)
                 + "\n\nOriginal sanitized intake payload:\n"

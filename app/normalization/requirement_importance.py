@@ -71,7 +71,9 @@ CREDENTIAL_PATTERN = re.compile(
 ORPHAN_FRAGMENT_PATTERN = re.compile(
     r"^(?:y|e|o|and|or)\b|"
     r"^(?:software|hardware|redes?\s+b[aá]sicas?|soporte\s+remoto)$|"
-    r"^(?:la\s+persona\s+deber[aá]\s+liderar|se\s+requiere\s+base\s+t[eé]cnica\s+en|base\s+t[eé]cnica\s+en)$|"
+    r"^(?:la\s+persona\s+deber[aá]\s+liderar|la\s+persona\s+deber[aá]\s+haber\s+trabajado\s+con|"
+    r"la\s+persona\s+ser[aá]\s+responsable(?:\s+de)?|"
+    r"se\s+requiere\s+base\s+t[eé]cnica\s+en|base\s+t[eé]cnica\s+en)$|"
     r"^(?:se\s+requiere|se\s+requieren|es\s+excluyente|son\s+excluyentes|"
     r"experiencia|experiencia\s+(?:en|con)|debe\s+manejar|manejo\s+de|dominio\s+de|conocimientos?\s+de)$",
     re.I,
@@ -116,6 +118,7 @@ STANDALONE_SKILL_PATTERN = re.compile(
 
 BLOCKER_METADATA_ARTIFACTS = {
     "source_text_span_hint_not_provided",
+    "source_text_span_missing",
     "hard_filter_candidate_as_written",
     "hard_filter_approved_as_written",
 }
@@ -250,9 +253,7 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     requirements["nice_to_have"] = nice_to_have
     requirements["credentials"] = _unique_credentials_by_strongest_importance(buckets["credentials"])
     requirements["blockers"] = _normalize_blocker_list(blockers)
-    requirements["soft_competencies"] = _normalize_soft_competencies(
-        requirements.get("soft_competencies", [])
-    )
+    requirements["soft_competencies"] = _normalize_soft_competencies(requirements.get("soft_competencies", []))
     requirements = _normalize_blockers_and_negations(requirements, source_text)
     requirements = _dedupe_requirement_concepts(requirements)
     output["requirements"] = requirements
@@ -604,6 +605,7 @@ def _normalize_accents(text: str) -> str:
         "formacion": "formación",
         "tecnica": "técnica",
         "informatica": "informática",
+        "certificaciones": "certificaciones",
         "certificacion": "certificación",
         "categoria": "categoría",
         "titulo": "título",
@@ -614,6 +616,7 @@ def _normalize_accents(text: str) -> str:
     clean = f" {text} "
     for source, target in replacements.items():
         clean = re.sub(re.escape(source), target, clean, flags=re.I)
+    clean = re.sub(r"\bcertificaciónes\b", "certificaciones", clean, flags=re.I)
     return clean.strip()
 
 
@@ -628,13 +631,15 @@ def _is_orphan_requirement_text(text: str) -> bool:
     folded = _fold(clean.strip(" -:.,;\t\r\n"))
     if not folded:
         return True
-    if folded == "no avanzar":
+    if folded == "no avanzar" or folded in BLOCKER_METADATA_ARTIFACTS:
         return True
     if _is_modifier_only_fragment(text) or _is_modifier_only_fragment(clean):
         return True
     if ORPHAN_FRAGMENT_PATTERN.search(folded):
         return True
     if _is_incomplete_para_tail(clean):
+        return True
+    if _has_dangling_connector_tail(clean):
         return True
     if folded in {"excluyente experiencia de al menos 1 ano resolviendo incidentes de", "experiencia de al menos 1 ano resolviendo incidentes de"}:
         return True
@@ -648,6 +653,15 @@ def _is_incomplete_para_tail(text: str) -> bool:
     if _is_credential_text(text) or STANDALONE_SKILL_PATTERN.search(text):
         return False
     return True
+
+
+def _has_dangling_connector_tail(text: str) -> bool:
+    folded = _fold(str(text).strip(" -:.,;\t\r\n"))
+    if not folded:
+        return True
+    if STANDALONE_SKILL_PATTERN.fullmatch(str(text).strip(" -:.,;\t\r\n")):
+        return False
+    return bool(re.search(r"\b(?:con|de|en|para|o|u|y)$", folded))
 
 
 def _strip_section_heading(text: str) -> str:
@@ -696,6 +710,14 @@ def _normalize_blockers_and_negations(requirements: Mapping[str, Any], source_te
         if not _is_attached_source_blocker_fragment(item, blockers)
     ]
     output["credentials"] = _unique_credentials_by_strongest_importance(cleaned_credentials)
+
+    cleaned_soft, blockers = _clean_requirement_items(output.get("soft_competencies", []), blockers)
+    cleaned_soft = [
+        item
+        for item in cleaned_soft
+        if not _is_attached_source_blocker_fragment(item, blockers)
+    ]
+    output["soft_competencies"] = _unique_requirement_items(cleaned_soft)
     output["blockers"] = _normalize_blocker_list(blockers)
     return output
 
@@ -728,6 +750,7 @@ def _dedupe_requirement_concepts(requirements: Mapping[str, Any]) -> Dict[str, A
                 selected[key] = record
 
     _remove_alternative_fragment_duplicates(selected, order)
+    _remove_component_requirement_duplicates(selected, order)
 
     bucketed: Dict[str, List[Dict[str, Any]]] = {
         "must_have": [],
@@ -796,6 +819,42 @@ def _is_alternative_fragment_key(fragment_key: str, composite_key: str) -> bool:
     return re.search(rf"\b{re.escape(fragment_key)}\b", composite_key) is not None
 
 
+def _remove_component_requirement_duplicates(
+    selected: Dict[str, Dict[str, Any]],
+    order: List[str],
+) -> None:
+    for key in list(order):
+        if key not in selected:
+            continue
+        replacement_key = _more_complete_duplicate_key(key, selected, order)
+        if replacement_key:
+            del selected[key]
+
+
+def _more_complete_duplicate_key(
+    key: str,
+    selected: Mapping[str, Dict[str, Any]],
+    order: List[str],
+) -> str:
+    tokens = key.split()
+    if len(tokens) > 6:
+        return ""
+    for other_key in order:
+        if other_key == key or other_key not in selected:
+            continue
+        if _is_alternative_requirement_text(str(selected[other_key].get("item", {}).get("text", ""))):
+            continue
+        if _component_key_inside(key, other_key):
+            return other_key
+    return ""
+
+
+def _component_key_inside(component_key: str, aggregate_key: str) -> bool:
+    if not component_key or not aggregate_key or component_key == aggregate_key:
+        return False
+    return re.search(rf"\b{re.escape(component_key)}\b", aggregate_key) is not None
+
+
 def _is_alternative_requirement_text(text: str) -> bool:
     clean = re.sub(r"\s+", " ", str(text).strip(" -:.,;\t\r\n"))
     if not clean:
@@ -817,7 +876,11 @@ def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     source_text = str(item.get("source_text", "")).strip()
     if not text:
         return {}
-    if _is_orphan_requirement_text(text) or _is_modifier_only_fragment(text) or _is_modifier_only_fragment(source_text):
+    if (
+        _is_orphan_requirement_text(text)
+        or _is_modifier_only_fragment(text)
+        or _is_modifier_only_fragment(source_text)
+    ):
         return {}
     if _has_negative_filter_modifier(text) or _has_negative_filter_modifier(source_text):
         return {}
@@ -825,6 +888,10 @@ def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
         return {}
     cleaned = dict(item)
     cleaned["text"] = text
+    if _is_blocker_only_clause(source_text) or _has_negative_filter_modifier(source_text):
+        cleaned["source_text"] = text
+    elif source_text and _is_orphan_requirement_text(source_text):
+        cleaned["source_text"] = text
     cleaned["hard_filter_candidate"] = str(cleaned.get("importance", "")) == MUST_HAVE
     cleaned["hard_filter_approved"] = False
     return cleaned
@@ -917,6 +984,7 @@ def _requirement_concept_key(text: str) -> str:
         r"^valorable\s+",
         r"^valorables\s+",
         r"^se\s+valorara\s+",
+        r"^sera\s+valorables?\s+",
         r"^se\s+valora\s+",
         r"^haber\s+",
         r"^contar\s+con\s+",
@@ -934,9 +1002,15 @@ def _requirement_concept_key(text: str) -> str:
             clean = re.sub(pattern, "", clean).strip(" -:.,;/\t\r\n")
 
     clean = re.sub(
-        r"\s+(?:es\s+deseable|sera\s+valorable|sera\s+un\s+plus|es\s+un\s+plus|"
+        r"\s+(?:es\s+deseable|sera\s+valorables?|seran\s+valorables?|sera\s+un\s+plus|es\s+un\s+plus|"
         r"suma|puede\s+sumar|no\s+central|requerid[oa]s?(?:\s+por\s+.*)?|excluyentes?)$",
         "",
+        clean,
+    )
+    clean = re.sub(
+        r"\b(?:valorable|valorables|seran\s+valorables|sera\s+valorable|"
+        r"sera\s+un\s+plus|plus|suma|puede\s+sumar)\b",
+        " ",
         clean,
     )
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;/\t\r\n")
@@ -1005,6 +1079,16 @@ def _normalize_blocker_text(text: str) -> str:
     had_final_period = raw.strip().endswith(".")
     clean = _normalize_accents(raw)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;\t\r\n")
+    clean = re.sub(r"^(no\s+(?:solo|solamente)\s+.+?)\s+\1$", r"\1", clean, flags=re.I)
+    clean = re.sub(r"^criterio\s+de\s+no\s+avanzar\b", "No avanzar", clean, flags=re.I)
+    clean = re.sub(r"\bcriterio\s+de\s*\.?\s*", "", clean, flags=re.I)
+    clean = re.sub(r"\s+ni\s+", " y ", clean, flags=re.I)
+    clean = re.sub(
+        r"^no\s+(?:solo|solamente)\s+(.+)$",
+        r"No avanzar perfiles centrados solo en \1",
+        clean,
+        flags=re.I,
+    )
     clean = _dedupe_repeated_no_avanzar_segments(clean)
     if _fold(clean) == "no avanzar" or _fold(clean) in BLOCKER_METADATA_ARTIFACTS:
         return ""

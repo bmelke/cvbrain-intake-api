@@ -144,6 +144,26 @@ def assert_flat_matches_nested_requirements(normalized, flat):
     ]
 
 
+def all_user_facing_text(normalized, flat):
+    return fold(
+        [
+            flat["role_title"],
+            flat["summary"],
+            flat["must_have"],
+            flat["should_have"],
+            flat["nice_to_have"],
+            flat["blockers"],
+            flat["credentials"],
+            normalized["requirements"]["must_have"],
+            normalized["requirements"]["should_have"],
+            normalized["requirements"]["nice_to_have"],
+            normalized["requirements"]["credentials"],
+            normalized["requirements"]["blockers"],
+            normalized["requirements"].get("soft_competencies", []),
+        ]
+    )
+
+
 def test_busqueda_001_blockers_and_modifier_only_fragments_are_removed_from_requirements():
     normalized, flat = normalize_and_flatten(
         {
@@ -493,7 +513,7 @@ def test_busqueda_016_ni_wordpress_fragment_is_blocker_not_should_have():
         "Ni perfiles WordPress puros",
         "No solamente implementaciones WordPress",
     )
-    assert_blockers_contain(normalized, flat, "maquetadores", "lógica frontend", "WordPress", "no solamente")
+    assert_blockers_contain(normalized, flat, "maquetadores", "lógica frontend", "WordPress", "centrados solo")
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
@@ -573,6 +593,50 @@ def test_blocker_metadata_artifacts_are_dropped():
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_source_text_span_missing_metadata_artifact_is_dropped_from_blockers_and_requirements():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Source_text_span_missing"),
+                requirement_item("Experiencia comercial B2B"),
+            ],
+            "blockers": [
+                "Source_text_span_missing",
+                "No avanzar perfiles sin experiencia comercial",
+            ],
+        }
+    )
+
+    output = all_user_facing_text(normalized, flat)
+    assert "source_text_span_missing" not in output
+    assert flat["blockers"] == ["No avanzar perfiles sin experiencia comercial"]
+    assert flat["must_have"] == ["Experiencia comercial B2B"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_nested_negative_soft_competency_source_text_is_removed_and_becomes_blocker():
+    blocker_source = "Criterio de no avanzar si solo tiene experiencia académica"
+    normalized, flat = normalize_and_flatten(
+        {
+            "soft_competencies": [
+                requirement_item("Criterio de no avanzar si solo tiene experiencia académica", "preferred"),
+                requirement_item("No solo ejecución operativa", "preferred"),
+                requirement_item("Ni perfiles junior", "preferred", source_text="No avanzar perfiles seniority bajo ni perfiles junior"),
+                requirement_item("Comunicación con clientes", "preferred"),
+            ],
+        },
+        source_text=blocker_source,
+    )
+
+    output = all_user_facing_text(normalized, flat)
+    assert "criterio de no avanzar" not in output
+    assert "no solo" not in output
+    assert "ni perfiles junior" not in output
+    assert "comunicacion con clientes" in output
+    assert_blockers_contain(normalized, flat, "no avanzar", "experiencia académica", "centrados solo", "perfiles junior")
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_busqueda_050_ni_cobradores_fragment_is_blocker_not_must_have():
     blocker_source = "No avanzar cobradores sin experiencia corporativa ni cobradores solo de consumo individual"
     normalized, flat = normalize_and_flatten(
@@ -613,7 +677,7 @@ def test_no_solo_and_no_solamente_qualification_clauses_are_not_must_have():
         "No solamente soporte operativo",
     )
     assert flat["must_have"] == ["Experiencia comercial B2B"]
-    assert_blockers_contain(normalized, flat, "no solo tareas administrativas", "no solamente soporte operativo")
+    assert_blockers_contain(normalized, flat, "centrados solo en tareas administrativas", "centrados solo en soporte operativo")
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
@@ -678,6 +742,30 @@ def test_incomplete_para_phrase_tails_are_dropped(case_label, tail):
     assert case_label
     assert_not_in_requirements_or_credentials(normalized, flat, tail)
     assert flat["should_have"] == ["Inglés"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+@pytest.mark.parametrize(
+    "fragment",
+    [
+        "La persona deberá haber trabajado con",
+        "La persona será responsable",
+        "La persona será responsable de",
+        "SaaS o",
+    ],
+)
+def test_incomplete_orphan_phrase_tails_and_dangling_connectors_are_dropped(fragment):
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item(fragment, "preferred"),
+                requirement_item("SaaS", "preferred"),
+            ],
+        }
+    )
+
+    assert_not_in_requirements_or_credentials(normalized, flat, fragment)
+    assert flat["should_have"] == ["SaaS"]
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
@@ -785,6 +873,54 @@ def test_unrelated_must_have_requirements_remain_separate():
     )
 
     assert flat["must_have"] == ["Experiencia comercial B2B", "Manejo de CRM"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+@pytest.mark.parametrize(
+    ("base", "preferred", "expected"),
+    [
+        (
+            "Inglés para clientes internacionales",
+            "Inglés valorable para clientes internacionales",
+            "Inglés valorable para clientes internacionales",
+        ),
+        (
+            "Certificaciones del rubro",
+            "Certificaciones del rubro serán valorables",
+            "Certificaciones del rubro serán valorables",
+        ),
+    ],
+)
+def test_near_duplicate_requirements_prefer_complete_phrase_with_importance_cue(base, preferred, expected):
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item(base, "preferred"),
+            ],
+            "nice_to_have": [
+                requirement_item(preferred, "nice_to_have"),
+            ],
+        }
+    )
+
+    combined = flat["should_have"] + flat["nice_to_have"]
+    assert combined == [expected]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_component_requirements_are_removed_when_aggregate_contains_same_criteria():
+    aggregate = "Perfil comercial fuerte y experiencia en ventas"
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Perfil comercial fuerte"),
+                requirement_item("Experiencia en ventas"),
+                requirement_item(aggregate),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == [aggregate]
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
