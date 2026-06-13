@@ -132,6 +132,19 @@ METADATA_ARTIFACT_PATTERN = re.compile(
     re.I,
 )
 
+METADATA_ARTIFACT_CONTAINS_PATTERN = re.compile(
+    r"(?:\bsource[_\s-]*text[_\s-]*|_missing_or_not_applicable\b|"
+    r"rationale[_\s-]*id[_\s-]*missing|classification[_\s-]*rationale[_\s-]*id[_\s-]*missing|"
+    r"span[_\s-]*missing|schema[_\s-]*repair|debug[_\s-]*placeholder|internal[_\s-]*diagnostic)",
+    re.I,
+)
+
+PUBLIC_NEGATIVE_FRAGMENT_PATTERN = re.compile(
+    r"(?:\bni\s+perfiles?\b|\bno\s+avanzar\b|\bno\s+avanzar\s+si\b|"
+    r"\bno\s+(?:solo|solamente)\b|\bsin\s+experiencia\s+en\b)",
+    re.I,
+)
+
 
 @dataclass(frozen=True)
 class RequirementItem:
@@ -266,7 +279,7 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     requirements = _normalize_blockers_and_negations(requirements, source_text)
     requirements = _dedupe_requirement_concepts(requirements)
     output["requirements"] = requirements
-    return _sanitize_metadata_artifacts(output)
+    return _sanitize_public_output_contract(output)
 
 
 def normalize_structured_requirement_item(item: Mapping[str, Any], default_importance: Importance) -> List[Dict[str, Any]]:
@@ -380,12 +393,43 @@ def normalize_requirement_text(text: str) -> str:
         return f"{doc} de conducir categoría {driver.group(2).upper()}"
     clean = _remove_importance_label(clean)
     clean = _remove_trailing_importance_modifier(clean)
+    clean = _remove_recruiter_lead_context(clean)
     clean = _remove_boilerplate_subject_prefix(clean)
     clean = _normalize_accents(clean)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;\t\r\n")
     clean = re.sub(r"\s+para\s+visitas?\s+puntuales?.*$", "", clean, flags=re.I).strip()
     clean = _capitalize_first(clean)
     return clean
+
+
+def _remove_recruiter_lead_context(text: str) -> str:
+    clean = str(text).strip()
+    match = re.search(
+        r"\b(?:empresa|industria|cliente|compañ[ií]a|consultora|agencia|startup|retail|software\s+house|"
+        r"instituci[oó]n|[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÜáéíóúüÑñ/-]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ/-]+){0,4})"
+        r"(?:\s+[\wÁÉÍÓÚÜáéíóúüÑñ/-]+){0,8}?\s+"
+        r"(?:busca|buscamos|selecciona|seleccionamos|incorpora|incorporar|necesita|requiere)\s+"
+        r"(?:(?:un|una|el|la|un/a)\s+)?"
+        r"(?P<title>.+?)\s+(?P<connector>con|para)\s+(?P<body>.+)$",
+        clean,
+        re.I,
+    )
+    if not match:
+        return clean
+    body = match.group("body").strip(" -:.,;\t\r\n")
+    connector = _fold(match.group("connector"))
+    if not body:
+        return clean
+    if connector == "con" and re.match(r"^(?:experiencia|conocimiento|manejo|dominio)\b", body, re.I):
+        return body
+    if connector == "para":
+        return body
+    return clean
+
+
+def _has_recruiter_lead_context(text: str) -> bool:
+    clean = str(text).strip()
+    return bool(clean and _fold(_remove_recruiter_lead_context(clean)) != _fold(clean))
 
 
 def _remove_boilerplate_subject_prefix(text: str) -> str:
@@ -991,6 +1035,10 @@ def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     cleaned["text"] = text
     if _is_blocker_only_clause(source_text) or _has_negative_filter_modifier(source_text):
         cleaned["source_text"] = text
+    elif _contains_public_negative_fragment(source_text):
+        cleaned["source_text"] = text
+    elif _has_recruiter_lead_context(source_text):
+        cleaned["source_text"] = text
     elif _has_boilerplate_subject_prefix(source_text):
         cleaned["source_text"] = text
     elif source_text and _is_orphan_requirement_text(source_text):
@@ -1279,18 +1327,28 @@ def _is_metadata_artifact_text(text: str) -> bool:
     return bool(METADATA_ARTIFACT_PATTERN.match(clean))
 
 
-def _sanitize_metadata_artifacts(value: Any) -> Any:
+def _contains_metadata_artifact_text(text: str) -> bool:
+    clean = str(text)
+    if _is_metadata_artifact_text(clean):
+        return True
+    return bool(METADATA_ARTIFACT_CONTAINS_PATTERN.search(clean))
+
+
+def _sanitize_public_output_contract(value: Any, key: str = "") -> Any:
     if isinstance(value, Mapping):
-        return {key: _sanitize_metadata_artifacts(child) for key, child in value.items()}
+        return {child_key: _sanitize_public_output_contract(child, str(child_key)) for child_key, child in value.items()}
     if isinstance(value, list):
         output = []
         for item in value:
-            if isinstance(item, str) and _is_metadata_artifact_text(item):
+            if isinstance(item, str) and _contains_metadata_artifact_text(item):
                 continue
-            output.append(_sanitize_metadata_artifacts(item))
+            output.append(_sanitize_public_output_contract(item, key))
         return output
-    if isinstance(value, str) and _is_metadata_artifact_text(value):
-        return ""
+    if isinstance(value, str):
+        if _contains_metadata_artifact_text(value):
+            return ""
+        if key == "source_text" and _contains_public_negative_fragment(value):
+            return ""
     return value
 
 
@@ -1299,6 +1357,10 @@ def _has_negative_filter_modifier(text: str) -> bool:
     if not clean or not NEGATIVE_FILTER_MODIFIER_PATTERN.search(clean):
         return False
     return not bool(SOFT_PATTERN.search(clean))
+
+
+def _contains_public_negative_fragment(text: str) -> bool:
+    return bool(PUBLIC_NEGATIVE_FRAGMENT_PATTERN.search(str(text or "")))
 
 
 def _has_boilerplate_subject_prefix(text: str) -> bool:

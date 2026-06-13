@@ -108,8 +108,10 @@ Case contract:
 PUBLIC_EXTRACTION_CONTRACT = """Public output contract:
 - Never output internal placeholders or diagnostics in public/user-facing fields.
 - Forbidden public text includes Source_text_span_missing, Source_text_span_missing_for_blocker_1, Source_text_span_missing_from_rules, source_text_span_missing, source_span_missing, and any similar source span or missing span placeholder.
+- Forbidden public text also includes Source_text_, source_text_, _missing_or_not_applicable, rationale_id_missing, classification_rationale_id_missing, span_missing, internal diagnostic identifiers, schema/repair/debug placeholders, and any machine-only rationale key.
 - If a blocker is real but its source span is unclear, write a clean human-readable blocker or omit it.
 - Never invent a placeholder to satisfy the schema.
+- Apply this public-output contract recursively to role_title, job_profile fields, requirements, credentials, blockers, soft_competencies, public source_text fields, recruiter questions, warnings, and diagnostics shown to users or runner output.
 
 Requirement list inheritance contract:
 - Local phrase modifiers are authoritative.
@@ -134,6 +136,16 @@ Orphan fragment contract:
 - Avoid "La persona deberá liderar pagos"; write "Liderar pagos".
 - Avoid "La persona deberá negociar condiciones"; write "Negociar condiciones".
 - Avoid "La persona será responsable de salón"; write "Responsable de salón" or "Gestión de salón".
+- Recruiter lead/title/context prose must not be emitted as a requirement.
+- Parse "[company/context] + busca/incorpora/selecciona + [role title] + con/para + [actual requirement/task]" into role_title plus actual requirement/task.
+- Avoid "Empresa digital busca UX/UI Designer con experiencia en producto"; write role_title "UX/UI Designer" and requirement "Experiencia en producto".
+- Avoid "Industria alimenticia busca Especialista en Compras para gestionar proveedores"; write role_title "Especialista en Compras" and requirement/task "Gestionar proveedores".
+- Avoid "Empresa de servicios busca Responsable de Atención al Cliente para liderar equipo multicanal"; write role_title "Responsable de Atención al Cliente" and requirement/task "Liderar equipo multicanal".
+- Do not emit the full recruiter lead sentence as must_have, should_have, nice_to_have, credentials, or soft_competencies.
+
+Negative-fragment contract:
+- Negative blocker language belongs in blockers or internal rationale, not in soft_competencies or public source_text fields.
+- Do not leak fragments such as ni perfiles, no avanzar, no avanzar si, no solo, no solamente, or exclusionary sin experiencia en... into positive requirements, competencies, or public source_text fields.
 
 Duplicate/component contract:
 - Do not output both a component and a larger aggregate requirement or blocker that repeats the same criterion.

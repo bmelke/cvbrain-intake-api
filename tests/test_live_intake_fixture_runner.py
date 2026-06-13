@@ -267,6 +267,20 @@ def test_runner_does_not_warn_when_hybrid_modality_is_usable_without_extra_detai
     assert notes == []
 
 
+def test_runner_does_not_warn_when_remote_hybrid_is_preserved_in_location_text():
+    classification, notes = runner.classify_result(
+        "Software house busca Implementador. Remoto/híbrido.",
+        successful_record(
+            role_title="Implementador",
+            location={"raw": "Remoto/híbrido", "normalized": "Remoto/híbrido", "hybrid_allowed": True},
+        ),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
 def test_runner_does_not_warn_for_seniority_only_inside_blockers():
     classification, notes = runner.classify_result(
         "Empresa busca Gerente Corporativo de Legales. No avanzar perfiles junior de asesoría legal.",
@@ -328,7 +342,7 @@ def test_runner_fails_when_naked_no_avanzar_leaks_into_requirements():
 def test_runner_fails_when_public_metadata_artifact_leaks():
     classification, notes = runner.classify_result(
         "Empresa busca Operario Calificado CNC.",
-        successful_record(blockers=["Source_text_span_missing_from_rules"]),
+        successful_record(blockers=["Source_text_classification_rationale_id_missing_or_not_applicable"]),
         expect_live_ai=True,
     )
 

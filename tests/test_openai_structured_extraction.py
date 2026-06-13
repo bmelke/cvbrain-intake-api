@@ -373,6 +373,10 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP" in system_prompt
     assert "Public output contract:" in system_prompt
     assert "Source_text_span_missing_from_rules" in system_prompt
+    assert "Source_text_" in system_prompt
+    assert "_missing_or_not_applicable" in system_prompt
+    assert "classification_rationale_id_missing" in system_prompt
+    assert "public source_text fields" in system_prompt
     assert "Never invent a placeholder to satisfy the schema." in system_prompt
     assert "Requirement list inheritance contract:" in system_prompt
     assert "A parent cue applies to every sibling in its comma/OR list" in system_prompt
@@ -382,8 +386,12 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Orphan fragment contract:" in system_prompt
     assert "La persona deberá" in system_prompt
     assert "La persona deberá liderar pagos" in system_prompt
+    assert "Empresa digital busca UX/UI Designer con experiencia en producto" in system_prompt
+    assert "Industria alimenticia busca Especialista en Compras para gestionar proveedores" in system_prompt
     assert "Duplicate/component contract:" in system_prompt
     assert "Base técnica comprobable en redes" in system_prompt
+    assert "Negative-fragment contract:" in system_prompt
+    assert "ni perfiles" in system_prompt
 
 
 def test_openai_structured_prompt_detects_english_source_language():
@@ -882,10 +890,12 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "For output, incoming source case wins." in repair_prompt
     assert "Public output contract:" in repair_prompt
     assert "Source_text_span_missing_from_rules" in repair_prompt
+    assert "classification_rationale_id_missing" in repair_prompt
     assert "Requirement list inheritance contract:" in repair_prompt
     assert "Libreta de conducir será valorable si debe recorrer servicios" in repair_prompt
     assert "Orphan fragment contract:" in repair_prompt
     assert "Duplicate/component contract:" in repair_prompt
+    assert "Negative-fragment contract:" in repair_prompt
     assert "Software Architect" in repair_user_prompt
 
 

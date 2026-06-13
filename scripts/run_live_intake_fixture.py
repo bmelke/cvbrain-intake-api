@@ -106,7 +106,10 @@ BLOCKER_CLAUSE_PATTERN = re.compile(
 )
 METADATA_ARTIFACT_PATTERN = re.compile(
     r"\b(?:source(?:[_\s-]*text)?[_\s-]*span(?:[_\s-]*(?:missing|hint|not[_\s-]*provided|from[_\s-]*rules|for[_\s-]*blocker|\d+))*|"
-    r"hard[_\s-]*filter[_\s-]*(?:candidate|approved)[_\s-]*as[_\s-]*written)\b",
+    r"hard[_\s-]*filter[_\s-]*(?:candidate|approved)[_\s-]*as[_\s-]*written|"
+    r"source[_\s-]*text[_\s-]*|_missing_or_not_applicable|rationale[_\s-]*id[_\s-]*missing|"
+    r"classification[_\s-]*rationale[_\s-]*id[_\s-]*missing|span[_\s-]*missing|"
+    r"schema[_\s-]*repair|debug[_\s-]*placeholder|internal[_\s-]*diagnostic)",
     re.I,
 )
 
@@ -507,7 +510,11 @@ def semantic_review_notes(source_text: str, data: Mapping[str, Any]) -> List[str
         and not _hybrid_modality_is_usable(location)
     ):
         notes.append("modality_review:hybrid_missing")
-    if re.search(r"\bremoto|remote\b", source) and location.get("remote_allowed") is not True:
+    if (
+        re.search(r"\bremoto|remote\b", source)
+        and location.get("remote_allowed") is not True
+        and not _remote_modality_is_usable(location)
+    ):
         notes.append("modality_review:remote_missing")
     if "presencial" in source and location.get("remote_allowed") is True:
         notes.append("modality_review:presencial_conflict")
@@ -530,6 +537,12 @@ def _hybrid_modality_is_usable(location: Mapping[str, Any]) -> bool:
     raw = _fold(str(location.get("raw", "")))
     normalized = _fold(str(location.get("normalized", "")))
     return bool(re.search(r"\b(hibrido|hybrid)\b", f"{raw} {normalized}"))
+
+
+def _remote_modality_is_usable(location: Mapping[str, Any]) -> bool:
+    raw = _fold(str(location.get("raw", "")))
+    normalized = _fold(str(location.get("normalized", "")))
+    return bool(re.search(r"\b(remoto|remote)\b", f"{raw} {normalized}"))
 
 
 def _source_without_blocker_clauses(source_text: str) -> str:

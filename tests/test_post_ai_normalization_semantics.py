@@ -679,6 +679,43 @@ def test_source_text_span_missing_from_rules_artifact_is_removed_from_nested_and
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_internal_metadata_artifact_class_is_removed_recursively_from_public_fields():
+    payload = minimal_job_intelligence(
+        {
+            "must_have": [
+                requirement_item("Source_text_classification_rationale_id_missing_or_not_applicable"),
+                requirement_item("Experiencia operativa"),
+            ],
+            "blockers": [
+                "Source_text_classification_rationale_id_missing_or_not_applicable",
+                "No avanzar perfiles sin experiencia operativa",
+            ],
+            "soft_competencies": [
+                requirement_item(
+                    "Comunicación con clientes",
+                    "preferred",
+                    source_text="Source_text_classification_rationale_id_missing_or_not_applicable",
+                ),
+            ],
+        }
+    )
+    payload["quality_control"]["warnings"] = ["debug_placeholder_source_text_missing"]
+    payload["company_clarification_questions"] = [
+        {"question": "Source_text_classification_rationale_id_missing_or_not_applicable"}
+    ]
+
+    normalized = normalize_job_intelligence_requirements(payload)
+    flat = derive_flat_compatibility(normalized)
+
+    output = all_user_facing_text(normalized, flat)
+    assert "source_text_" not in output
+    assert "missing_or_not_applicable" not in output
+    assert "classification_rationale_id_missing" not in output
+    assert flat["blockers"] == ["No avanzar perfiles sin experiencia operativa"]
+    assert flat["must_have"] == ["Experiencia operativa"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_nested_negative_soft_competency_source_text_is_removed_and_becomes_blocker():
     blocker_source = "Criterio de no avanzar si solo tiene experiencia académica"
     normalized, flat = normalize_and_flatten(
@@ -699,6 +736,26 @@ def test_nested_negative_soft_competency_source_text_is_removed_and_becomes_bloc
     assert "ni perfiles junior" not in output
     assert "comunicacion con clientes" in output
     assert_blockers_contain(normalized, flat, "no avanzar", "experiencia académica", "centrados solo", "perfiles junior")
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_negative_blocker_fragment_is_removed_from_soft_competency_source_text():
+    normalized, flat = normalize_and_flatten(
+        {
+            "soft_competencies": [
+                requirement_item(
+                    "Comunicación con clientes",
+                    "preferred",
+                    source_text="Comunicación con clientes ni perfiles comerciales sin experiencia en atención estructurada",
+                ),
+            ],
+        }
+    )
+
+    output = all_user_facing_text(normalized, flat)
+    assert "ni perfiles" not in output
+    assert "sin experiencia en atencion estructurada" not in output
+    assert "comunicacion con clientes" in output
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
@@ -867,6 +924,43 @@ def test_boilerplate_subject_prefix_is_removed_from_public_requirements():
     assert flat["must_have"] == ["Liderar pagos", "Negociar condiciones", "Responsable de salón"]
     assert "la persona debera" not in all_user_facing_text(normalized, flat)
     assert "la persona sera responsable" not in all_user_facing_text(normalized, flat)
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+@pytest.mark.parametrize(
+    ("lead_sentence", "expected_requirement"),
+    [
+        (
+            "Empresa digital busca UX/UI Designer con experiencia en producto",
+            "Experiencia en producto",
+        ),
+        (
+            "Industria alimenticia busca Especialista en Compras para gestionar proveedores",
+            "Gestionar proveedores",
+        ),
+        (
+            "Empresa de servicios busca Responsable de Atención al Cliente para liderar equipo multicanal",
+            "Liderar equipo multicanal",
+        ),
+    ],
+)
+def test_recruiter_lead_title_context_sentence_is_split_into_actual_requirement(
+    lead_sentence,
+    expected_requirement,
+):
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item(lead_sentence),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == [expected_requirement]
+    output = all_user_facing_text(normalized, flat)
+    assert "busca ux/ui designer" not in output
+    assert "busca especialista en compras" not in output
+    assert "busca responsable de atencion al cliente" not in output
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
