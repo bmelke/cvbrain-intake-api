@@ -371,6 +371,15 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Do not apply English title case, Spanish title case, sentence case" in system_prompt
     assert "Do not title-case Spanish titles unless the source itself is title-cased." in system_prompt
     assert "QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP" in system_prompt
+    assert "Public output contract:" in system_prompt
+    assert "Source_text_span_missing_from_rules" in system_prompt
+    assert "Never invent a placeholder to satisfy the schema." in system_prompt
+    assert "Requirement list inheritance contract:" in system_prompt
+    assert "A parent cue applies to every sibling in its comma/OR list" in system_prompt
+    assert "Debe manejar métricas, calidad, ausentismo, turnos, coaching" in system_prompt
+    assert "Orphan fragment contract:" in system_prompt
+    assert "La persona deberá" in system_prompt
+    assert "Duplicate/component contract:" in system_prompt
 
 
 def test_openai_structured_prompt_detects_english_source_language():
@@ -568,6 +577,8 @@ def test_english_source_keeps_english_primary_role_title(english_title):
         "Electricista Industrial",
         "Diseñador Gráfico Senior",
         "Arquitecto de Software",
+        "Operario Calificado CNC",
+        "Escribano Junior o estudiante avanzado de notariado",
         "Redactor UX",
         "UX/UI Designer",
     ],
@@ -865,6 +876,11 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "If source_text is Spanish, write those user-facing fields in Spanish." in repair_prompt
     assert "Case contract:" in repair_prompt
     assert "For output, incoming source case wins." in repair_prompt
+    assert "Public output contract:" in repair_prompt
+    assert "Source_text_span_missing_from_rules" in repair_prompt
+    assert "Requirement list inheritance contract:" in repair_prompt
+    assert "Orphan fragment contract:" in repair_prompt
+    assert "Duplicate/component contract:" in repair_prompt
     assert "Software Architect" in repair_user_prompt
 
 

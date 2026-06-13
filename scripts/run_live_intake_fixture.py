@@ -59,6 +59,8 @@ FAIL_SCHEMA = "FAIL_SCHEMA"
 FAIL_PROVIDER = "FAIL_PROVIDER"
 FAIL_FALLBACK = "FAIL_FALLBACK"
 FAIL_EMPTY = "FAIL_EMPTY"
+FAIL_PUBLIC_ARTIFACT = "FAIL_PUBLIC_ARTIFACT"
+FAIL_TITLE_CASING = "FAIL_TITLE_CASING"
 FAIL_ORPHAN_FRAGMENTS = "FAIL_ORPHAN_FRAGMENTS"
 FAIL_IMPORTANCE = "FAIL_IMPORTANCE"
 
@@ -100,6 +102,11 @@ HARD_MODIFIER_PATTERN = re.compile(
 )
 BLOCKER_CLAUSE_PATTERN = re.compile(
     r"\b(no\s+avanzar|no\s+presentarse\s+si\s+no|no\s+considerar)\b",
+    re.I,
+)
+METADATA_ARTIFACT_PATTERN = re.compile(
+    r"\b(?:source(?:[_\s-]*text)?[_\s-]*span(?:[_\s-]*(?:missing|hint|not[_\s-]*provided|from[_\s-]*rules|for[_\s-]*blocker|\d+))*|"
+    r"hard[_\s-]*filter[_\s-]*(?:candidate|approved)[_\s-]*as[_\s-]*written)\b",
     re.I,
 )
 
@@ -340,6 +347,14 @@ def classify_result(source_text: str, record: ResponseRecord, expect_live_ai: bo
     if _empty_core_output(data):
         return FAIL_EMPTY, ["role_title_summary_and_requirements_empty"]
 
+    artifact_notes = public_artifact_notes(data)
+    if artifact_notes:
+        return FAIL_PUBLIC_ARTIFACT, artifact_notes
+
+    title_notes = title_casing_notes_for(source_text, data)
+    if title_notes:
+        return FAIL_TITLE_CASING, title_notes
+
     orphan_notes = orphan_fragment_notes(data)
     if orphan_notes:
         return FAIL_ORPHAN_FRAGMENTS, orphan_notes
@@ -367,6 +382,24 @@ def _empty_core_output(data: Mapping[str, Any]) -> bool:
     )
 
 
+def public_artifact_notes(data: Mapping[str, Any]) -> List[str]:
+    notes = []
+    for path, text in _public_strings(data):
+        if METADATA_ARTIFACT_PATTERN.search(text):
+            notes.append(f"metadata_artifact:{path}:{text[:160]}")
+    return notes
+
+
+def title_casing_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]:
+    role_title = str(data.get("role_title", "")).strip()
+    if not role_title:
+        return []
+    source_span = _matching_source_span(source_text, role_title)
+    if source_span and source_span != role_title:
+        return [f"title_casing_mismatch:{source_span}!={role_title}"]
+    return []
+
+
 def orphan_fragment_notes(data: Mapping[str, Any]) -> List[str]:
     notes = []
     for bucket in ("must_have", "should_have", "nice_to_have"):
@@ -377,6 +410,38 @@ def orphan_fragment_notes(data: Mapping[str, Any]) -> List[str]:
             if _is_incomplete_para_tail(item):
                 notes.append(f"orphan_fragment:{bucket}:{item}")
     return notes
+
+
+def _matching_source_span(source_text: str, value: str) -> str:
+    words = [word for word in re.split(r"\s+", value.strip()) if word]
+    if not words:
+        return ""
+    pattern = r"\b" + r"\s+".join(re.escape(word) for word in words) + r"\b"
+    match = re.search(pattern, source_text, re.I)
+    if match:
+        prefix = source_text[max(0, match.start() - 90) : match.start()]
+        if not re.search(
+            r"\b(?:busca|buscamos|selecciona|seleccionamos|necesita|incorporar|sumar|rol\s*:|"
+            r"hiring|hire|seeking|looking\s+for)\b",
+            prefix,
+            re.I,
+        ):
+            return ""
+        return match.group(0)
+    return ""
+
+
+def _public_strings(value: Any, path: str = "$") -> List[tuple[str, str]]:
+    output: List[tuple[str, str]] = []
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            output.extend(_public_strings(child, f"{path}.{key}"))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            output.extend(_public_strings(child, f"{path}[{index}]"))
+    elif isinstance(value, str):
+        output.append((path, value))
+    return output
 
 
 def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]:

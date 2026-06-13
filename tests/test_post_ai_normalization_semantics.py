@@ -658,6 +658,27 @@ def test_source_text_span_missing_for_blocker_artifact_is_removed_from_user_faci
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_source_text_span_missing_from_rules_artifact_is_removed_from_nested_and_flat_blockers():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia operativa"),
+            ],
+            "blockers": [
+                "Source_text_span_missing_from_rules",
+                "No avanzar perfiles sin experiencia operativa",
+            ],
+        }
+    )
+
+    output = all_user_facing_text(normalized, flat)
+    assert "source_text_span_missing" not in output
+    assert "from_rules" not in output
+    assert normalized["requirements"]["blockers"] == ["No avanzar perfiles sin experiencia operativa"]
+    assert flat["blockers"] == ["No avanzar perfiles sin experiencia operativa"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_nested_negative_soft_competency_source_text_is_removed_and_becomes_blocker():
     blocker_source = "Criterio de no avanzar si solo tiene experiencia académica"
     normalized, flat = normalize_and_flatten(
@@ -813,6 +834,25 @@ def test_incomplete_orphan_phrase_tails_and_dangling_connectors_are_dropped(frag
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_la_persona_debera_orphan_fragment_is_dropped_everywhere():
+    normalized, flat = normalize_and_flatten(
+        {
+            "nice_to_have": [
+                requirement_item("La persona deberá", "nice_to_have"),
+                requirement_item("Excel deseable", "preferred"),
+            ],
+            "soft_competencies": [
+                requirement_item("La persona deberá", "preferred"),
+            ],
+        }
+    )
+
+    output = all_user_facing_text(normalized, flat)
+    assert "la persona debera" not in output
+    assert flat["should_have"] == ["Excel"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_busqueda_006_weak_preferences_stay_nice_to_have_after_source_normalization():
     source_text = (
         "Se valorará experiencia con TMS, WMS, Excel y tableros de indicadores. "
@@ -850,6 +890,86 @@ def test_busqueda_006_weak_preferences_stay_nice_to_have_after_source_normalizat
     for expected in ("tms", "wms", "excel", "tableros de indicadores", "libreta profesional"):
         assert expected in nice
     assert "libreta profesional" not in fold(flat["credentials"]["required"])
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_soft_parent_cue_inherits_to_every_comma_list_sibling():
+    source_text = "Se valorará experiencia con TMS, WMS, Excel y tableros de indicadores."
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item("TMS", "preferred"),
+                requirement_item("WMS", "preferred"),
+                requirement_item("Excel", "preferred"),
+                requirement_item("Tableros de indicadores", "preferred"),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert flat["must_have"] == []
+    assert flat["should_have"] == []
+    nice = fold(flat["nice_to_have"])
+    for expected in ("tms", "wms", "excel", "tableros de indicadores"):
+        assert expected in nice
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_hard_parent_cue_inherits_to_every_comma_list_sibling():
+    source_text = "Debe manejar métricas, calidad, ausentismo, turnos y coaching."
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item("Métricas", "preferred"),
+                requirement_item("Calidad", "preferred"),
+                requirement_item("Ausentismo", "preferred"),
+                requirement_item("Turnos", "preferred"),
+                requirement_item("Coaching", "preferred"),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert flat["should_have"] == []
+    must = fold(flat["must_have"])
+    for expected in ("metricas", "calidad", "ausentismo", "turnos", "coaching"):
+        assert expected in must
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_debe_manejar_alternative_tool_list_is_must_have():
+    source_text = "Debe manejar Adobe y/o Figma con criterio visual sólido."
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item("Adobe y/o Figma", "preferred", source_text=source_text),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert flat["should_have"] == []
+    assert "adobe y/o figma" in fold(flat["must_have"])
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_sibling_can_override_parent_cue_with_explicit_local_soft_modifier():
+    source_text = "Debe manejar métricas, calidad y Excel valorable."
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Métricas"),
+                requirement_item("Calidad"),
+                requirement_item("Excel", source_text="Excel valorable"),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert "metricas" in fold(flat["must_have"])
+    assert "calidad" in fold(flat["must_have"])
+    assert "excel" not in fold(flat["must_have"] + flat["should_have"])
+    assert "excel" in fold(flat["nice_to_have"])
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
@@ -1017,6 +1137,57 @@ def test_busqueda_033_near_duplicate_qa_experience_keeps_single_hard_requirement
 
     assert flat["must_have"] == ["Experiencia excluyente diseñando casos de prueba"]
     assert fold(flat["must_have"]).count("disenando casos de prueba") == 1
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_busqueda_001_component_and_larger_management_requirement_collapses_to_larger_phrase():
+    larger = (
+        "Haber ocupado posiciones gerenciales o de jefatura durante al menos 5 años "
+        "trabajando con contratos comerciales"
+    )
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Haber ocupado posiciones gerenciales o de jefatura durante al menos 5 años"),
+                requirement_item(larger),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == [larger]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_busqueda_006_trailing_component_duplicate_collapses_to_larger_phrase():
+    larger = (
+        "Haber trabajado en logística de distribución o transporte, "
+        "con contacto directo con choferes y clientes"
+    )
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item(larger),
+                requirement_item("Con contacto directo con choferes y clientes"),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == [larger]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_blocker_component_and_aggregate_duplicates_collapse_to_larger_blocker():
+    normalized, flat = normalize_and_flatten(
+        {
+            "blockers": [
+                "No avanzar perfiles sin experiencia corporativa",
+                "No avanzar perfiles sin experiencia corporativa ni perfiles junior",
+            ],
+        }
+    )
+
+    assert flat["blockers"] == ["No avanzar perfiles sin experiencia corporativa y perfiles junior"]
+    assert normalized["requirements"]["blockers"] == flat["blockers"]
     assert_flat_matches_nested_requirements(normalized, flat)
 
 

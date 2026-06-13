@@ -23,7 +23,8 @@ NICE_TO_HAVE = "nice_to_have"
 HARD_PATTERN = re.compile(
     r"\b("
     r"excluyente|excluyentes|imprescindible|obligatori[oa]s?|requerid[oa]s?|"
-    r"indispensable|m[ií]nim[oa]|requisito\s+excluyente|"
+    r"indispensable|m[ií]nim[oa]|requisito(?:\s+excluyente)?|"
+    r"se\s+requiere(?:n)?|debe(?:\s+(?:manejar|contar\s+con|tener))?|"
     r"sin\s+.+?\s+no\s+avanzar|no\s+avanzar\s+si\s+no\s+.+|"
     r"no\s+presentarse\s+si\s+no\s+.+|no\s+presentarse\s+a\s+menos\s+que\s+.+|"
     r"solo\s+avanzar\s+si\s+.+|con\s+experiencia\s+en\s+.+"
@@ -72,10 +73,11 @@ ORPHAN_FRAGMENT_PATTERN = re.compile(
     r"^(?:y|e|o|and|or)\b|"
     r"^(?:software|hardware|redes?\s+b[aá]sicas?|soporte\s+remoto)$|"
     r"^(?:la\s+persona\s+deber[aá]\s+liderar|la\s+persona\s+deber[aá]\s+haber\s+trabajado\s+con|"
+    r"la\s+persona\s+deber[aá]|"
     r"la\s+persona\s+ser[aá]\s+responsable(?:\s+de)?|"
     r"se\s+requiere\s+base\s+t[eé]cnica\s+en|base\s+t[eé]cnica\s+en)$|"
     r"^(?:se\s+requiere|se\s+requieren|es\s+excluyente|son\s+excluyentes|"
-    r"experiencia|experiencia\s+(?:en|con)|debe\s+manejar|manejo\s+de|dominio\s+de|conocimientos?\s+de)$",
+    r"experiencia|experiencia\s+(?:en|con)|debe\s+manejar|manejar|manejo\s+de|dominio\s+de|conocimientos?\s+de)$",
     re.I,
 )
 
@@ -124,7 +126,7 @@ BLOCKER_METADATA_ARTIFACTS = {
 }
 
 METADATA_ARTIFACT_PATTERN = re.compile(
-    r"^(?:source[_\s-]*text[_\s-]*span(?:[_\s-]*(?:missing|hint|not[_\s-]*provided))?(?:[_\s-]*for[_\s-]*blocker[_\s-]*\d+)?|"
+    r"^(?:(?:source(?:[_\s-]*text)?[_\s-]*span)(?:[_\s-]*(?:missing|hint|not[_\s-]*provided|from[_\s-]*rules|for[_\s-]*blocker|\d+))*|"
     r"hard[_\s-]*filter[_\s-]*(?:candidate|approved)[_\s-]*as[_\s-]*written)$",
     re.I,
 )
@@ -302,6 +304,10 @@ def normalize_structured_requirement_item(item: Mapping[str, Any], default_impor
 def resolve_importance(text: str, section_default: Importance = PREFERRED) -> Importance:
     """Resolve final importance. Local modifiers outrank section defaults."""
 
+    if WEAK_PREFERENCE_PATTERN.search(text) and _has_parent_hard_cue(text):
+        return NICE_TO_HAVE
+    if STRONG_PREFERENCE_PATTERN.search(text) and _has_parent_hard_cue(text):
+        return PREFERRED
     if HARD_PATTERN.search(text):
         return MUST_HAVE
     if STRONG_PREFERENCE_PATTERN.search(text):
@@ -309,6 +315,17 @@ def resolve_importance(text: str, section_default: Importance = PREFERRED) -> Im
     if WEAK_PREFERENCE_PATTERN.search(text):
         return NICE_TO_HAVE
     return section_default or PREFERRED
+
+
+def _has_parent_hard_cue(text: str) -> bool:
+    return bool(
+        re.match(
+            r"^\s*(?:debe(?:\s+(?:manejar|contar\s+con|tener))?|se\s+requiere(?:n)?|"
+            r"requisito|obligatori[oa]s?|excluyentes?|imprescindible)\b",
+            str(text),
+            re.I,
+        )
+    )
 
 
 def split_requirement_clauses(text: str) -> List[str]:
@@ -523,6 +540,23 @@ def _expand_coordinated_sentence(sentence: str) -> List[str]:
             for item in _split_coordinated_list(valued_experience.group("items"))
         ]
 
+    parent_cue_list = re.match(
+        r"^(?P<modifier>"
+        r"debe\s+manejar|debe\s+contar\s+con|debe\s+tener|debe|"
+        r"se\s+requiere(?:n)?|requisito|obligatori[oa]s?|excluyentes?|imprescindible|"
+        r"deseable|idealmente|ideal|preferentemente|"
+        r"valorable|se\s+valora|se\s+valorar[aá]|ser[aá]\s+valorable|plus|suma|puede\s+sumar"
+        r")\s+(?P<items>.+)$",
+        clean,
+        re.I,
+    )
+    if parent_cue_list and _has_list_separator(parent_cue_list.group("items")):
+        modifier = parent_cue_list.group("modifier")
+        return [
+            f"{modifier} {_normalize_accents(item)}"
+            for item in _split_coordinated_list(parent_cue_list.group("items"))
+        ]
+
     english_knowledge = re.match(
         r"^(?:preferred\s+|desirable\s+|nice\s+to\s+have\s+)?(?:knowledge|experience)\s+(?:of|with)\s+(.+)$",
         clean,
@@ -572,6 +606,7 @@ def _remove_importance_label(text: str) -> str:
         r"^\s*(?:(?:es|son)\s+)?(?:excluyente|excluyentes|imprescindible|obligatori[oa]s?|requerid[oa]s?|"
         r"indispensable|deseable|deseables|muy\s+valorad[oa]s?|muy\s+valorables?|"
         r"se\s+requiere|se\s+requieren|"
+        r"debe\s+manejar|debe\s+contar\s+con|debe\s+tener|debe|"
         r"se\s+valorar[aá](?:\s+especialmente)?|ser[aá]\s+valorable|"
         r"valorable|valorables|se\s+valora|"
         r"preferid[oa]s?|preferentemente|ideal(?:mente)?|plus|es\s+un\s+plus|suma|puede\s+sumar|"
@@ -870,13 +905,8 @@ def _more_complete_duplicate_key(
     selected: Mapping[str, Dict[str, Any]],
     order: List[str],
 ) -> str:
-    tokens = key.split()
-    if len(tokens) > 6:
-        return ""
     for other_key in order:
         if other_key == key or other_key not in selected:
-            continue
-        if _is_alternative_requirement_text(str(selected[other_key].get("item", {}).get("text", ""))):
             continue
         if _component_key_inside(key, other_key):
             return other_key
@@ -1076,6 +1106,7 @@ def _clean_requirement_items(items: Any, blockers: List[str]) -> tuple[List[Dict
         if (
             _is_modifier_only_fragment(text)
             or _is_modifier_only_fragment(source_text)
+            or _is_orphan_requirement_text(text)
             or _has_negative_filter_modifier(text)
             or _has_negative_filter_modifier(source_text)
         ):
@@ -1138,7 +1169,35 @@ def _normalize_blocker_text(text: str) -> str:
 
 
 def _normalize_blocker_list(items: Iterable[str]) -> List[str]:
-    return _unique(_normalize_blocker_text(str(item)) for item in items if str(item).strip())
+    return _dedupe_blocker_components(_unique(_normalize_blocker_text(str(item)) for item in items if str(item).strip()))
+
+
+def _dedupe_blocker_components(items: List[str]) -> List[str]:
+    keys = [_blocker_concept_key(item) for item in items]
+    remove_indexes = set()
+    for index, key in enumerate(keys):
+        if not key:
+            remove_indexes.add(index)
+            continue
+        for other_index, other_key in enumerate(keys):
+            if index == other_index or not other_key:
+                continue
+            if _component_key_inside(key, other_key):
+                remove_indexes.add(index)
+                break
+    return [item for index, item in enumerate(items) if index not in remove_indexes]
+
+
+def _blocker_concept_key(text: str) -> str:
+    clean = _requirement_concept_key(text)
+    clean = re.sub(
+        r"^(?:no\s+avanzar|no\s+presentarse\s+si\s+no|no\s+considerar)\s+",
+        "",
+        clean,
+    )
+    clean = re.sub(r"^(?:perfiles?|candidatos?|personas?)\s+", "", clean)
+    clean = re.sub(r"\s+", " ", clean).strip(" -:.,;/\t\r\n")
+    return clean
 
 
 def _dedupe_repeated_no_avanzar_segments(text: str) -> str:

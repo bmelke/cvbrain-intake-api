@@ -105,6 +105,37 @@ Case contract:
 - Preserve acronyms, products, and technologies exactly where possible: QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP, Salesforce, B2B, B2C, and SaaS.
 """
 
+PUBLIC_EXTRACTION_CONTRACT = """Public output contract:
+- Never output internal placeholders or diagnostics in public/user-facing fields.
+- Forbidden public text includes Source_text_span_missing, Source_text_span_missing_for_blocker_1, Source_text_span_missing_from_rules, source_text_span_missing, source_span_missing, and any similar source span or missing span placeholder.
+- If a blocker is real but its source span is unclear, write a clean human-readable blocker or omit it.
+- Never invent a placeholder to satisfy the schema.
+
+Requirement list inheritance contract:
+- Local phrase modifiers are authoritative.
+- A parent cue applies to every sibling in its comma/OR list unless that sibling has its own explicit local cue.
+- Hard parent cues include debe, debe manejar, debe contar con, se requiere, requisito, obligatorio, excluyente, imprescindible, and no avanzar si no. These become must_have or blockers depending on wording.
+- Soft should_have cues include deseable, idealmente, and preferentemente.
+- Weak/nice cues include se valorara, se valorará, valorable, plus, suma, and sera/será un plus.
+- "Se valorará experiencia con TMS, WMS, Excel y tableros" means TMS, WMS, Excel, and tableros are all nice_to_have.
+- "Debe manejar métricas, calidad, ausentismo, turnos, coaching" means every listed item is must_have.
+- "Debe manejar Adobe y/o Figma" is must_have.
+- Do not allow comma-splitting to lose the parent cue.
+
+Orphan fragment contract:
+- Never output incomplete fragments as requirements, credentials, blockers, competencies, questions, warnings, or notes.
+- Forbidden incomplete fragments include La persona deberá, La persona deberá haber trabajado con, La persona será responsable, La persona será responsable de, Se requiere, Experiencia, Debe manejar, and SaaS o.
+- If a phrase has no object or complement, omit it.
+
+Duplicate/component contract:
+- Do not output both a component and a larger aggregate requirement or blocker that repeats the same criterion.
+- Prefer one clean item.
+- If the larger phrase adds meaningful scope, keep the larger phrase and remove the component.
+- If the larger phrase is an awkward aggregate of clean independent criteria, keep the clean independent criteria and drop the aggregate.
+- Do not break OR-lists.
+- Do not collapse independent criteria.
+"""
+
 
 class OpenAIStructuredExtractor:
     """OpenAI-backed extractor that returns the existing flat contract."""
@@ -604,11 +635,25 @@ def _language_contract_for_payload(ai_payload: Mapping[str, Any]) -> str:
 
 
 def _system_instructions_for_payload(ai_payload: Mapping[str, Any]) -> str:
-    return SYSTEM_INSTRUCTIONS.rstrip() + "\n\n" + _language_contract_for_payload(ai_payload).strip() + "\n"
+    return (
+        SYSTEM_INSTRUCTIONS.rstrip()
+        + "\n\n"
+        + _language_contract_for_payload(ai_payload).strip()
+        + "\n\n"
+        + PUBLIC_EXTRACTION_CONTRACT.strip()
+        + "\n"
+    )
 
 
 def _repair_instructions_for_payload(ai_payload: Mapping[str, Any]) -> str:
-    return REPAIR_INSTRUCTIONS.rstrip() + "\n\n" + _language_contract_for_payload(ai_payload).strip() + "\n"
+    return (
+        REPAIR_INSTRUCTIONS.rstrip()
+        + "\n\n"
+        + _language_contract_for_payload(ai_payload).strip()
+        + "\n\n"
+        + PUBLIC_EXTRACTION_CONTRACT.strip()
+        + "\n"
+    )
 
 
 def job_intelligence_v1_response_schema() -> Dict[str, Any]:

@@ -286,6 +286,39 @@ def test_runner_fails_when_naked_no_avanzar_leaks_into_requirements():
     assert any(note.startswith("blocker_leaked_to_requirement:nice_to_have:") for note in notes)
 
 
+def test_runner_fails_when_public_metadata_artifact_leaks():
+    classification, notes = runner.classify_result(
+        "Empresa busca Operario Calificado CNC.",
+        successful_record(blockers=["Source_text_span_missing_from_rules"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_PUBLIC_ARTIFACT
+    assert any(note.startswith("metadata_artifact:") for note in notes)
+
+
+def test_runner_fails_when_role_title_casing_does_not_match_source_span():
+    classification, notes = runner.classify_result(
+        "Empresa metalúrgica busca Operario Calificado CNC para planta.",
+        successful_record(role_title="Operario calificado CNC"),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_TITLE_CASING
+    assert notes == ["title_casing_mismatch:Operario Calificado CNC!=Operario calificado CNC"]
+
+
+def test_runner_accepts_exact_role_title_source_casing():
+    classification, notes = runner.classify_result(
+        "Estudio profesional busca Escribano Junior o estudiante avanzado de notariado.",
+        successful_record(role_title="Escribano Junior o estudiante avanzado de notariado"),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
 def test_runner_keeps_ai_schema_validation_failed_as_schema_failure():
     classification, notes = runner.classify_result(
         "Sanitized request.",
