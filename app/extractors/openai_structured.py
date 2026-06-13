@@ -116,22 +116,32 @@ Requirement list inheritance contract:
 - A parent cue applies to every sibling in its comma/OR list unless that sibling has its own explicit local cue.
 - Hard parent cues include debe, debe manejar, debe contar con, se requiere, requisito, obligatorio, excluyente, imprescindible, and no avanzar si no. These become must_have or blockers depending on wording.
 - Soft should_have cues include deseable, idealmente, and preferentemente.
-- Weak/nice cues include se valorara, se valorará, valorable, plus, suma, and sera/será un plus.
-- "Se valorará experiencia con TMS, WMS, Excel y tableros" means TMS, WMS, Excel, and tableros are all nice_to_have.
+- Weak/nice cues include se valorara, se valorará, sera/será valorable, valorable, plus, suma, puede sumar, and sera/será un plus.
+- When a weak/nice cue introduces a list, every sibling inherits nice_to_have unless that sibling has its own stronger local cue.
+- "Se valorará experiencia con TMS, WMS, Excel y tableros" means Experiencia con TMS, Experiencia con WMS, Experiencia con Excel, and Experiencia con tableros are all nice_to_have.
 - "Debe manejar métricas, calidad, ausentismo, turnos, coaching" means every listed item is must_have.
 - "Debe manejar Adobe y/o Figma" is must_have.
+- "Libreta de conducir será valorable si debe recorrer servicios" means Libreta de conducir is nice_to_have, not must_have.
+- Do not promote a weak/nice item to must_have merely because the phrase later says "si debe" or describes a possible duty.
+- Only keep a weak/nice item as must_have if the same item has an explicit stronger hard cue such as excluyente, obligatorio, imprescindible, requisito excluyente, no avanzar sin, or debe tener sí o sí.
 - Do not allow comma-splitting to lose the parent cue.
 
 Orphan fragment contract:
 - Never output incomplete fragments as requirements, credentials, blockers, competencies, questions, warnings, or notes.
 - Forbidden incomplete fragments include La persona deberá, La persona deberá haber trabajado con, La persona será responsable, La persona será responsable de, Se requiere, Experiencia, Debe manejar, and SaaS o.
 - If a phrase has no object or complement, omit it.
+- Do not emit public requirements starting with boilerplate subject phrases when the meaning can be preserved cleanly.
+- Avoid "La persona deberá liderar pagos"; write "Liderar pagos".
+- Avoid "La persona deberá negociar condiciones"; write "Negociar condiciones".
+- Avoid "La persona será responsable de salón"; write "Responsable de salón" or "Gestión de salón".
 
 Duplicate/component contract:
 - Do not output both a component and a larger aggregate requirement or blocker that repeats the same criterion.
 - Prefer one clean item.
 - If the larger phrase adds meaningful scope, keep the larger phrase and remove the component.
 - If the larger phrase is an awkward aggregate of clean independent criteria, keep the clean independent criteria and drop the aggregate.
+- Avoid pairs like "Base técnica comprobable en redes" and "Base técnica en redes"; keep the most complete source-faithful phrasing.
+- Avoid duplicate blockers that repeat the same exclusion in shorter and longer forms.
 - Do not break OR-lists.
 - Do not collapse independent criteria.
 """

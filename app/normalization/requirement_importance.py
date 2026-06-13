@@ -77,7 +77,8 @@ ORPHAN_FRAGMENT_PATTERN = re.compile(
     r"la\s+persona\s+ser[aá]\s+responsable(?:\s+de)?|"
     r"se\s+requiere\s+base\s+t[eé]cnica\s+en|base\s+t[eé]cnica\s+en)$|"
     r"^(?:se\s+requiere|se\s+requieren|es\s+excluyente|son\s+excluyentes|"
-    r"experiencia|experiencia\s+(?:en|con)|debe\s+manejar|manejar|manejo\s+de|dominio\s+de|conocimientos?\s+de)$",
+    r"experiencia|experiencia\s+(?:en|con)|debe\s+manejar|manejar|manejo\s+de|dominio\s+de|conocimientos?\s+de|"
+    r"liderar|negociar|gestionar|trabajar|responsable)$",
     re.I,
 )
 
@@ -304,6 +305,12 @@ def normalize_structured_requirement_item(item: Mapping[str, Any], default_impor
 def resolve_importance(text: str, section_default: Importance = PREFERRED) -> Importance:
     """Resolve final importance. Local modifiers outrank section defaults."""
 
+    if (
+        WEAK_PREFERENCE_PATTERN.search(text)
+        and not STRONG_PREFERENCE_PATTERN.search(text)
+        and not _has_explicit_stronger_hard_cue(text)
+    ):
+        return NICE_TO_HAVE
     if WEAK_PREFERENCE_PATTERN.search(text) and _has_parent_hard_cue(text):
         return NICE_TO_HAVE
     if STRONG_PREFERENCE_PATTERN.search(text) and _has_parent_hard_cue(text):
@@ -315,6 +322,17 @@ def resolve_importance(text: str, section_default: Importance = PREFERRED) -> Im
     if WEAK_PREFERENCE_PATTERN.search(text):
         return NICE_TO_HAVE
     return section_default or PREFERRED
+
+
+def _has_explicit_stronger_hard_cue(text: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(?:excluyentes?|obligatori[oa]s?|imprescindible|requisito\s+excluyente|"
+            r"no\s+avanzar\s+sin|sin\s+.+?\s+no\s+avanzar|debe\s+tener\s+s[ií]\s+o\s+s[ií])\b",
+            str(text),
+            re.I,
+        )
+    )
 
 
 def _has_parent_hard_cue(text: str) -> bool:
@@ -362,10 +380,25 @@ def normalize_requirement_text(text: str) -> str:
         return f"{doc} de conducir categoría {driver.group(2).upper()}"
     clean = _remove_importance_label(clean)
     clean = _remove_trailing_importance_modifier(clean)
+    clean = _remove_boilerplate_subject_prefix(clean)
     clean = _normalize_accents(clean)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;\t\r\n")
     clean = re.sub(r"\s+para\s+visitas?\s+puntuales?.*$", "", clean, flags=re.I).strip()
     clean = _capitalize_first(clean)
+    return clean
+
+
+def _remove_boilerplate_subject_prefix(text: str) -> str:
+    clean = str(text).strip()
+    clean = re.sub(r"^\s*la\s+persona\s+deber[aá]\s+", "", clean, flags=re.I)
+    clean = re.sub(r"^\s*la\s+persona\s+debe\s+", "", clean, flags=re.I)
+    clean = re.sub(
+        r"^\s*la\s+persona\s+ser[aá]\s+responsable\s+de\s+(.+)$",
+        r"Responsable de \1",
+        clean,
+        flags=re.I,
+    )
+    clean = re.sub(r"^\s*la\s+persona\s+ser[aá]\s+responsable\s+", "", clean, flags=re.I)
     return clean
 
 
@@ -623,6 +656,8 @@ def _remove_trailing_importance_modifier(text: str) -> str:
         r"\s+es\s+deseable$",
         r"\s+deseables?$",
         r"\s+ser[aá]\s+valorables?$",
+        r"\s+ser[aá]\s+valorable\s+si\b.*$",
+        r"\s+valorables?\s+si\b.*$",
         r"\s+ser[aá]\s+un\s+plus$",
         r"\s+es\s+un\s+plus$",
         r"\s+puede\s+sumar(?:,?\s*(?:pero\s+)?no\s+es\s+requisito)?$",
@@ -956,6 +991,8 @@ def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     cleaned["text"] = text
     if _is_blocker_only_clause(source_text) or _has_negative_filter_modifier(source_text):
         cleaned["source_text"] = text
+    elif _has_boilerplate_subject_prefix(source_text):
+        cleaned["source_text"] = text
     elif source_text and _is_orphan_requirement_text(source_text):
         cleaned["source_text"] = text
     cleaned["hard_filter_candidate"] = str(cleaned.get("importance", "")) == MUST_HAVE
@@ -1083,6 +1120,7 @@ def _requirement_concept_key(text: str) -> str:
         " ",
         clean,
     )
+    clean = re.sub(r"\bcomprobable\b", " ", clean)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;/\t\r\n")
     return clean
 
@@ -1261,6 +1299,16 @@ def _has_negative_filter_modifier(text: str) -> bool:
     if not clean or not NEGATIVE_FILTER_MODIFIER_PATTERN.search(clean):
         return False
     return not bool(SOFT_PATTERN.search(clean))
+
+
+def _has_boilerplate_subject_prefix(text: str) -> bool:
+    return bool(
+        re.match(
+            r"^\s*la\s+persona\s+(?:deber[aá]|debe|ser[aá]\s+responsable)\b",
+            str(text),
+            re.I,
+        )
+    )
 
 
 def _is_attached_source_blocker_fragment(item: Mapping[str, Any], blockers: Iterable[str]) -> bool:

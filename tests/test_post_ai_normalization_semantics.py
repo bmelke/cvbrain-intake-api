@@ -853,6 +853,23 @@ def test_la_persona_debera_orphan_fragment_is_dropped_everywhere():
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_boilerplate_subject_prefix_is_removed_from_public_requirements():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("La persona deberá liderar pagos"),
+                requirement_item("La persona deberá negociar condiciones"),
+                requirement_item("La persona será responsable de salón"),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == ["Liderar pagos", "Negociar condiciones", "Responsable de salón"]
+    assert "la persona debera" not in all_user_facing_text(normalized, flat)
+    assert "la persona sera responsable" not in all_user_facing_text(normalized, flat)
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_busqueda_006_weak_preferences_stay_nice_to_have_after_source_normalization():
     source_text = (
         "Se valorará experiencia con TMS, WMS, Excel y tableros de indicadores. "
@@ -970,6 +987,25 @@ def test_sibling_can_override_parent_cue_with_explicit_local_soft_modifier():
     assert "calidad" in fold(flat["must_have"])
     assert "excel" not in fold(flat["must_have"] + flat["should_have"])
     assert "excel" in fold(flat["nice_to_have"])
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_local_valorable_overrides_later_conditional_debe_clause():
+    source_text = "Libreta de conducir será valorable si debe recorrer servicios."
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Libreta de conducir", source_text=source_text),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert flat["must_have"] == []
+    assert flat["should_have"] == []
+    assert flat["nice_to_have"] == ["Libreta de conducir"]
+    assert flat["credentials"]["required"] == []
+    assert flat["credentials"]["preferred"] == []
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
@@ -1137,6 +1173,20 @@ def test_busqueda_033_near_duplicate_qa_experience_keeps_single_hard_requirement
 
     assert flat["must_have"] == ["Experiencia excluyente diseñando casos de prueba"]
     assert fold(flat["must_have"]).count("disenando casos de prueba") == 1
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_component_duplicate_base_tecnica_keeps_more_complete_phrase():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Base técnica comprobable en redes"),
+                requirement_item("Base técnica en redes"),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == ["Base técnica comprobable en redes"]
     assert_flat_matches_nested_requirements(normalized, flat)
 
 

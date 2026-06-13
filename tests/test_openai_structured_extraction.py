@@ -376,10 +376,14 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Never invent a placeholder to satisfy the schema." in system_prompt
     assert "Requirement list inheritance contract:" in system_prompt
     assert "A parent cue applies to every sibling in its comma/OR list" in system_prompt
+    assert "Experiencia con WMS" in system_prompt
+    assert "Libreta de conducir será valorable si debe recorrer servicios" in system_prompt
     assert "Debe manejar métricas, calidad, ausentismo, turnos, coaching" in system_prompt
     assert "Orphan fragment contract:" in system_prompt
     assert "La persona deberá" in system_prompt
+    assert "La persona deberá liderar pagos" in system_prompt
     assert "Duplicate/component contract:" in system_prompt
+    assert "Base técnica comprobable en redes" in system_prompt
 
 
 def test_openai_structured_prompt_detects_english_source_language():
@@ -879,6 +883,7 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "Public output contract:" in repair_prompt
     assert "Source_text_span_missing_from_rules" in repair_prompt
     assert "Requirement list inheritance contract:" in repair_prompt
+    assert "Libreta de conducir será valorable si debe recorrer servicios" in repair_prompt
     assert "Orphan fragment contract:" in repair_prompt
     assert "Duplicate/component contract:" in repair_prompt
     assert "Software Architect" in repair_user_prompt

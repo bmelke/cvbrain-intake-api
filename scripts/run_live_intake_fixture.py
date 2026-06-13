@@ -501,7 +501,11 @@ def semantic_review_notes(source_text: str, data: Mapping[str, Any]) -> List[str
         if city in source and city not in location_normalized:
             notes.append(f"location_review:{city}_missing")
 
-    if re.search(r"\b(hibrido|híbrido|hybrid)\b", source) and location.get("hybrid_allowed") is not True:
+    if (
+        re.search(r"\b(hibrido|híbrido|hybrid)\b", source)
+        and location.get("hybrid_allowed") is not True
+        and not _hybrid_modality_is_usable(location)
+    ):
         notes.append("modality_review:hybrid_missing")
     if re.search(r"\bremoto|remote\b", source) and location.get("remote_allowed") is not True:
         notes.append("modality_review:remote_missing")
@@ -511,14 +515,29 @@ def semantic_review_notes(source_text: str, data: Mapping[str, Any]) -> List[str
     if re.search(r"\b\d+\s+(?:anos?|años?)\b", source) and experience.get("minimum_years") in (None, ""):
         notes.append("experience_review:minimum_years_missing")
 
+    source_without_blockers = _source_without_blocker_clauses(source_text)
     for level in ("junior", "semi senior", "semisenior", "senior"):
-        if level in source and level not in role_title and level not in seniority:
+        if level in source_without_blockers and level not in role_title and level not in seniority:
             notes.append(f"seniority_review:{level}_missing")
 
     if re.search(r"\b(no\s+avanzar|no\s+presentarse)\b", source) and not _string_list(data.get("blockers", [])):
         notes.append("blocker_review:blocker_missing")
 
     return notes
+
+
+def _hybrid_modality_is_usable(location: Mapping[str, Any]) -> bool:
+    raw = _fold(str(location.get("raw", "")))
+    normalized = _fold(str(location.get("normalized", "")))
+    return bool(re.search(r"\b(hibrido|hybrid)\b", f"{raw} {normalized}"))
+
+
+def _source_without_blocker_clauses(source_text: str) -> str:
+    kept = []
+    for clause in re.split(r"[\n.;]+", source_text):
+        if not re.search(r"\b(no\s+avanzar|no\s+presentarse|no\s+considerar)\b", clause, re.I):
+            kept.append(clause)
+    return _fold(" ".join(kept))
 
 
 def modifier_clauses(

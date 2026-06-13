@@ -253,6 +253,34 @@ def test_runner_treats_repair_and_readiness_as_diagnostics_not_warn(tmp_path):
     assert ("search_readiness_exploratory", 1) in result["summary"]["top_diagnostics"]
 
 
+def test_runner_does_not_warn_when_hybrid_modality_is_usable_without_extra_detail():
+    classification, notes = runner.classify_result(
+        "Empresa busca Analista Contable. Trabajo híbrido en Montevideo.",
+        successful_record(
+            role_title="Analista Contable",
+            location={"raw": "Trabajo híbrido en Montevideo", "normalized": "Montevideo híbrido"},
+        ),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_does_not_warn_for_seniority_only_inside_blockers():
+    classification, notes = runner.classify_result(
+        "Empresa busca Gerente Corporativo de Legales. No avanzar perfiles junior de asesoría legal.",
+        successful_record(
+            role_title="Gerente Corporativo de Legales",
+            blockers=["No avanzar perfiles junior de asesoría legal"],
+        ),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
 def test_runner_fails_when_weak_preference_is_promoted_to_should_have():
     classification, notes = runner.classify_result(
         "Libreta profesional puede sumar.",
@@ -262,6 +290,17 @@ def test_runner_fails_when_weak_preference_is_promoted_to_should_have():
 
     assert classification == runner.FAIL_IMPORTANCE
     assert any(note.startswith("weak_modifier_over_promoted:should_have:") for note in notes)
+
+
+def test_runner_fails_when_valorable_with_conditional_debe_is_promoted_to_must_have():
+    classification, notes = runner.classify_result(
+        "Libreta de conducir será valorable si debe recorrer servicios.",
+        successful_record(must_have=["Libreta de conducir"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_IMPORTANCE
+    assert any(note.startswith("weak_modifier_over_promoted:must_have:") for note in notes)
 
 
 def test_runner_fails_when_no_avanzar_leaks_into_requirements():
