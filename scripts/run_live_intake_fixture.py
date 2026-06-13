@@ -82,14 +82,19 @@ WEAK_MODIFIER_PATTERN = re.compile(
     re.I,
 )
 STRONG_PREFERENCE_PATTERN = re.compile(
-    r"\b(muy\s+valorad[oa]s?|muy\s+valorables?)\b",
+    r"\b("
+    r"deseable|deseables|preferid[oa]s?|preferentemente|ideal(?:mente)?|"
+    r"muy\s+valorad[oa]s?|muy\s+valorables?|"
+    r"strongly\s+preferred|preferred|desirable"
+    r")\b",
     re.I,
 )
 HARD_MODIFIER_PATTERN = re.compile(
     r"\b("
     r"excluyente|excluyentes|imprescindible|obligatori[oa]s?|requerid[oa]s?|"
     r"indispensable|m[ií]nim[oa]|sin\s+.+?\s+no\s+avanzar|"
-    r"no\s+presentarse\s+si\s+no\s+.+|no\s+avanzar\s+si\s+no\s+.+"
+    r"no\s+presentarse\s+si\s+no\s+.+|no\s+avanzar\s+si\s+no\s+.+|"
+    r"se\s+requiere|debe(?:\s+tener|\s+manejar)?|requisito"
     r")\b",
     re.I,
 )
@@ -377,6 +382,7 @@ def orphan_fragment_notes(data: Mapping[str, Any]) -> List[str]:
 def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]:
     notes: List[str] = []
     weak_clauses = modifier_clauses(source_text, WEAK_MODIFIER_PATTERN, exclude=STRONG_PREFERENCE_PATTERN)
+    preference_clauses = modifier_clauses(source_text, STRONG_PREFERENCE_PATTERN) + weak_clauses
     hard_clauses = modifier_clauses(source_text, HARD_MODIFIER_PATTERN)
 
     for bucket, item in _requirement_and_credential_items(data):
@@ -390,7 +396,7 @@ def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]
 
     for bucket in ("should_have", "nice_to_have"):
         for item in _string_list(data.get(bucket, [])):
-            if any(_clause_matches_item(clause, item) for clause in weak_clauses):
+            if any(_clause_matches_item(clause, item) for clause in preference_clauses):
                 continue
             if any(_clause_matches_item(clause, item) for clause in hard_clauses):
                 notes.append(f"hard_modifier_under_promoted:{bucket}:{item}")

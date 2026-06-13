@@ -95,8 +95,13 @@ Case contract:
 - For matching and validation purposes, upper/lower case differences should usually be ignored.
 - For output, incoming source case wins.
 - If the recruiter source contains an explicit role title span, preserve that source span's casing and punctuation in role_title, job_profile.job_title, and job_profile.normalized_role_title.
+- The canonical displayed title must be the literal extracted source title span after safe trimming, not a reconstructed or generated title.
+- Do not lowercase it.
+- Do not uppercase it.
 - Do not title-case Spanish titles unless the source itself is title-cased.
+- Do not apply English title case, Spanish title case, sentence case, or first-word-only capitalization.
 - Do not lowercase acronyms or technical abbreviations.
+- Allowed cleanup is limited to trimming leading/trailing whitespace, normalizing repeated internal whitespace, and removing trailing punctuation that clearly belongs to the sentence rather than the title.
 - Preserve acronyms, products, and technologies exactly where possible: QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP, Salesforce, B2B, B2C, and SaaS.
 """
 

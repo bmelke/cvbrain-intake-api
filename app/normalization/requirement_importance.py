@@ -123,6 +123,12 @@ BLOCKER_METADATA_ARTIFACTS = {
     "hard_filter_approved_as_written",
 }
 
+METADATA_ARTIFACT_PATTERN = re.compile(
+    r"^(?:source[_\s-]*text[_\s-]*span(?:[_\s-]*(?:missing|hint|not[_\s-]*provided))?(?:[_\s-]*for[_\s-]*blocker[_\s-]*\d+)?|"
+    r"hard[_\s-]*filter[_\s-]*(?:candidate|approved)[_\s-]*as[_\s-]*written)$",
+    re.I,
+)
+
 
 @dataclass(frozen=True)
 class RequirementItem:
@@ -257,7 +263,7 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     requirements = _normalize_blockers_and_negations(requirements, source_text)
     requirements = _dedupe_requirement_concepts(requirements)
     output["requirements"] = requirements
-    return output
+    return _sanitize_metadata_artifacts(output)
 
 
 def normalize_structured_requirement_item(item: Mapping[str, Any], default_importance: Importance) -> List[Dict[str, Any]]:
@@ -269,12 +275,13 @@ def normalize_structured_requirement_item(item: Mapping[str, Any], default_impor
     clauses = split_requirement_clauses(raw)
     if not clauses:
         clauses = [raw]
+    clause_default = MUST_HAVE if HARD_PATTERN.search(raw) else default_importance
 
     output: List[Dict[str, Any]] = []
     for clause in clauses:
         if _has_negative_filter_modifier(clause):
             continue
-        importance = resolve_importance(clause, default_importance)
+        importance = resolve_importance(clause, clause_default)
         normalized = dict(item)
         normalized["source_text"] = clause
         normalized["importance"] = importance
@@ -631,7 +638,7 @@ def _is_orphan_requirement_text(text: str) -> bool:
     folded = _fold(clean.strip(" -:.,;\t\r\n"))
     if not folded:
         return True
-    if folded == "no avanzar" or folded in BLOCKER_METADATA_ARTIFACTS:
+    if folded == "no avanzar" or _is_metadata_artifact_text(clean):
         return True
     if _is_modifier_only_fragment(text) or _is_modifier_only_fragment(clean):
         return True
@@ -750,6 +757,7 @@ def _dedupe_requirement_concepts(requirements: Mapping[str, Any]) -> Dict[str, A
                 selected[key] = record
 
     _remove_alternative_fragment_duplicates(selected, order)
+    _remove_redundant_aggregate_duplicates(selected, order)
     _remove_component_requirement_duplicates(selected, order)
 
     bucketed: Dict[str, List[Dict[str, Any]]] = {
@@ -831,6 +839,32 @@ def _remove_component_requirement_duplicates(
             del selected[key]
 
 
+def _remove_redundant_aggregate_duplicates(
+    selected: Dict[str, Dict[str, Any]],
+    order: List[str],
+) -> None:
+    for key in list(order):
+        if key not in selected:
+            continue
+        item = selected[key].get("item", {})
+        if not isinstance(item, Mapping):
+            continue
+        text = str(item.get("text", ""))
+        if _is_alternative_requirement_text(text):
+            continue
+        if not re.search(r"\b(?:y|e|and)\b", _fold(text)):
+            continue
+        component_keys = [
+            other_key
+            for other_key in order
+            if other_key != key
+            and other_key in selected
+            and _component_key_inside(other_key, key)
+        ]
+        if len(component_keys) >= 2:
+            del selected[key]
+
+
 def _more_complete_duplicate_key(
     key: str,
     selected: Mapping[str, Dict[str, Any]],
@@ -874,7 +908,7 @@ def _is_alternative_requirement_text(text: str) -> bool:
 def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     text = normalize_requirement_text(str(item.get("text", "")).strip())
     source_text = str(item.get("source_text", "")).strip()
-    if not text:
+    if not text or _is_metadata_artifact_text(text):
         return {}
     if (
         _is_orphan_requirement_text(text)
@@ -882,6 +916,8 @@ def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
         or _is_modifier_only_fragment(source_text)
     ):
         return {}
+    if _is_metadata_artifact_text(source_text):
+        source_text = text
     if _has_negative_filter_modifier(text) or _has_negative_filter_modifier(source_text):
         return {}
     if blocker_text_for_clause(source_text or text) and _is_blocker_only_clause(source_text or text):
@@ -991,6 +1027,7 @@ def _requirement_concept_key(text: str) -> str:
         r"^tener\s+",
         r"^poseer\s+",
         r"^experiencia\s+(?:en|con)\s+",
+        r"^experiencia\s+(?!(?:en|con)\b)",
         r"^manejo\s+de\s+",
         r"^dominio\s+de\s+",
         r"^conocimientos?\s+de\s+",
@@ -1009,7 +1046,10 @@ def _requirement_concept_key(text: str) -> str:
     )
     clean = re.sub(
         r"\b(?:valorable|valorables|seran\s+valorables|sera\s+valorable|"
-        r"sera\s+un\s+plus|plus|suma|puede\s+sumar)\b",
+        r"sera\s+un\s+plus|plus|suma|puede\s+sumar|"
+        r"excluyente|excluyentes|imprescindible|obligatorio|obligatoria|"
+        r"obligatorios|obligatorias|requerido|requerida|requeridos|requeridas|"
+        r"deseable|deseables|idealmente|ideal)\b",
         " ",
         clean,
     )
@@ -1090,7 +1130,7 @@ def _normalize_blocker_text(text: str) -> str:
         flags=re.I,
     )
     clean = _dedupe_repeated_no_avanzar_segments(clean)
-    if _fold(clean) == "no avanzar" or _fold(clean) in BLOCKER_METADATA_ARTIFACTS:
+    if _fold(clean) == "no avanzar" or _is_metadata_artifact_text(clean):
         return ""
     if had_final_period and clean and not clean.endswith("."):
         clean = f"{clean}."
@@ -1128,7 +1168,33 @@ def _is_modifier_only_fragment(text: str) -> bool:
     clean = _fold(str(text)).strip(" -:.,;\t\r\n")
     if not clean:
         return True
+    if _is_metadata_artifact_text(clean):
+        return True
     return any(pattern.match(clean) for pattern in MODIFIER_ONLY_FRAGMENT_PATTERNS)
+
+
+def _is_metadata_artifact_text(text: str) -> bool:
+    clean = _fold(str(text)).strip(" -:.,;/\t\r\n")
+    if not clean:
+        return False
+    if clean in BLOCKER_METADATA_ARTIFACTS:
+        return True
+    return bool(METADATA_ARTIFACT_PATTERN.match(clean))
+
+
+def _sanitize_metadata_artifacts(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _sanitize_metadata_artifacts(child) for key, child in value.items()}
+    if isinstance(value, list):
+        output = []
+        for item in value:
+            if isinstance(item, str) and _is_metadata_artifact_text(item):
+                continue
+            output.append(_sanitize_metadata_artifacts(item))
+        return output
+    if isinstance(value, str) and _is_metadata_artifact_text(value):
+        return ""
+    return value
 
 
 def _has_negative_filter_modifier(text: str) -> bool:

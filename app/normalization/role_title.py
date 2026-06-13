@@ -28,6 +28,8 @@ PRESERVED_ENGLISH_TITLES = (
 SPANISH_TITLE_START = (
     "Administrador",
     "Administradora",
+    "Administrativo",
+    "Administrativa",
     "Analista",
     "Arquitecto",
     "Arquitecta",
@@ -38,10 +40,14 @@ SPANISH_TITLE_START = (
     "Consultora",
     "Desarrollador",
     "Desarrolladora",
+    "Diseñador",
+    "Diseñadora",
     "Ejecutivo",
     "Ejecutiva",
+    "Electricista",
     "Encargado",
     "Encargada",
+    "Especialista",
     "Gerente",
     "Ingeniero",
     "Ingeniera",
@@ -128,7 +134,8 @@ REJECTED_TITLE_EXACT = {
 }
 
 REJECTED_TITLE_PREFIX_PATTERN = re.compile(
-    r"^(?:soporte\s+a|responsable\s+de|gesti[oó]n\s+de|empresa\s+|startup\s+|agencia\s+|multinacional\s+)",
+    r"^(?:soporte\s+a|responsable\s+de\s+(?:gestionar|hacer|realizar|coordinar|liderar|ejecutar)\b|"
+    r"gesti[oó]n\s+de|empresa\s+|startup\s+|agencia\s+|multinacional\s+)",
     re.I,
 )
 
@@ -155,10 +162,7 @@ def normalize_role_title_for_source(payload: Mapping[str, Any], source_text: str
 
     canonical_title = ""
     if source_title and _is_preserved_english_title(source_title):
-        if current_title and _fold(current_title).startswith(_fold(source_title)):
-            canonical_title = current_title
-        else:
-            canonical_title = source_title
+        canonical_title = source_title
     elif source_title:
         canonical_title = source_title
     elif source_is_spanish and _looks_spanish_title(job_title):
@@ -214,7 +218,13 @@ def _source_role_title(source_text: str) -> str:
 
 def _preserved_english_title_from_source(source: str) -> str:
     for title in PRESERVED_ENGLISH_TITLES:
-        match = re.search(rf"(?<![A-Za-z0-9/+.-]){re.escape(title)}(?![A-Za-z0-9/+.-])", source, re.I)
+        match = re.search(
+            rf"(?<![A-Za-z0-9/+.-]){re.escape(title)}"
+            r"(?:\s+(?:Trainee|Junior|Jr\.?|Semi\s+Senior|SemiSenior|SSR|Ssr|Senior|Sr\.?|Lead|Principal)){0,2}"
+            r"(?![A-Za-z0-9/+.-])",
+            source,
+            re.I,
+        )
         if match:
             return source[match.start() : match.end()]
     return ""
@@ -262,7 +272,11 @@ def _looks_english_title(title: str) -> bool:
 
 def _is_preserved_english_title(title: str) -> bool:
     folded = _fold(title)
-    return any(_fold(preserved) == folded for preserved in PRESERVED_ENGLISH_TITLES)
+    return any(
+        folded == _fold(preserved)
+        or folded.startswith(f"{_fold(preserved)} ")
+        for preserved in PRESERVED_ENGLISH_TITLES
+    )
 
 
 def _is_rejected_title(title: str) -> bool:

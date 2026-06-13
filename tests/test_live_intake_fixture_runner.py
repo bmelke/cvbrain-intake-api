@@ -190,6 +190,28 @@ def test_runner_accepts_idealmente_as_should_have_without_importance_failure():
     assert notes == []
 
 
+def test_runner_accepts_busqueda_091_deseable_group_as_should_have():
+    classification, notes = runner.classify_result(
+        "Deseable inglés, protocolo y experiencia con eventos empresariales.",
+        successful_record(should_have=["Inglés", "Protocolo", "Experiencia con eventos empresariales"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_fails_when_hard_commercial_training_is_under_promoted():
+    classification, notes = runner.classify_result(
+        "Es excluyente experiencia gestionando franquiciados, estándares operativos, auditorías, capacitación y seguimiento comercial.",
+        successful_record(should_have=["Capacitación y seguimiento comercial"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_IMPORTANCE
+    assert any(note.startswith("hard_modifier_under_promoted:should_have:") for note in notes)
+
+
 def test_runner_accepts_openai_api_valorable_as_nice_to_have():
     classification, notes = runner.classify_result(
         "Experiencia con OpenAI APIs será valorable.",

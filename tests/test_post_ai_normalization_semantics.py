@@ -154,12 +154,18 @@ def all_user_facing_text(normalized, flat):
             flat["nice_to_have"],
             flat["blockers"],
             flat["credentials"],
+            flat["warnings"],
+            flat["recruiter_questions"],
             normalized["requirements"]["must_have"],
             normalized["requirements"]["should_have"],
             normalized["requirements"]["nice_to_have"],
             normalized["requirements"]["credentials"],
             normalized["requirements"]["blockers"],
             normalized["requirements"].get("soft_competencies", []),
+            normalized.get("missing_information", []),
+            normalized.get("company_clarification_questions", []),
+            normalized.get("candidate_screening_questions", []),
+            normalized.get("quality_control", {}).get("warnings", []),
         ]
     )
 
@@ -614,6 +620,44 @@ def test_source_text_span_missing_metadata_artifact_is_dropped_from_blockers_and
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_source_text_span_missing_for_blocker_artifact_is_removed_from_user_facing_fields():
+    payload = minimal_job_intelligence(
+        {
+            "must_have": [
+                requirement_item("Source_text_span_missing_for_blocker_1"),
+                requirement_item("Experiencia comercial B2B"),
+            ],
+            "blockers": [
+                "Source_text_span_missing_for_blocker_1",
+                "No avanzar perfiles sin experiencia comercial",
+            ],
+            "soft_competencies": [
+                requirement_item("Source_text_span_missing_for_blocker_1", "preferred"),
+            ],
+        }
+    )
+    payload["quality_control"]["warnings"] = ["Source_text_span_missing_for_blocker_1"]
+    payload["missing_information"] = [
+        {
+            "field": "Source_text_span_missing_for_blocker_1",
+            "suggested_question": "Source_text_span_missing_for_blocker_1",
+        }
+    ]
+    payload["company_clarification_questions"] = [
+        {"question": "Source_text_span_missing_for_blocker_1"}
+    ]
+
+    normalized = normalize_job_intelligence_requirements(payload)
+    flat = derive_flat_compatibility(normalized)
+
+    output = all_user_facing_text(normalized, flat)
+    assert "source_text_span_missing" not in output
+    assert "for_blocker" not in output
+    assert flat["blockers"] == ["No avanzar perfiles sin experiencia comercial"]
+    assert flat["must_have"] == ["Experiencia comercial B2B"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_nested_negative_soft_competency_source_text_is_removed_and_becomes_blocker():
     blocker_source = "Criterio de no avanzar si solo tiene experiencia académica"
     normalized, flat = normalize_and_flatten(
@@ -809,6 +853,59 @@ def test_busqueda_006_weak_preferences_stay_nice_to_have_after_source_normalizat
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_busqueda_084_sales_requirement_not_duplicated_when_inmobiliarias_is_preferred_context():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item(
+                    "Perfil comercial fuerte y experiencia en ventas",
+                    source_text="Es excluyente perfil comercial fuerte y experiencia en ventas",
+                ),
+            ],
+            "should_have": [
+                requirement_item(
+                    "Experiencia en ventas",
+                    "preferred",
+                    source_text="idealmente inmobiliarias",
+                ),
+                requirement_item(
+                    "Experiencia inmobiliaria",
+                    "preferred",
+                    source_text="idealmente inmobiliarias",
+                ),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == ["Perfil comercial fuerte y experiencia en ventas"]
+    assert flat["should_have"] == ["Experiencia inmobiliaria"]
+    assert fold(flat["must_have"] + flat["should_have"]).count("experiencia en ventas") == 1
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_busqueda_098_hard_excluyente_context_applies_to_comma_split_components():
+    source_text = (
+        "Es excluyente experiencia gestionando franquiciados, estándares operativos, "
+        "auditorías, capacitación y seguimiento comercial."
+    )
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item(
+                    "Capacitación y seguimiento comercial",
+                    "preferred",
+                    source_text=source_text,
+                ),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert "capacitacion y seguimiento comercial" in fold(flat["must_have"])
+    assert "capacitacion y seguimiento comercial" not in fold(flat["should_have"])
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_alternative_healthcare_commercial_experience_stays_one_composite_requirement():
     phrase = "experiencia comercial en salud, laboratorios, equipamiento médico, dispositivos médicos o servicios vinculados al sector"
     normalized, flat = normalize_and_flatten(
@@ -908,7 +1005,22 @@ def test_near_duplicate_requirements_prefer_complete_phrase_with_importance_cue(
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
-def test_component_requirements_are_removed_when_aggregate_contains_same_criteria():
+def test_busqueda_033_near_duplicate_qa_experience_keeps_single_hard_requirement():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia excluyente diseñando casos de prueba"),
+                requirement_item("Experiencia diseñando casos de prueba"),
+            ],
+        }
+    )
+
+    assert flat["must_have"] == ["Experiencia excluyente diseñando casos de prueba"]
+    assert fold(flat["must_have"]).count("disenando casos de prueba") == 1
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_redundant_aggregate_requirement_is_removed_when_clean_independent_components_exist():
     aggregate = "Perfil comercial fuerte y experiencia en ventas"
     normalized, flat = normalize_and_flatten(
         {
@@ -920,7 +1032,7 @@ def test_component_requirements_are_removed_when_aggregate_contains_same_criteri
         }
     )
 
-    assert flat["must_have"] == [aggregate]
+    assert flat["must_have"] == ["Perfil comercial fuerte", "Experiencia en ventas"]
     assert_flat_matches_nested_requirements(normalized, flat)
 
 

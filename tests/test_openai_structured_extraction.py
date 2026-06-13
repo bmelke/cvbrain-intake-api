@@ -365,6 +365,10 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "The primary role_title must not be translated away from the source language." in system_prompt
     assert "Case contract:" in system_prompt
     assert "For output, incoming source case wins." in system_prompt
+    assert "The canonical displayed title must be the literal extracted source title span" in system_prompt
+    assert "Do not lowercase it." in system_prompt
+    assert "Do not uppercase it." in system_prompt
+    assert "Do not apply English title case, Spanish title case, sentence case" in system_prompt
     assert "Do not title-case Spanish titles unless the source itself is title-cased." in system_prompt
     assert "QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP" in system_prompt
 
@@ -497,7 +501,8 @@ def test_analyze_endpoint_syncs_top_level_and_nested_spanish_role_title(monkeypa
 
 @pytest.mark.parametrize("english_title", ["Data Engineer", "Product Manager", "QA Tester"])
 def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it(english_title):
-    source_text = f"Compañía tecnológica busca {english_title} Semi Senior para producto digital."
+    source_title = f"{english_title} Semi Senior"
+    source_text = f"Compañía tecnológica busca {source_title} para producto digital."
     extractor = OpenAIStructuredExtractor(
         api_key="test-key-not-used",
         model="test-model-not-used",
@@ -506,9 +511,9 @@ def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it
 
     result = extractor.extract(request(source_text))
 
-    assert result["role_title"] == english_title
-    assert result["job_intelligence"]["job_profile"]["job_title"] == english_title
-    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == english_title
+    assert result["role_title"] == source_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == source_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == source_title
 
 
 @pytest.mark.parametrize(
@@ -553,10 +558,18 @@ def test_english_source_keeps_english_primary_role_title(english_title):
 @pytest.mark.parametrize(
     "source_title",
     [
+        "Community Manager Senior",
         "Coordinador de logística",
         "Liquidador de siniestros",
         "Ejecutivo de licitaciones",
+        "Responsable de Recursos Humanos generalista",
+        "Responsable de Facilities",
+        "Administrativo Comercial",
+        "Electricista Industrial",
+        "Diseñador Gráfico Senior",
         "Arquitecto de Software",
+        "Redactor UX",
+        "UX/UI Designer",
     ],
 )
 def test_explicit_source_title_casing_wins_for_top_level_and_nested_titles(source_title):
