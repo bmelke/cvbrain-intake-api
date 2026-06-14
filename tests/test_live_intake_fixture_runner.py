@@ -194,6 +194,117 @@ def test_build_request_sends_only_real_hr_text_and_allowed_payload_fields():
     assert "BUSQUEDA_" not in json.dumps(payload, ensure_ascii=False)
 
 
+def test_timeout_for_source_chars_uses_dynamic_thresholds():
+    assert runner.timeout_for_source_chars(1000) == 90
+    assert runner.timeout_for_source_chars(3000) == 150
+    assert runner.timeout_for_source_chars(8000) == 240
+    assert runner.timeout_for_source_chars(15000) == 300
+
+
+def test_runner_records_source_chars_and_dynamic_timeout_metadata(tmp_path):
+    short_source = "Buscamos Analista Contable con Excel."
+    medium_source = "x" * 3000
+    cases = [
+        runner.Case("BUSQUEDA_001", short_source),
+        runner.Case("BUSQUEDA_002", medium_source),
+    ]
+    observed_timeouts = []
+
+    def fake_transport(url, api_key, payload, timeout):
+        observed_timeouts.append(timeout)
+        return successful_record(role_title="Analista Contable")
+
+    result = runner.run_fixture(
+        cases,
+        out_dir=tmp_path,
+        url="https://example.test/api/job-intake/analyze",
+        api_key="test-key-not-printed",
+        sleep_seconds=0,
+        transport=fake_transport,
+    )
+
+    assert observed_timeouts == [90.0, 150.0]
+    assert result["cases"][0]["source_chars"] == len(short_source)
+    assert result["cases"][0]["timeout_seconds"] == 90.0
+    assert result["cases"][1]["source_chars"] == len(medium_source)
+    assert result["cases"][1]["timeout_seconds"] == 150.0
+
+    request_file = json.loads((tmp_path / "requests" / "BUSQUEDA_002.request.json").read_text())
+    response_file = json.loads((tmp_path / "responses" / "BUSQUEDA_002.response.json").read_text())
+    assert request_file["_runner_metadata"]["source_chars"] == len(medium_source)
+    assert request_file["_runner_metadata"]["timeout_seconds"] == 150.0
+    assert response_file["_runner_metadata"]["source_chars"] == len(medium_source)
+    assert response_file["_runner_metadata"]["timeout_seconds"] == 150.0
+
+
+def test_fixed_timeout_override_does_not_affect_short_inputs_dynamically(tmp_path):
+    cases = [runner.Case("BUSQUEDA_001", "Buscamos Administrativo. Deseable Excel.")]
+    observed_timeouts = []
+
+    def fake_transport(url, api_key, payload, timeout):
+        observed_timeouts.append(timeout)
+        return successful_record(role_title="Administrativo")
+
+    result = runner.run_fixture(
+        cases,
+        out_dir=tmp_path,
+        url="https://example.test/api/job-intake/analyze",
+        api_key="test-key-not-printed",
+        timeout=0.01,
+        sleep_seconds=0,
+        transport=fake_transport,
+    )
+
+    assert observed_timeouts == [0.01]
+    assert result["cases"][0]["timeout_seconds"] == 0.01
+    assert result["cases"][0]["source_chars"] == len(cases[0].source_text)
+
+
+def test_504_empty_body_is_classified_as_timeout_not_invalid_json():
+    record = runner._response_record(504, "")
+
+    classification, notes = runner.classify_result(
+        "Texto largo normal de recruiter que excedió el timeout.",
+        record,
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_TIMEOUT
+    assert notes == ["timeout_504"]
+    assert record.error == "timeout_504: empty response body"
+    assert "invalid_json" not in record.error
+
+
+def test_runner_records_timeout_failure_metadata_for_empty_504(tmp_path):
+    source = "Texto largo de recruiter. " * 200
+    cases = [runner.Case("BUSQUEDA_001", source)]
+
+    def fake_transport(url, api_key, payload, timeout):
+        return runner._response_record(504, "")
+
+    result = runner.run_fixture(
+        cases,
+        out_dir=tmp_path,
+        url="https://example.test/api/job-intake/analyze",
+        api_key="test-key-not-printed",
+        sleep_seconds=0,
+        transport=fake_transport,
+    )
+
+    row = result["cases"][0]
+    response_file = json.loads((tmp_path / "responses" / "BUSQUEDA_001.response.json").read_text())
+    assert row["result_classification"] == runner.FAIL_TIMEOUT
+    assert row["failure_class"] == "timeout"
+    assert row["notes"] == "timeout_504"
+    assert row["source_chars"] == len(source)
+    assert row["timeout_seconds"] == 150.0
+    assert row["status_code"] == 504
+    assert response_file["_runner_error"] == "timeout_504: empty response body"
+    assert response_file["_runner_metadata"]["failure_class"] == "timeout"
+    assert response_file["_runner_metadata"]["source_chars"] == len(source)
+    assert response_file["_runner_metadata"]["timeout_seconds"] == 150.0
+
+
 def test_runner_writes_outputs_and_continues_after_failed_case(tmp_path):
     cases = [
         runner.Case("BUSQUEDA_001", "Buscamos Soporte IT. Excluyente experiencia en tickets."),
@@ -251,7 +362,8 @@ def test_runner_writes_outputs_and_continues_after_failed_case(tmp_path):
     assert result["summary"]["total_cases"] == 2
     assert result["summary"]["pass_count"] == 1
     assert result["summary"]["fail_count"] == 1
-    assert result["cases"][1]["result_classification"] == "FAIL_TECHNICAL"
+    assert result["cases"][1]["result_classification"] == runner.FAIL_TIMEOUT
+    assert result["cases"][1]["failure_class"] == "timeout"
     assert len(calls) == 3
 
 

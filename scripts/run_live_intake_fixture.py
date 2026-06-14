@@ -29,6 +29,9 @@ API_PATH = "/api/job-intake/analyze"
 SUMMARY_FIELDS = [
     "id",
     "http_status",
+    "status_code",
+    "source_chars",
+    "timeout_seconds",
     "ok",
     "engine",
     "fallback_used",
@@ -48,12 +51,18 @@ SUMMARY_FIELDS = [
     "location.normalized",
     "experience.minimum_years",
     "execution_time_seconds",
+    "failure_class",
     "result_classification",
     "notes",
 ]
+DEFAULT_BASE_TIMEOUT_SECONDS = 90
+DEFAULT_MEDIUM_TIMEOUT_SECONDS = 150
+DEFAULT_LONG_TIMEOUT_SECONDS = 240
+DEFAULT_MAX_TIMEOUT_SECONDS = 300
 
 PASS = "PASS"
 WARN = "WARN"
+FAIL_TIMEOUT = "FAIL_TIMEOUT"
 FAIL_TECHNICAL = "FAIL_TECHNICAL"
 FAIL_SCHEMA = "FAIL_SCHEMA"
 FAIL_PROVIDER = "FAIL_PROVIDER"
@@ -211,6 +220,29 @@ def endpoint_url(base_or_endpoint: str) -> str:
     return f"{clean}{API_PATH}"
 
 
+def timeout_for_source_chars(source_chars: int, max_timeout_seconds: float = DEFAULT_MAX_TIMEOUT_SECONDS) -> int:
+    chars = max(0, int(source_chars))
+    if chars <= 2000:
+        timeout = DEFAULT_BASE_TIMEOUT_SECONDS
+    elif chars <= 6000:
+        timeout = DEFAULT_MEDIUM_TIMEOUT_SECONDS
+    elif chars <= 12000:
+        timeout = DEFAULT_LONG_TIMEOUT_SECONDS
+    else:
+        timeout = DEFAULT_MAX_TIMEOUT_SECONDS
+    return int(min(timeout, max_timeout_seconds))
+
+
+def timeout_for_case(
+    case: Case,
+    timeout_seconds: Optional[float],
+    max_timeout_seconds: float,
+) -> float:
+    if timeout_seconds is not None:
+        return float(timeout_seconds)
+    return float(timeout_for_source_chars(len(case.source_text), max_timeout_seconds=max_timeout_seconds))
+
+
 def post_json(url: str, api_key: str, payload: Mapping[str, Any], timeout: float) -> ResponseRecord:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     headers = {
@@ -234,6 +266,8 @@ def post_json(url: str, api_key: str, payload: Mapping[str, Any], timeout: float
 
 
 def _response_record(http_status: int, raw_text: str) -> ResponseRecord:
+    if http_status == 504 and not str(raw_text or "").strip():
+        return ResponseRecord(http_status, None, raw_text, error="timeout_504: empty response body")
     try:
         parsed = json.loads(raw_text)
     except json.JSONDecodeError as error:
@@ -248,7 +282,8 @@ def run_fixture(
     out_dir: Path,
     url: str,
     api_key: str,
-    timeout: float = 120.0,
+    timeout: Optional[float] = None,
+    max_timeout_seconds: float = DEFAULT_MAX_TIMEOUT_SECONDS,
     sleep_seconds: float = 1.0,
     expect_live_ai: bool = True,
     transport: Transport = post_json,
@@ -263,23 +298,33 @@ def run_fixture(
 
     for index, case in enumerate(cases):
         payload = build_request(case)
+        source_chars = len(case.source_text)
+        request_timeout = timeout_for_case(case, timeout, max_timeout_seconds)
         request_path = requests_dir / f"{case.id}.request.json"
         response_path = responses_dir / f"{case.id}.response.json"
-        write_json(request_path, payload)
+        write_json(request_path, request_file_payload(payload, source_chars, request_timeout))
 
         started = time.monotonic()
-        record = transport(url, api_key, payload, timeout)
+        record = transport(url, api_key, payload, request_timeout)
         if record.http_status == 0:
-            retry_record = transport(url, api_key, payload, timeout)
+            retry_record = transport(url, api_key, payload, request_timeout)
             if retry_record.http_status != 0:
                 record = retry_record
         elapsed = time.monotonic() - started
 
-        response_payload = response_file_payload(record)
+        response_payload = response_file_payload(record, source_chars, request_timeout, elapsed)
         write_json(response_path, response_payload)
         response_records[case.id] = response_payload
 
-        rows.append(summarize_case(case, record, elapsed, expect_live_ai=expect_live_ai))
+        rows.append(
+            summarize_case(
+                case,
+                record,
+                elapsed,
+                timeout_seconds=request_timeout,
+                expect_live_ai=expect_live_ai,
+            )
+        )
         if sleep_seconds > 0 and index < len(cases) - 1:
             time.sleep(sleep_seconds)
 
@@ -290,18 +335,48 @@ def run_fixture(
     return {"summary": summary, "cases": rows, "responses": response_records}
 
 
-def response_file_payload(record: ResponseRecord) -> Dict[str, Any]:
+def request_file_payload(payload: Mapping[str, Any], source_chars: int, timeout_seconds: float) -> Dict[str, Any]:
+    output = dict(payload)
+    output["_runner_metadata"] = {
+        "source_chars": source_chars,
+        "timeout_seconds": timeout_seconds,
+    }
+    return output
+
+
+def response_file_payload(
+    record: ResponseRecord,
+    source_chars: int,
+    timeout_seconds: float,
+    elapsed: float,
+) -> Dict[str, Any]:
+    metadata = {
+        "source_chars": source_chars,
+        "timeout_seconds": timeout_seconds,
+        "execution_time_seconds": round(elapsed, 3),
+        "status_code": record.http_status,
+        "failure_class": "timeout" if timeout_failure_note(record) else "",
+    }
     if record.data is not None:
-        return dict(record.data)
+        output = dict(record.data)
+        output["_runner_metadata"] = metadata
+        return output
     return {
         "ok": False,
         "_runner_error": record.error,
         "_http_status": record.http_status,
         "_raw_response": record.raw_text[:4000],
+        "_runner_metadata": metadata,
     }
 
 
-def summarize_case(case: Case, record: ResponseRecord, elapsed: float, expect_live_ai: bool) -> Dict[str, Any]:
+def summarize_case(
+    case: Case,
+    record: ResponseRecord,
+    elapsed: float,
+    timeout_seconds: float,
+    expect_live_ai: bool,
+) -> Dict[str, Any]:
     data = dict(record.data or {})
     warnings = _string_list(data.get("warnings", []))
     credentials = data.get("credentials", {}) if isinstance(data.get("credentials"), Mapping) else {}
@@ -309,10 +384,14 @@ def summarize_case(case: Case, record: ResponseRecord, elapsed: float, expect_li
     experience = data.get("experience", {}) if isinstance(data.get("experience"), Mapping) else {}
     readiness_status = search_readiness_status(data)
     classification, notes = classify_result(case.source_text, record, expect_live_ai)
+    failure_class = failure_class_for(classification)
 
     return {
         "id": case.id,
         "http_status": record.http_status,
+        "status_code": record.http_status,
+        "source_chars": len(case.source_text),
+        "timeout_seconds": timeout_seconds,
         "ok": data.get("ok"),
         "engine": data.get("engine", ""),
         "fallback_used": data.get("fallback_used"),
@@ -332,6 +411,7 @@ def summarize_case(case: Case, record: ResponseRecord, elapsed: float, expect_li
         "location.normalized": location.get("normalized", ""),
         "experience.minimum_years": experience.get("minimum_years", ""),
         "execution_time_seconds": round(elapsed, 3),
+        "failure_class": failure_class,
         "result_classification": classification,
         "notes": "; ".join(notes),
     }
@@ -341,7 +421,10 @@ def classify_result(source_text: str, record: ResponseRecord, expect_live_ai: bo
     data = dict(record.data or {})
     warnings = _string_list(data.get("warnings", []))
     notes: List[str] = []
+    timeout_note = timeout_failure_note(record)
 
+    if timeout_note:
+        return FAIL_TIMEOUT, [timeout_note]
     if record.http_status != 200:
         return FAIL_TECHNICAL, [record.error or f"http_status={record.http_status}"]
     if record.data is None:
@@ -386,6 +469,31 @@ def classify_result(source_text: str, record: ResponseRecord, expect_live_ai: bo
         return WARN, warning_notes
 
     return PASS, notes
+
+
+def timeout_failure_note(record: ResponseRecord) -> str:
+    error = str(record.error or "")
+    if record.http_status == 504:
+        return "timeout_504"
+    if record.http_status in {408, 524}:
+        return f"timeout_{record.http_status}"
+    if re.search(r"\b(?:timeout|timed\s*out|read\s+operation\s+timed\s+out)\b", error, re.I):
+        return "request_timeout"
+    return ""
+
+
+def failure_class_for(classification: str) -> str:
+    if classification == FAIL_TIMEOUT:
+        return "timeout"
+    if classification == FAIL_SCHEMA:
+        return "schema"
+    if classification == FAIL_PROVIDER:
+        return "provider"
+    if classification == FAIL_FALLBACK:
+        return "fallback"
+    if classification.startswith("FAIL_"):
+        return "technical"
+    return ""
 
 
 def _empty_core_output(data: Mapping[str, Any]) -> bool:
@@ -894,7 +1002,32 @@ def parse_args() -> argparse.Namespace:
         default=os.getenv("CVBRAIN_KEY") or os.getenv("CVBRAIN_INTAKE_API_KEY") or "",
         help="API key. If omitted, reads CVBRAIN_KEY or CVBRAIN_INTAKE_API_KEY.",
     )
-    parser.add_argument("--timeout", type=float, default=120.0, help="Per-request timeout in seconds.")
+    parser.add_argument(
+        "--timeout",
+        dest="timeout_seconds",
+        type=float,
+        default=None,
+        help="Legacy alias for --timeout-seconds. Overrides dynamic timeout when provided.",
+    )
+    parser.add_argument(
+        "--timeout-seconds",
+        dest="timeout_seconds",
+        type=float,
+        default=None,
+        help="Fixed per-request timeout. Omit to use source-length dynamic timeout.",
+    )
+    parser.add_argument(
+        "--max-timeout-seconds",
+        type=float,
+        default=DEFAULT_MAX_TIMEOUT_SECONDS,
+        help="Maximum dynamic timeout when --timeout-seconds is omitted.",
+    )
+    parser.add_argument(
+        "--service-timeout-seconds",
+        type=float,
+        default=float(os.getenv("CVBRAIN_SERVICE_TIMEOUT_SECONDS", "0") or 0),
+        help="Known service timeout for warnings only. Reads CVBRAIN_SERVICE_TIMEOUT_SECONDS when set.",
+    )
     parser.add_argument("--sleep-seconds", type=float, default=1.0, help="Sleep between requests.")
     parser.add_argument("--expected-count", type=int, default=100, help="Expected number of parsed cases.")
     parser.add_argument(
@@ -913,18 +1046,36 @@ def main() -> int:
     cases = parse_fixture(args.input)
     validate_case_sequence(cases, args.expected_count)
     url = endpoint_url(args.url)
+    computed_timeouts = [
+        timeout_for_case(case, args.timeout_seconds, args.max_timeout_seconds)
+        for case in cases
+    ]
+    max_computed_timeout = max(computed_timeouts) if computed_timeouts else 0
 
     print(f"Parsed cases: {len(cases)}")
     print(f"URL: {url}")
     print(f"API_KEY_LENGTH: {len(args.api_key)}")
     print(f"Output: {args.out}")
+    if args.timeout_seconds is None:
+        print(
+            "Timeout mode: dynamic "
+            f"(max_computed={max_computed_timeout:g}s, max_allowed={args.max_timeout_seconds:g}s)"
+        )
+    else:
+        print(f"Timeout mode: fixed ({args.timeout_seconds:g}s)")
+    if args.service_timeout_seconds and max_computed_timeout > args.service_timeout_seconds:
+        print(
+            "WARNING: computed request timeout exceeds configured service timeout "
+            f"({max_computed_timeout:g}s > {args.service_timeout_seconds:g}s)."
+        )
 
     result = run_fixture(
         cases,
         out_dir=args.out,
         url=url,
         api_key=args.api_key,
-        timeout=args.timeout,
+        timeout=args.timeout_seconds,
+        max_timeout_seconds=args.max_timeout_seconds,
         sleep_seconds=args.sleep_seconds,
         expect_live_ai=not args.no_expect_live_ai,
     )
