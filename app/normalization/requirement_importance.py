@@ -519,6 +519,8 @@ def _has_requirement_signal(source_text: str, normalized_text: str, importance: 
         return True
     if _is_credential_text(source) or _is_credential_text(normalized_text):
         return True
+    if importance == MUST_HAVE and folded_text.startswith("con "):
+        return True
     if folded_text.startswith(("experiencia ", "conocimientos ", "manejo ", "dominio ")):
         return True
     if folded_text in {"buena comunicacion", "registro de tickets", "disponibilidad para viajar"}:
@@ -938,6 +940,8 @@ def _is_alternative_fragment_key(fragment_key: str, composite_key: str) -> bool:
     tokens = fragment_key.split()
     if len(tokens) > 5:
         return False
+    if re.search(r"[^a-z0-9áéíóúñü\s]", fragment_key):
+        return fragment_key in composite_key
     return re.search(rf"\b{re.escape(fragment_key)}\b", composite_key) is not None
 
 
@@ -1141,6 +1145,7 @@ def _requirement_concept_key(text: str) -> str:
         r"^contar\s+con\s+",
         r"^tener\s+",
         r"^poseer\s+",
+        r"^certificacion(?:es)?\s+(?:en\s+)?",
         r"^experiencia\s+(?:en|con)\s+",
         r"^experiencia\s+(?!(?:en|con)\b)",
         r"^manejo\s+de\s+",
@@ -1259,7 +1264,21 @@ def _normalize_blocker_list(items: Iterable[str]) -> List[str]:
 
 
 def _dedupe_blocker_components(items: List[str]) -> List[str]:
-    keys = [_blocker_concept_key(item) for item in items]
+    by_key: Dict[str, str] = {}
+    order: List[str] = []
+    for item in items:
+        key = _blocker_concept_key(item)
+        if not key:
+            continue
+        if key not in by_key:
+            by_key[key] = item
+            order.append(key)
+            continue
+        if _should_replace_duplicate_blocker(by_key[key], item):
+            by_key[key] = item
+
+    deduped = [by_key[key] for key in order if key in by_key]
+    keys = [_blocker_concept_key(item) for item in deduped]
     remove_indexes = set()
     for index, key in enumerate(keys):
         if not key:
@@ -1271,7 +1290,15 @@ def _dedupe_blocker_components(items: List[str]) -> List[str]:
             if _component_key_inside(key, other_key):
                 remove_indexes.add(index)
                 break
-    return [item for index, item in enumerate(items) if index not in remove_indexes]
+    return [item for index, item in enumerate(deduped) if index not in remove_indexes]
+
+
+def _should_replace_duplicate_blocker(existing: str, candidate: str) -> bool:
+    existing_no_avanzar = _fold(existing).startswith("no avanzar")
+    candidate_no_avanzar = _fold(candidate).startswith("no avanzar")
+    if candidate_no_avanzar != existing_no_avanzar:
+        return candidate_no_avanzar
+    return len(candidate) > len(existing)
 
 
 def _blocker_concept_key(text: str) -> str:

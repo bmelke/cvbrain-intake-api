@@ -383,6 +383,7 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Experiencia con WMS" in system_prompt
     assert "Libreta de conducir será valorable si debe recorrer servicios" in system_prompt
     assert "Debe manejar métricas, calidad, ausentismo, turnos, coaching" in system_prompt
+    assert "Es excluyente experiencia en RRHH generalista, con exposición a conflictos laborales" in system_prompt
     assert "Orphan fragment contract:" in system_prompt
     assert "La persona deberá" in system_prompt
     assert "La persona deberá liderar pagos" in system_prompt
@@ -390,6 +391,7 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Industria alimenticia busca Especialista en Compras para gestionar proveedores" in system_prompt
     assert "Duplicate/component contract:" in system_prompt
     assert "Base técnica comprobable en redes" in system_prompt
+    assert "Certificación Security+" in system_prompt
     assert "Negative-fragment contract:" in system_prompt
     assert "ni perfiles" in system_prompt
 

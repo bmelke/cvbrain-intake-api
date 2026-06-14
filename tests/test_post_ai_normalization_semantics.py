@@ -1048,6 +1048,29 @@ def test_hard_parent_cue_inherits_to_every_comma_list_sibling():
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_hard_parent_cue_preserves_dependent_con_fragment():
+    source_text = (
+        "Es excluyente experiencia en RRHH generalista, con exposición a conflictos laborales "
+        "y gestión de personas en operación."
+    )
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item("Experiencia en RRHH generalista", "preferred"),
+                requirement_item("Exposición a conflictos laborales", "preferred"),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert flat["should_have"] == []
+    must = fold(flat["must_have"])
+    assert "experiencia en rrhh generalista" in must
+    assert "conflictos laborales" in must
+    assert "gestion de personas en operacion" in must
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_debe_manejar_alternative_tool_list_is_must_have():
     source_text = "Debe manejar Adobe y/o Figma con criterio visual sólido."
     normalized, flat = normalize_and_flatten(
@@ -1332,6 +1355,38 @@ def test_blocker_component_and_aggregate_duplicates_collapse_to_larger_blocker()
 
     assert flat["blockers"] == ["No avanzar perfiles sin experiencia corporativa y perfiles junior"]
     assert normalized["requirements"]["blockers"] == flat["blockers"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_blocker_duplicate_with_and_without_no_avanzar_prefers_prefixed_blocker():
+    normalized, flat = normalize_and_flatten(
+        {
+            "blockers": [
+                "Sin experiencia documentada en calidad",
+                "No avanzar perfiles sin experiencia documentada en calidad",
+            ],
+        }
+    )
+
+    assert flat["blockers"] == ["No avanzar perfiles sin experiencia documentada en calidad"]
+    assert normalized["requirements"]["blockers"] == flat["blockers"]
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_alternative_certification_aggregate_removes_component_duplicates():
+    aggregate = "Security+, Cisco, Microsoft o similares"
+    normalized, flat = normalize_and_flatten(
+        {
+            "nice_to_have": [
+                requirement_item("Certificación Security+", "nice_to_have"),
+                requirement_item("Certificación Cisco", "nice_to_have"),
+                requirement_item("Certificación Microsoft", "nice_to_have"),
+                requirement_item(aggregate, "nice_to_have"),
+            ],
+        }
+    )
+
+    assert flat["nice_to_have"] == [aggregate]
     assert_flat_matches_nested_requirements(normalized, flat)
 
 

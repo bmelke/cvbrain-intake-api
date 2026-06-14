@@ -495,25 +495,35 @@ def semantic_review_notes(source_text: str, data: Mapping[str, Any]) -> List[str
     notes: List[str] = []
     source = _fold(source_text)
     location = data.get("location", {}) if isinstance(data.get("location"), Mapping) else {}
+    work_modality = _fold(str(data.get("work_modality", "") or location.get("work_modality", "")))
     location_normalized = _fold(str(location.get("normalized", "")))
     experience = data.get("experience", {}) if isinstance(data.get("experience"), Mapping) else {}
     role_title = _fold(str(data.get("role_title", "")))
     seniority = _fold(str(experience.get("seniority", "")))
+    source_has_hybrid = bool(re.search(r"\b(hibrido|híbrido|hybrid)\b", source))
+    source_has_remote = bool(re.search(r"\bremoto|remote\b", source))
 
     for city in ("montevideo", "canelones"):
         if city in source and city not in location_normalized:
             notes.append(f"location_review:{city}_missing")
 
     if (
-        re.search(r"\b(hibrido|híbrido|hybrid)\b", source)
+        source_has_hybrid
         and location.get("hybrid_allowed") is not True
-        and not _hybrid_modality_is_usable(location)
+        and not _hybrid_modality_is_usable(location, work_modality)
     ):
         notes.append("modality_review:hybrid_missing")
     if (
-        re.search(r"\bremoto|remote\b", source)
+        source_has_remote
         and location.get("remote_allowed") is not True
-        and not _remote_modality_is_usable(location)
+        and not _remote_modality_is_usable(location, work_modality)
+        and not (
+            source_has_hybrid
+            and (
+                location.get("hybrid_allowed") is True
+                or _hybrid_modality_is_usable(location, work_modality)
+            )
+        )
     ):
         notes.append("modality_review:remote_missing")
     if "presencial" in source and location.get("remote_allowed") is True:
@@ -533,16 +543,16 @@ def semantic_review_notes(source_text: str, data: Mapping[str, Any]) -> List[str
     return notes
 
 
-def _hybrid_modality_is_usable(location: Mapping[str, Any]) -> bool:
+def _hybrid_modality_is_usable(location: Mapping[str, Any], work_modality: str = "") -> bool:
     raw = _fold(str(location.get("raw", "")))
     normalized = _fold(str(location.get("normalized", "")))
-    return bool(re.search(r"\b(hibrido|hybrid)\b", f"{raw} {normalized}"))
+    return bool(re.search(r"\b(hibrido|hybrid)\b", f"{raw} {normalized} {work_modality}"))
 
 
-def _remote_modality_is_usable(location: Mapping[str, Any]) -> bool:
+def _remote_modality_is_usable(location: Mapping[str, Any], work_modality: str = "") -> bool:
     raw = _fold(str(location.get("raw", "")))
     normalized = _fold(str(location.get("normalized", "")))
-    return bool(re.search(r"\b(remoto|remote)\b", f"{raw} {normalized}"))
+    return bool(re.search(r"\b(remoto|remote)\b", f"{raw} {normalized} {work_modality}"))
 
 
 def _source_without_blocker_clauses(source_text: str) -> str:

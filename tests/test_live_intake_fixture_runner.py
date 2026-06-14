@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER_PATH = ROOT / "scripts" / "run_live_intake_fixture.py"
 FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_100_busquedas_hr_realistas_sin_role_hint.txt"
+CHALLENGE_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_50_challenge_plus_regressions.txt"
 
 spec = importlib.util.spec_from_file_location("run_live_intake_fixture", RUNNER_PATH)
 runner = importlib.util.module_from_spec(spec)
@@ -27,6 +28,40 @@ def test_live_intake_parser_reads_exactly_100_real_search_cases():
         assert "BUSQUEDA_" not in case.source_text
         assert "END_BUSQUEDA_" not in case.source_text
         assert "role_hint" not in case.source_text.lower()
+
+
+def test_challenge_fixture_reads_65_cases_and_keeps_old_regressions_exact():
+    original_cases = {case.id: case.source_text for case in runner.parse_fixture(FIXTURE_PATH)}
+    challenge_cases = runner.parse_fixture(CHALLENGE_FIXTURE_PATH)
+    regression_mapping = {
+        "BUSQUEDA_051": "BUSQUEDA_005",
+        "BUSQUEDA_052": "BUSQUEDA_006",
+        "BUSQUEDA_053": "BUSQUEDA_009",
+        "BUSQUEDA_054": "BUSQUEDA_018",
+        "BUSQUEDA_055": "BUSQUEDA_025",
+        "BUSQUEDA_056": "BUSQUEDA_035",
+        "BUSQUEDA_057": "BUSQUEDA_036",
+        "BUSQUEDA_058": "BUSQUEDA_057",
+        "BUSQUEDA_059": "BUSQUEDA_060",
+        "BUSQUEDA_060": "BUSQUEDA_061",
+        "BUSQUEDA_061": "BUSQUEDA_069",
+        "BUSQUEDA_062": "BUSQUEDA_090",
+        "BUSQUEDA_063": "BUSQUEDA_013",
+        "BUSQUEDA_064": "BUSQUEDA_054",
+        "BUSQUEDA_065": "BUSQUEDA_081",
+    }
+
+    runner.validate_case_sequence(challenge_cases, 65)
+    assert len(challenge_cases[:50]) == 50
+    for case in challenge_cases:
+        assert case.source_text.strip()
+        assert "BUSQUEDA_" not in case.source_text
+        assert "END_BUSQUEDA_" not in case.source_text
+        assert "role_hint" not in case.source_text.lower()
+
+    by_id = {case.id: case.source_text for case in challenge_cases}
+    for challenge_id, original_id in regression_mapping.items():
+        assert by_id[challenge_id] == original_cases[original_id]
 
 
 def test_build_request_sends_only_real_hr_text_and_allowed_payload_fields():
@@ -273,6 +308,21 @@ def test_runner_does_not_warn_when_remote_hybrid_is_preserved_in_location_text()
         successful_record(
             role_title="Implementador",
             location={"raw": "Remoto/híbrido", "normalized": "Remoto/híbrido", "hybrid_allowed": True},
+        ),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_does_not_warn_when_remote_hybrid_is_modeled_as_hybrid_modality():
+    classification, notes = runner.classify_result(
+        "Software house busca Implementador. Remoto/híbrido.",
+        successful_record(
+            role_title="Implementador",
+            work_modality="hybrid",
+            location={"raw": "", "normalized": "", "hybrid_allowed": True},
         ),
         expect_live_ai=True,
     )

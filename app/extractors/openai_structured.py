@@ -123,6 +123,7 @@ Requirement list inheritance contract:
 - "Se valorará experiencia con TMS, WMS, Excel y tableros" means Experiencia con TMS, Experiencia con WMS, Experiencia con Excel, and Experiencia con tableros are all nice_to_have.
 - "Debe manejar métricas, calidad, ausentismo, turnos, coaching" means every listed item is must_have.
 - "Debe manejar Adobe y/o Figma" is must_have.
+- "Es excluyente experiencia en RRHH generalista, con exposición a conflictos laborales y gestión de personas en operación" means the base experience and the dependent "con..." fragment remain must_have; do not drop the dependent fragment when splitting.
 - "Libreta de conducir será valorable si debe recorrer servicios" means Libreta de conducir is nice_to_have, not must_have.
 - Do not promote a weak/nice item to must_have merely because the phrase later says "si debe" or describes a possible duty.
 - Only keep a weak/nice item as must_have if the same item has an explicit stronger hard cue such as excluyente, obligatorio, imprescindible, requisito excluyente, no avanzar sin, or debe tener sí o sí.
@@ -154,6 +155,7 @@ Duplicate/component contract:
 - If the larger phrase is an awkward aggregate of clean independent criteria, keep the clean independent criteria and drop the aggregate.
 - Avoid pairs like "Base técnica comprobable en redes" and "Base técnica en redes"; keep the most complete source-faithful phrasing.
 - Avoid duplicate blockers that repeat the same exclusion in shorter and longer forms.
+- Avoid outputting both "Certificación Security+", "Certificación Cisco", "Certificación Microsoft" and "Security+, Cisco, Microsoft o similares"; keep the aggregate OR-list.
 - Do not break OR-lists.
 - Do not collapse independent criteria.
 """
