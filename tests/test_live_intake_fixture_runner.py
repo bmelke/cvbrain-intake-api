@@ -11,6 +11,7 @@ RUNNER_PATH = ROOT / "scripts" / "run_live_intake_fixture.py"
 FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_100_busquedas_hr_realistas_sin_role_hint.txt"
 CHALLENGE_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_50_challenge_plus_regressions.txt"
 CHALLENGE_V2_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_50_challenge_v2_plus_failures.txt"
+CHALLENGE_V3_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_50_challenge_v3_plus_importance_regression.txt"
 
 spec = importlib.util.spec_from_file_location("run_live_intake_fixture", RUNNER_PATH)
 runner = importlib.util.module_from_spec(spec)
@@ -93,6 +94,20 @@ def test_challenge_v2_fixture_reads_59_cases_and_keeps_previous_failures_exact()
     by_id = {case.id: case.source_text for case in challenge_cases}
     for challenge_id, previous_id in regression_mapping.items():
         assert by_id[challenge_id] == previous_cases[previous_id]
+
+
+def test_challenge_v3_fixture_reads_51_cases_and_keeps_importance_regression_exact():
+    previous_cases = {case.id: case.source_text for case in runner.parse_fixture(CHALLENGE_V2_FIXTURE_PATH)}
+    challenge_cases = runner.parse_fixture(CHALLENGE_V3_FIXTURE_PATH)
+
+    runner.validate_case_sequence(challenge_cases, 51)
+    assert len(challenge_cases[:50]) == 50
+    for case in challenge_cases:
+        assert case.source_text.strip()
+        assert "BUSQUEDA_" not in case.source_text
+        assert "END_BUSQUEDA_" not in case.source_text
+        assert "role_hint" not in case.source_text.lower()
+    assert challenge_cases[-1].source_text == previous_cases["BUSQUEDA_001"]
 
 
 def test_build_request_sends_only_real_hr_text_and_allowed_payload_fields():
@@ -391,6 +406,57 @@ def test_runner_fails_when_valorable_with_conditional_debe_is_promoted_to_must_h
     classification, notes = runner.classify_result(
         "Libreta de conducir será valorable si debe recorrer servicios.",
         successful_record(must_have=["Libreta de conducir"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_IMPORTANCE
+    assert any(note.startswith("weak_modifier_over_promoted:must_have:") for note in notes)
+
+
+@pytest.mark.parametrize(
+    ("source_text", "must_item"),
+    [
+        (
+            "Empresa busca rol con experiencia excluyente en producción continua. Se valorará experiencia en mejora continua.",
+            "Experiencia excluyente en producción continua",
+        ),
+        (
+            "Empresa busca rol con experiencia obligatoria en coordinación de mostradores. Conocimiento de nomencladores será valorable.",
+            "Experiencia obligatoria en coordinación de mostradores",
+        ),
+        (
+            "Empresa busca rol con experiencia imprescindible en seguridad industrial. ISO 14001 será valorable.",
+            "Experiencia imprescindible en seguridad industrial",
+        ),
+        (
+            "Empresa busca rol con experiencia requerida en documentación GMP. Inglés técnico será un plus.",
+            "Experiencia requerida en documentación GMP",
+        ),
+        (
+            "Empresa busca rol que debe contar con experiencia en producción, mantenimiento y seguridad. SAP será valorable.",
+            "Mantenimiento",
+        ),
+        (
+            "Empresa busca rol. Es obligatorio conocimiento de SAP, Excel y Power BI. Python será valorable.",
+            "Excel",
+        ),
+    ],
+)
+def test_runner_does_not_flag_explicit_hard_cue_as_weak_over_promoted(source_text, must_item):
+    classification, notes = runner.classify_result(
+        source_text,
+        successful_record(must_have=[must_item], nice_to_have=["Automatización"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_keeps_failing_true_weak_over_promoted_experience():
+    classification, notes = runner.classify_result(
+        "Se valorará experiencia en mejora continua y Lean.",
+        successful_record(must_have=["Experiencia en mejora continua"]),
         expect_live_ai=True,
     )
 

@@ -387,6 +387,7 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Libreta de conducir será valorable si debe recorrer servicios" in system_prompt
     assert "Debe manejar métricas, calidad, ausentismo, turnos, coaching" in system_prompt
     assert "Es excluyente experiencia en RRHH generalista, con exposición a conflictos laborales" in system_prompt
+    assert "Hard cues beat weak/contextual experience heuristics" in system_prompt
     assert "Orphan fragment contract:" in system_prompt
     assert "La persona deberá" in system_prompt
     assert "La persona deberá liderar pagos" in system_prompt

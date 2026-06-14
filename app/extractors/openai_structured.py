@@ -135,6 +135,8 @@ Requirement list inheritance contract:
 - "Libreta de conducir será valorable si debe recorrer servicios" means Libreta de conducir is nice_to_have, not must_have.
 - Do not promote a weak/nice item to must_have merely because the phrase later says "si debe" or describes a possible duty.
 - Only keep a weak/nice item as must_have if the same item has an explicit stronger hard cue such as excluyente, obligatorio, imprescindible, requisito excluyente, no avanzar sin, or debe tener sí o sí.
+- Hard cues beat weak/contextual experience heuristics: experiencia excluyente, experiencia obligatoria, experiencia imprescindible, experiencia requerida, experiencia sí o sí, debe contar con experiencia, es excluyente experiencia, es obligatorio experiencia, imprescindible experiencia.
+- If a parent hard cue governs a list, all dependent siblings remain hard unless a sibling has its own local weak modifier.
 - Do not allow comma-splitting to lose the parent cue.
 
 Orphan fragment contract:

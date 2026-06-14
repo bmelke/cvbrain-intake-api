@@ -100,6 +100,18 @@ HARD_MODIFIER_PATTERN = re.compile(
     r")\b",
     re.I,
 )
+EXPLICIT_HARD_CUE_PATTERN = re.compile(
+    r"\b(?:"
+    r"experiencia\s+(?:excluyente|obligatori[oa]|imprescindible|requerid[oa]|s[ií]\s+o\s+s[ií])|"
+    r"debe\s+contar\s+con\s+experiencia|"
+    r"es\s+(?:excluyente|obligatori[oa])\s+experiencia|"
+    r"imprescindible\s+experiencia|"
+    r"es\s+obligatori[oa]\s+conocimiento|"
+    r"conocimiento\s+.+?\s+es\s+obligatori[oa]|"
+    r"debe\s+manejar|debe\s+tener|debe\s+contar\s+con"
+    r")\b",
+    re.I,
+)
 BLOCKER_CLAUSE_PATTERN = re.compile(
     r"\b(no\s+avanzar|no\s+presentarse\s+si\s+no|no\s+considerar)\b",
     re.I,
@@ -535,6 +547,8 @@ def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]
 
     for bucket in ("must_have", "should_have"):
         for item in _string_list(data.get(bucket, [])):
+            if _explicit_hard_cue_governs_item(item, hard_clauses):
+                continue
             if any(_clause_matches_item(clause, item) for clause in weak_clauses):
                 notes.append(f"weak_modifier_over_promoted:{bucket}:{item}")
 
@@ -652,6 +666,15 @@ def modifier_clauses(
         if include.search(clean) and not (exclude and exclude.search(clean)):
             clauses.append(clean)
     return clauses
+
+
+def _explicit_hard_cue_governs_item(item: str, hard_clauses: Iterable[str]) -> bool:
+    if EXPLICIT_HARD_CUE_PATTERN.search(item):
+        return True
+    return any(
+        EXPLICIT_HARD_CUE_PATTERN.search(clause) and _clause_matches_item(clause, item)
+        for clause in hard_clauses
+    )
 
 
 def _clause_matches_item(clause: str, item: str) -> bool:
