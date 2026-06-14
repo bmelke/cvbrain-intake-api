@@ -397,6 +397,11 @@ def title_casing_notes_for(source_text: str, data: Mapping[str, Any]) -> List[st
     role_title = str(data.get("role_title", "")).strip()
     if not role_title:
         return []
+    explicit_source_title = _explicit_source_role_title_span(source_text)
+    if explicit_source_title and explicit_source_title != role_title:
+        if _fold(explicit_source_title) == _fold(role_title):
+            return [f"title_casing_mismatch:{explicit_source_title}!={role_title}"]
+        return [f"title_source_span_mismatch:{explicit_source_title}!={role_title}"]
     source_span = _matching_source_span(source_text, role_title)
     if source_span and source_span != role_title:
         return [f"title_casing_mismatch:{source_span}!={role_title}"]
@@ -413,6 +418,77 @@ def orphan_fragment_notes(data: Mapping[str, Any]) -> List[str]:
             if _is_incomplete_para_tail(item):
                 notes.append(f"orphan_fragment:{bucket}:{item}")
     return notes
+
+
+def _explicit_source_role_title_span(source_text: str) -> str:
+    source = " ".join(str(source_text or "").split())
+    if not source:
+        return ""
+    patterns = (
+        re.compile(
+            r"\b(?:busca|buscamos|selecciona|seleccionamos|incorpora|incorporar|"
+            r"contrata|requiere|necesita|necesitamos|rol\s*:|se\s+busca)\s+"
+            r"(?:(?:un|una|el|la|un/a)\s+)?(?P<tail>.{0,180})",
+            re.I | re.S,
+        ),
+        re.compile(
+            r"\b(?:posici[oó]n|puesto|perfil|vacante)\s+de\s+"
+            r"(?:(?:un|una|el|la|un/a)\s+)?(?P<tail>.{0,180})",
+            re.I | re.S,
+        ),
+    )
+    for pattern in patterns:
+        for lead in pattern.finditer(source):
+            title = _source_title_from_tail(lead.group("tail"))
+            if title:
+                return title
+    return ""
+
+
+def _source_title_from_tail(text: str) -> str:
+    text = re.split(r"[.;]", str(text or ""), maxsplit=1)[0]
+    title = re.sub(
+        r"(?:[.;:]\s*)?\b(?:es\s+excluyente|excluyente|la\s+persona|se\s+requiere|debe|"
+        r"deseable|valorable|ser[aá]\s+valorable|no\s+avanzar|con|para)\b.*$",
+        "",
+        text,
+        flags=re.I | re.S,
+    )
+    title = re.sub(r"^(?:un|una|el|la|un/a)\s+", "", title.strip(), flags=re.I)
+    title = re.sub(r"\s+", " ", title).strip(" -:.,;\t\r\n")
+    if not title or len(title.split()) > 9:
+        return ""
+    if _is_rejected_source_title(title):
+        return ""
+    return title if _looks_source_title_span(title) else ""
+
+
+def _is_rejected_source_title(title: str) -> bool:
+    folded = _fold(title)
+    return bool(
+        not folded
+        or folded in {"empresa", "consultora", "startup", "agencia", "empresa de software"}
+        or re.match(r"^(?:empresa|consultora|startup|agencia|soporte\s+b2b)\b", folded)
+    )
+
+
+def _looks_source_title_span(title: str) -> bool:
+    folded = _fold(title)
+    if re.search(
+        r"\b(?:administrativ[oa]|abogad[oa]|agente|analista|arquitect[oa]|asistente|comprador[ae]?|"
+        r"coordinador[ae]?|consultor[ae]?|dibujante|disenador[ae]?|diseñador[ae]?|ejecutiv[oa]|"
+        r"encargad[oa]|gerente|ingenier[oa]|jefe|jefa|licenciad[oa]|operari[oa]|planificador[ae]?|"
+        r"responsable|supervisor[ae]?|tecnic[oa]|t[eé]cnic[oa]|vendedor[ae]?)\b",
+        folded,
+    ):
+        return True
+    return bool(
+        re.search(
+            r"\b(?:manager|specialist|consultant|engineer|owner|analyst|lead|writer|designer|"
+            r"developer|coordinator|architect|support|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
+            folded,
+        )
+    )
 
 
 def _matching_source_span(source_text: str, value: str) -> str:

@@ -371,6 +371,9 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Do not apply English title case, Spanish title case, sentence case" in system_prompt
     assert "Do not title-case Spanish titles unless the source itself is title-cased." in system_prompt
     assert "QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP" in system_prompt
+    assert "Coordinador/a de Admisiones" in system_prompt
+    assert "Technical Support Specialist" in system_prompt
+    assert "Consultora tecnológica" in system_prompt
     assert "Public output contract:" in system_prompt
     assert "Source_text_span_missing_from_rules" in system_prompt
     assert "Source_text_" in system_prompt
@@ -473,6 +476,46 @@ def test_nested_spanish_job_title_wins_over_english_normalized_title(source_text
             "Agencia digital busca Redactor UX para contenidos de producto.",
             "UX Writer",
             "Redactor UX",
+        ),
+        (
+            "Clínica privada busca Coordinador/a de Admisiones con experiencia en salud.",
+            "Coordinador",
+            "Coordinador/a de Admisiones",
+        ),
+        (
+            "Empresa constructora busca Arquitecto/a de Obra con experiencia en dirección de obra.",
+            "Arquitecto",
+            "Arquitecto/a de Obra",
+        ),
+        (
+            "Importadora busca Comprador Técnico con experiencia en repuestos industriales.",
+            "Técnico",
+            "Comprador Técnico",
+        ),
+        (
+            "Consultora de RRHH busca Payroll Specialist con experiencia en liquidación de sueldos.",
+            "Consultora de RRHH",
+            "Payroll Specialist",
+        ),
+        (
+            "Agencia creativa busca Diseñador/a UX/UI con experiencia en research.",
+            "Diseñador",
+            "Diseñador/a UX/UI",
+        ),
+        (
+            "Empresa de software busca Technical Support Specialist con experiencia en soporte B2B.",
+            "soporte B2B",
+            "Technical Support Specialist",
+        ),
+        (
+            "Consultora tecnológica busca Scrum Master con experiencia facilitando ceremonias ágiles.",
+            "Consultora tecnológica",
+            "Scrum Master",
+        ),
+        (
+            "Empresa inmobiliaria busca Agente Comercial con experiencia en captación de propiedades.",
+            "Sales Agent",
+            "Agente Comercial",
         ),
     ],
 )
@@ -890,6 +933,8 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "If source_text is Spanish, write those user-facing fields in Spanish." in repair_prompt
     assert "Case contract:" in repair_prompt
     assert "For output, incoming source case wins." in repair_prompt
+    assert "Do not return a public API envelope" in repair_prompt
+    assert "Agente Comercial" in repair_prompt
     assert "Public output contract:" in repair_prompt
     assert "Source_text_span_missing_from_rules" in repair_prompt
     assert "classification_rationale_id_missing" in repair_prompt
@@ -899,6 +944,35 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "Duplicate/component contract:" in repair_prompt
     assert "Negative-fragment contract:" in repair_prompt
     assert "Software Architect" in repair_user_prompt
+
+
+def test_ai_schema_repair_recovers_from_public_error_stub_for_normal_recruiter_prose():
+    repaired_payload = role_title_payload("Agente Comercial")
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"output_parsed": {"ok": False, "warnings": ["ai_schema_validation_failed"], "engine": "openai"}},
+            {"output_parsed": repaired_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+    source_text = (
+        "Empresa inmobiliaria busca Agente Comercial con experiencia en captación de propiedades, "
+        "negociación, seguimiento de clientes y cierre de operaciones."
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert result["ai_schema_repaired"] is True
+    assert result["role_title"] == "Agente Comercial"
+    assert len(fake_client.responses.calls) == 2
 
 
 def test_ai_invalid_json_repair_success_returns_openai_result_with_marker():

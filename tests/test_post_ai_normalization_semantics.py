@@ -1026,6 +1026,46 @@ def test_soft_parent_cue_inherits_to_every_comma_list_sibling():
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_soft_parent_cue_inherits_across_y_list_for_analytics_tools():
+    source_text = "Se valorará experiencia con GA4 y Looker Studio."
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item("GA4", "preferred"),
+                requirement_item("Looker Studio", "preferred"),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert flat["must_have"] == []
+    assert flat["should_have"] == []
+    nice = fold(flat["nice_to_have"])
+    assert "ga4" in nice
+    assert "looker studio" in nice
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_soft_parent_cue_inherits_to_libreta_and_vehiculo_plural_phrase():
+    source_text = "Libreta y vehículo serán valorables."
+    normalized, flat = normalize_and_flatten(
+        {
+            "should_have": [
+                requirement_item("Libreta", "preferred"),
+                requirement_item("Vehículo", "preferred"),
+            ],
+        },
+        source_text=source_text,
+    )
+
+    assert flat["must_have"] == []
+    assert flat["should_have"] == []
+    nice = fold(flat["nice_to_have"])
+    assert "libreta" in nice
+    assert "vehiculo" in nice
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_hard_parent_cue_inherits_to_every_comma_list_sibling():
     source_text = "Debe manejar métricas, calidad, ausentismo, turnos y coaching."
     normalized, flat = normalize_and_flatten(

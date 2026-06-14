@@ -76,6 +76,10 @@ The previous model response did not validate. Return only corrected JSON that
 matches the CVBrain Job Intelligence v1 schema. Do not add commentary, markdown,
 or extra keys. Preserve the original source facts. Do not invent missing facts.
 Do not include candidate data or candidate PII.
+Do not return a public API envelope such as ok=false, warnings, engine, or
+fallback_used. Return the Job Intelligence schema object itself.
+If the invalid output was an empty error stub but the source text is normal
+recruiter prose, rebuild a valid Job Intelligence schema from the source text.
 """
 
 LANGUAGE_CONTRACT = """Language contract:
@@ -96,6 +100,10 @@ Case contract:
 - For output, incoming source case wins.
 - If the recruiter source contains an explicit role title span, preserve that source span's casing and punctuation in role_title, job_profile.job_title, and job_profile.normalized_role_title.
 - The canonical displayed title must be the literal extracted source title span after safe trimming, not a reconstructed or generated title.
+- For source patterns like "[employer/context] busca/incorpora/selecciona/requiere [role title] con/para ...", the full role title span is before con/para and must be preserved.
+- Preserve complete title spans such as Coordinador/a de Admisiones, Arquitecto/a de Obra, Comprador Técnico, Payroll Specialist, Diseñador/a UX/UI, Technical Support Specialist, Scrum Master, and Agente Comercial.
+- Do not reduce source titles to a single generic head noun such as Coordinador, Arquitecto, Técnico, Diseñador, or soporte B2B.
+- Do not use employer/context descriptors as role_title, such as Consultora de RRHH, Consultora tecnológica, Empresa de software, or Startup.
 - Do not lowercase it.
 - Do not uppercase it.
 - Do not title-case Spanish titles unless the source itself is title-cased.

@@ -230,6 +230,14 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
                 continue
             normalized_items = normalize_structured_requirement_item(item, default)
             for normalized in normalized_items:
+                source_importance = _source_modifier_importance_for_requirement(
+                    str(normalized.get("text", "")),
+                    source_text,
+                )
+                if source_importance:
+                    normalized["importance"] = source_importance
+                    normalized["hard_filter_candidate"] = source_importance == MUST_HAVE
+                    normalized["hard_filter_approved"] = False
                 target = _bucket_for_importance(str(normalized.get("importance", default)))
                 blocker = blocker_text_for_clause(str(normalized.get("source_text", "")))
                 if target == "must_have" and blocker:
@@ -537,6 +545,45 @@ def _should_normalize_requirement_text(text: str) -> bool:
 def _source_requirement_items(text: str) -> List[RequirementItem]:
     items = [_resolve_clause(clause, default) for clause, default in _iter_clauses_with_defaults(text)]
     return [item for item in items if item and item.text]
+
+
+def _source_modifier_importance_for_requirement(text: str, source_text: str) -> str:
+    item_key = _requirement_concept_key(text)
+    if not item_key or not source_text:
+        return ""
+
+    for sentence in re.split(r"[\n.;]+", source_text):
+        clean = sentence.strip(" -:.,;\t\r\n")
+        if not clean:
+            continue
+        sentence_key = _requirement_concept_key(clean)
+        if not _component_key_inside(item_key, sentence_key):
+            continue
+        hard_scan = _remove_negative_filter_modifier_text(clean)
+        if (
+            WEAK_PREFERENCE_PATTERN.search(clean)
+            and not STRONG_PREFERENCE_PATTERN.search(clean)
+            and not _has_explicit_stronger_hard_cue(hard_scan)
+        ):
+            return NICE_TO_HAVE
+        if STRONG_PREFERENCE_PATTERN.search(clean) and not HARD_PATTERN.search(hard_scan):
+            return PREFERRED
+        if HARD_PATTERN.search(hard_scan):
+            return MUST_HAVE
+    return ""
+
+
+def _remove_negative_filter_modifier_text(text: str) -> str:
+    clean = str(text)
+    clean = re.sub(
+        r",?\s*(?:pero\s+)?no\s+debe\s+usarse\s+(?:como|as)\s+filtro(?:\s+excluyente)?",
+        "",
+        clean,
+        flags=re.I,
+    )
+    clean = re.sub(r",?\s*(?:pero\s+)?no\s+es\s+requisito", "", clean, flags=re.I)
+    clean = re.sub(r",?\s*(?:pero\s+)?no\s+es\s+excluyente(?:\s+salvo\b.*)?", "", clean, flags=re.I)
+    return clean
 
 
 def _requirement_item_to_mapping(item: RequirementItem) -> Dict[str, Any]:

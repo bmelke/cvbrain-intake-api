@@ -30,16 +30,22 @@ SPANISH_TITLE_START = (
     "Administradora",
     "Administrativo",
     "Administrativa",
+    "Abogado",
+    "Abogada",
+    "Agente",
     "Analista",
     "Arquitecto",
     "Arquitecta",
     "Asistente",
+    "Comprador",
+    "Compradora",
     "Coordinador",
     "Coordinadora",
     "Consultor",
     "Consultora",
     "Desarrollador",
     "Desarrolladora",
+    "Dibujante",
     "Diseñador",
     "Diseñadora",
     "Ejecutivo",
@@ -60,6 +66,10 @@ SPANISH_TITLE_START = (
     "Periodista",
     "Operario",
     "Operaria",
+    "Planificador",
+    "Planificadora",
+    "Psicopedagogo",
+    "Psicopedagoga",
     "Responsable",
     "Redactor",
     "Redactora",
@@ -109,12 +119,13 @@ SOURCE_ROLE_LEAD_PATTERNS = (
 
 TITLE_SENTENCE_TAIL_PATTERN = re.compile(
     r"(?:[.;:]\s*)?\b(?:es\s+excluyente|excluyente|la\s+persona|se\s+requiere|debe|"
-    r"deseable|valorable|ser[aá]\s+valorable|no\s+avanzar|para)\b.*$",
+    r"deseable|valorable|ser[aá]\s+valorable|no\s+avanzar|con|para)\b.*$",
     re.I | re.S,
 )
 
 SPANISH_ROLE_PATTERN = re.compile(
     rf"\b(?:{'|'.join(SPANISH_TITLE_START)})\b"
+    r"(?:/a)?"
     r"(?:\s+(?!(?:para|con|que|deber[aá]|debe|busca|buscamos|necesita|"
     r"es|excluyente|la|se|deseable|valorable)\b)"
     r"[A-Za-zÁÉÍÓÚÜáéíóúüÑñ0-9/+.-]+){0,7}",
@@ -213,6 +224,9 @@ def _source_role_title(source_text: str) -> str:
 
     for pattern in SOURCE_ROLE_LEAD_PATTERNS:
         for lead in pattern.finditer(source):
+            title_span = _source_title_span_from_tail(lead.group("tail"))
+            if title_span:
+                return title_span
             title = _spanish_title_from_text(lead.group("tail"))
             if title:
                 return title
@@ -244,6 +258,24 @@ def _spanish_title_from_text(text: str) -> str:
     return title
 
 
+def _source_title_span_from_tail(text: str) -> str:
+    candidate = re.split(r"[.;]", str(text or ""), maxsplit=1)[0]
+    candidate = _clean_role_title(candidate)
+    candidate = re.sub(r"^(?:un|una|el|la|un/a)\s+", "", candidate, flags=re.I)
+    candidate = candidate.strip(" -:.,;\t\r\n")
+    if not candidate:
+        return ""
+    if _is_rejected_title(candidate):
+        return ""
+
+    tokens = candidate.split()
+    if len(tokens) > 9:
+        return ""
+    if _looks_spanish_title(candidate) or _looks_explicit_source_title_span(candidate):
+        return candidate
+    return ""
+
+
 def _clean_role_title(text: str) -> str:
     title = TITLE_SENTENCE_TAIL_PATTERN.sub("", str(text or ""))
     title = title.strip(" -:.,;\t\r\n")
@@ -272,6 +304,30 @@ def _looks_english_title(title: str) -> bool:
     if _is_preserved_english_title(clean):
         return True
     return bool(re.search(r"\b(?:manager|engineer|developer|representative|receptionist|auditor|assistant|analyst|visitor)\b", clean, re.I))
+
+
+def _looks_explicit_source_title_span(title: str) -> bool:
+    clean = _clean_role_title(title)
+    if not clean or _is_rejected_title(clean):
+        return False
+    if re.match(r"^(?:incorporar|sumar|necesita|requiere|persona|perfil)\b", clean, re.I):
+        return False
+    tokens = clean.split()
+    if not tokens or len(tokens) > 9:
+        return False
+    starts_like_title = bool(
+        re.match(r"^[A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜáéíóúüÑñ0-9/+.-]*$", tokens[0])
+        or re.search(r"/a\b", tokens[0])
+    )
+    technical_or_role_token = bool(
+        re.search(
+            r"\b(?:manager|specialist|consultant|engineer|owner|analyst|lead|writer|designer|"
+            r"developer|coordinator|architect|support|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
+            clean,
+            re.I,
+        )
+    )
+    return starts_like_title and technical_or_role_token
 
 
 def _is_preserved_english_title(title: str) -> bool:

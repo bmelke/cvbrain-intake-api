@@ -1,0 +1,257 @@
+CVBRAIN_JOB_INTAKE_CHALLENGE_V2_PLUS_FAILURES
+
+IMPORTANTE:
+- Este archivo NO incluye role_hint ni ningún metadato de rol dentro de las búsquedas.
+- Para probar el API, Codex debe enviar solamente el texto que aparece entre cada marcador BUSQUEDA_### y END_BUSQUEDA_###.
+- Los marcadores son solo separadores del fixture; no forman parte de la búsqueda real.
+- BUSQUEDA_001 a BUSQUEDA_050 son búsquedas nuevas de desafío v2.
+- BUSQUEDA_051 a BUSQUEDA_059 son regresiones copiadas exactamente del challenge anterior.
+- Mapeo de regresiones: 051=034, 052=007, 053=002, 054=012, 055=013, 056=030, 057=032, 058=044, 059=050.
+- Payload sugerido por cada caso:
+  {
+    "source_text": "<texto de la búsqueda, sin marcadores>",
+    "source_filename": "",
+    "source_mime_type": "text/plain",
+    "recruiter_notes": "",
+    "locale": "es-UY",
+    "country_context": "UY",
+    "candidate_market": "UY",
+    "employer_market": "UY"
+  }
+
+
+BUSQUEDA_001
+Empresa industrial del interior busca Gerente de Planta con experiencia excluyente en producción continua, mantenimiento, seguridad industrial y liderazgo de jefaturas. Se valorará experiencia en mejora continua y Lean. No avanzar perfiles solo administrativos sin gestión de planta.
+END_BUSQUEDA_001
+
+BUSQUEDA_002
+Grupo médico busca Responsable de Facturación Sanatorial con experiencia en liquidación a mutualistas, autorizaciones, nomencladores, auditoría de prestaciones y coordinación con admisión. Es deseable manejo de sistemas de salud. No avanzar perfiles contables sin facturación médica.
+END_BUSQUEDA_002
+
+BUSQUEDA_003
+Empresa de software para retail busca Implementation Consultant con experiencia en relevamiento, parametrización, capacitación a usuarios y puesta en marcha de soluciones SaaS. SQL básico será valorable. No avanzar soporte técnico sin implementación.
+END_BUSQUEDA_003
+
+BUSQUEDA_004
+Industria láctea busca Supervisor de Calidad con experiencia excluyente en BPM, HACCP, auditorías, liberación de producto y gestión de no conformidades. Se valorará experiencia con inocuidad alimentaria. No avanzar perfiles de laboratorio sin planta.
+END_BUSQUEDA_004
+
+BUSQUEDA_005
+Empresa de consumo masivo busca Trade Marketing Analyst con experiencia en activaciones, análisis de sell-out, materiales POP, coordinación con ventas y seguimiento de campañas. Power BI será un plus. No avanzar community managers sin trade.
+END_BUSQUEDA_005
+
+BUSQUEDA_006
+Compañía financiera busca Product Owner con experiencia en productos digitales, backlog, priorización, historias de usuario y coordinación con squads. Inglés será valorable. No avanzar project managers sin ownership de producto.
+END_BUSQUEDA_006
+
+BUSQUEDA_007
+Operador logístico busca Coordinador de Transporte con experiencia en ruteo, seguimiento de flota, trato con choferes, indicadores de entrega y resolución de incidencias. Se valorará experiencia con TMS. No avanzar perfiles solo de depósito.
+END_BUSQUEDA_007
+
+BUSQUEDA_008
+Empresa constructora busca Jefe de Compras de Obra con experiencia en materiales de construcción, negociación con proveedores, comparativos, órdenes de compra y coordinación con residentes. No avanzar compradores de retail sin obra.
+END_BUSQUEDA_008
+
+BUSQUEDA_009
+Estudio jurídico corporativo busca Paralegal Senior con experiencia en contratos, sociedades, poderes, compliance documental y seguimiento de vencimientos. Inglés jurídico será un plus. No avanzar secretarias sin gestión legal.
+END_BUSQUEDA_009
+
+BUSQUEDA_010
+Startup fintech busca Fraud Analyst con experiencia en monitoreo transaccional, reglas antifraude, chargebacks, KYC y análisis de patrones. SQL será deseable. No avanzar perfiles de atención al cliente sin análisis de riesgo.
+END_BUSQUEDA_010
+
+BUSQUEDA_011
+Empresa de tecnología busca Cloud Architect con experiencia en AWS, redes, seguridad, arquitectura de soluciones, costos cloud y migraciones. Certificaciones AWS serán valorables. No avanzar administradores de servidores sin arquitectura.
+END_BUSQUEDA_011
+
+BUSQUEDA_012
+Cadena de farmacias busca Encargado/a de Sucursal con experiencia en gestión de equipo, caja, stock, atención al cliente y cumplimiento de procedimientos. Es excluyente experiencia en retail. No avanzar vendedores sin liderazgo.
+END_BUSQUEDA_012
+
+BUSQUEDA_013
+Empresa agroindustrial busca Analista de Planificación de Demanda con experiencia en forecast, S&OP, análisis de ventas, stock y coordinación con producción. Excel avanzado es imprescindible. Power BI será valorable.
+END_BUSQUEDA_013
+
+BUSQUEDA_014
+Agencia de medios busca Paid Media Manager con experiencia en Google Ads, Meta Ads, TikTok Ads, presupuestos, ROAS y atribución. GA4 y Looker Studio serán valorables. No avanzar perfiles solo orgánicos.
+END_BUSQUEDA_014
+
+BUSQUEDA_015
+Empresa de ingeniería busca Dibujante Proyectista con experiencia en AutoCAD, planos industriales, layouts, interpretación de especificaciones y coordinación con ingeniería. Revit será un plus. No avanzar dibujantes solo arquitectónicos.
+END_BUSQUEDA_015
+
+BUSQUEDA_016
+Multinacional busca HR Business Partner con experiencia generalista, relaciones laborales, gestión de desempeño, clima y acompañamiento a líderes operativos. Inglés avanzado es excluyente. No avanzar perfiles solo de selección.
+END_BUSQUEDA_016
+
+BUSQUEDA_017
+Empresa de telecomunicaciones busca Field Service Coordinator con experiencia coordinando técnicos en calle, SLA, repuestos, reclamos y planificación de agenda. Se valorará experiencia con CRM. No avanzar administrativos sin operación técnica.
+END_BUSQUEDA_017
+
+BUSQUEDA_018
+Mutualista busca Auditor Médico con experiencia en revisión de prestaciones, autorizaciones, análisis de historias clínicas y criterios de cobertura. Título médico habilitante es excluyente. No avanzar médicos sin auditoría.
+END_BUSQUEDA_018
+
+BUSQUEDA_019
+Empresa de e-commerce busca Marketplace Specialist con experiencia en Mercado Libre, catálogo, pricing, promociones, reputación y análisis de conversión. Se valorará experiencia con Shopify. No avanzar perfiles solo de tienda física.
+END_BUSQUEDA_019
+
+BUSQUEDA_020
+Industria farmacéutica busca Regulatory Affairs Analyst con experiencia en registros sanitarios, documentación técnica, interacción con autoridades y seguimiento de expedientes. Inglés técnico será deseable. No avanzar perfiles de calidad sin asuntos regulatorios.
+END_BUSQUEDA_020
+
+BUSQUEDA_021
+Empresa hotelera busca Gerente de Alimentos y Bebidas con experiencia en restaurantes, costos, inventario, proveedores, estándares de servicio y liderazgo de salón/cocina. No avanzar perfiles solo de recepción.
+END_BUSQUEDA_021
+
+BUSQUEDA_022
+Consultora tecnológica busca Data Engineer con experiencia en pipelines, SQL, Python, modelado de datos, APIs y cloud. Snowflake o BigQuery serán valorables. No avanzar analistas BI sin construcción de pipelines.
+END_BUSQUEDA_022
+
+BUSQUEDA_023
+Empresa industrial busca Responsable de Seguridad Patrimonial con experiencia en control de accesos, CCTV, protocolos, investigación de incidentes y coordinación con empresas de vigilancia. No avanzar guardias sin gestión.
+END_BUSQUEDA_023
+
+BUSQUEDA_024
+Colegio bilingüe busca Coordinador/a de Inglés con experiencia docente, planificación curricular, observación de clases, evaluación de estudiantes y acompañamiento a profesores. Inglés nativo o avanzado es excluyente.
+END_BUSQUEDA_024
+
+BUSQUEDA_025
+Empresa de servicios financieros busca Ejecutivo de Onboarding Corporativo con experiencia en apertura de cuentas, documentación societaria, KYC, seguimiento de clientes y coordinación interna. No avanzar vendedores sin documentación financiera.
+END_BUSQUEDA_025
+
+BUSQUEDA_026
+Industria autopartista busca Ingeniero de Procesos con experiencia en layout, tiempos y métodos, mejora de productividad, documentación técnica y soporte a producción. Lean o Six Sigma será valorable.
+END_BUSQUEDA_026
+
+BUSQUEDA_027
+Empresa de software busca Technical Writer con experiencia en documentación técnica, APIs, guías de usuario, release notes y trabajo con equipos de producto. Inglés avanzado será un plus. No avanzar redactores de marketing sin documentación técnica.
+END_BUSQUEDA_027
+
+BUSQUEDA_028
+Red de clínicas odontológicas busca Coordinador/a Operativo/a con experiencia en agenda de profesionales, atención de pacientes, insumos, caja y seguimiento de indicadores. Se valorará experiencia en salud. No avanzar recepcionistas sin coordinación.
+END_BUSQUEDA_028
+
+BUSQUEDA_029
+Empresa de alimentos busca Responsable de I+D con experiencia en desarrollo de productos, pruebas piloto, formulaciones, costos, proveedores e inocuidad. Es excluyente experiencia en industria alimentaria.
+END_BUSQUEDA_029
+
+BUSQUEDA_030
+Empresa de software busca QA Lead con experiencia en estrategia de testing, automatización, gestión de equipo, métricas de calidad y coordinación con desarrollo. Playwright o Cypress será valorable. No avanzar testers manuales sin liderazgo.
+END_BUSQUEDA_030
+
+BUSQUEDA_031
+Importadora de maquinaria busca Service Manager con experiencia en posventa técnica, repuestos, coordinación de técnicos, garantías y atención a clientes industriales. Inglés técnico será deseable. No avanzar vendedores sin servicio técnico.
+END_BUSQUEDA_031
+
+BUSQUEDA_032
+Empresa energética busca Analista de Compras Técnicas con experiencia en licitaciones, proveedores de ingeniería, contratos, comparativos y seguimiento de entregas. SAP será valorable. No avanzar compradores generales sin compras técnicas.
+END_BUSQUEDA_032
+
+BUSQUEDA_033
+Medio de comunicación busca Editor/a Digital con experiencia en redacción, SEO, agenda informativa, edición de notas y coordinación con periodistas. No avanzar community managers sin criterio editorial.
+END_BUSQUEDA_033
+
+BUSQUEDA_034
+Empresa industrial busca Jefe de Turno con experiencia en producción, seguridad, calidad, liderazgo de operarios y resolución de paradas. Disponibilidad para turnos rotativos es excluyente.
+END_BUSQUEDA_034
+
+BUSQUEDA_035
+Plataforma educativa busca Learning Experience Designer con experiencia en diseño instruccional, contenidos digitales, LMS, evaluación de aprendizaje y trabajo con expertos técnicos. Articulate será valorable.
+END_BUSQUEDA_035
+
+BUSQUEDA_036
+Empresa de cobranza busca Supervisor de Recupero con experiencia en call center, métricas de mora, negociación, coaching y cumplimiento de objetivos. No avanzar cobradores individuales sin liderazgo.
+END_BUSQUEDA_036
+
+BUSQUEDA_037
+Laboratorio busca Técnico de Validaciones con experiencia en calificación de equipos, protocolos IQ/OQ/PQ, documentación GMP y ejecución de pruebas. Inglés técnico será valorable.
+END_BUSQUEDA_037
+
+BUSQUEDA_038
+Empresa de moda busca Visual Merchandiser con experiencia en layout de tiendas, exhibición, campañas, análisis de ventas y coordinación con locales. No avanzar diseñadores gráficos sin experiencia en punto de venta.
+END_BUSQUEDA_038
+
+BUSQUEDA_039
+Compañía B2B busca Sales Operations Analyst con experiencia en CRM, forecast, pipeline hygiene, dashboards, comisiones y soporte a dirección comercial. Salesforce será un plus. No avanzar vendedores sin análisis.
+END_BUSQUEDA_039
+
+BUSQUEDA_040
+Empresa de servicios IT busca Service Delivery Manager con experiencia en SLA, gestión de incidentes, relación con clientes, equipos técnicos y mejora continua. ITIL será valorable. No avanzar soporte N1 sin gestión de servicio.
+END_BUSQUEDA_040
+
+BUSQUEDA_041
+Fábrica textil busca Encargado de Producción con experiencia en planificación, control de calidad, rendimiento de líneas, manejo de personal y coordinación con mantenimiento. No avanzar perfiles sin industria textil.
+END_BUSQUEDA_041
+
+BUSQUEDA_042
+Empresa financiera busca Analista de Tesorería con experiencia en flujo de fondos, conciliaciones bancarias, pagos, inversiones de corto plazo y reportes financieros. Excel avanzado es excluyente.
+END_BUSQUEDA_042
+
+BUSQUEDA_043
+Empresa de tecnología busca Cybersecurity Consultant con experiencia en assessment, hardening, ISO 27001, análisis de vulnerabilidades y presentación a clientes. Certificaciones serán valorables.
+END_BUSQUEDA_043
+
+BUSQUEDA_044
+Institución educativa busca Responsable de Admisiones y Marketing con experiencia en captación de alumnos, entrevistas familiares, campañas digitales y seguimiento de leads. CRM será valorable.
+END_BUSQUEDA_044
+
+BUSQUEDA_045
+Industria química busca Analista de Laboratorio con experiencia en ensayos fisicoquímicos, cromatografía, documentación y normas de calidad. Es excluyente experiencia en laboratorio industrial.
+END_BUSQUEDA_045
+
+BUSQUEDA_046
+Empresa de movilidad busca Operations Manager con experiencia en flota, mantenimiento, indicadores operativos, proveedores y coordinación de equipos en campo. No avanzar perfiles solo administrativos.
+END_BUSQUEDA_046
+
+BUSQUEDA_047
+Empresa tecnológica busca Solutions Engineer con experiencia en preventa técnica, demos, APIs, integración con clientes y acompañamiento comercial. Inglés avanzado será valorable. No avanzar vendedores sin base técnica.
+END_BUSQUEDA_047
+
+BUSQUEDA_048
+Organización social busca Coordinador/a de Programas con experiencia en gestión de proyectos, indicadores, rendición a financiadores, trabajo territorial y liderazgo de equipos. Se valorará experiencia con organismos internacionales.
+END_BUSQUEDA_048
+
+BUSQUEDA_049
+Empresa industrial busca Responsable de Medio Ambiente con experiencia en gestión de residuos, permisos, auditorías, normativa ambiental y reportes. ISO 14001 será un plus. No avanzar técnicos de seguridad sin ambiente.
+END_BUSQUEDA_049
+
+BUSQUEDA_050
+Software factory busca Mobile Developer con experiencia en React Native, integración con APIs, publicación en stores, testing y trabajo con producto. Kotlin o Swift será valorable. No avanzar desarrolladores web sin mobile.
+END_BUSQUEDA_050
+
+BUSQUEDA_051
+Empresa inmobiliaria busca Agente Comercial con experiencia en captación de propiedades, negociación, seguimiento de clientes y cierre de operaciones. Libreta y vehículo serán valorables. No avanzar perfiles sin venta consultiva.
+END_BUSQUEDA_051
+
+BUSQUEDA_052
+Agencia digital busca Performance Marketing Specialist con experiencia en Google Ads, Meta Ads, tracking, reportes y optimización de campañas. Se valorará experiencia con GA4 y Looker Studio. No avanzar community managers sin pauta paga.
+END_BUSQUEDA_052
+
+BUSQUEDA_053
+Clínica privada busca Coordinador/a de Admisiones con experiencia en salud, manejo de autorizaciones, trato con pacientes y coordinación con mutualistas. Es deseable experiencia con seguros médicos. No avanzar perfiles administrativos sin contacto directo con pacientes.
+END_BUSQUEDA_053
+
+BUSQUEDA_054
+Empresa constructora busca Arquitecto/a de Obra con experiencia en dirección de obra, coordinación de subcontratos, seguimiento de cronograma y control de costos. AutoCAD y Excel son imprescindibles. Revit será un plus.
+END_BUSQUEDA_054
+
+BUSQUEDA_055
+Importadora busca Comprador Técnico con experiencia en repuestos industriales, negociación con proveedores del exterior, análisis de costos y seguimiento de importaciones. Inglés técnico será valorable. No avanzar compradores solo de consumo masivo.
+END_BUSQUEDA_055
+
+BUSQUEDA_056
+Consultora de RRHH busca Payroll Specialist con experiencia en liquidación de sueldos, BPS, IRPF, licencias y convenios colectivos. Memory será un plus. No avanzar perfiles de selección sin nómina.
+END_BUSQUEDA_056
+
+BUSQUEDA_057
+Agencia creativa busca Diseñador/a UX/UI con experiencia en research, prototipos, Figma, design systems y trabajo con producto digital. Se valorará HTML/CSS. No avanzar diseñadores gráficos sin UX.
+END_BUSQUEDA_057
+
+BUSQUEDA_058
+Empresa de software busca Technical Support Specialist con experiencia en soporte B2B, SQL básico, APIs, documentación de tickets y comunicación con desarrollo. Inglés técnico será valorable.
+END_BUSQUEDA_058
+
+BUSQUEDA_059
+Consultora tecnológica busca Scrum Master con experiencia facilitando ceremonias ágiles, removiendo impedimentos, métricas de delivery y coordinación con Product Owners. Certificación Scrum será valorable. No avanzar project managers tradicionales sin agilidad.
+END_BUSQUEDA_059
