@@ -45,6 +45,8 @@ SPANISH_TITLE_START = (
     "Consultora",
     "Desarrollador",
     "Desarrolladora",
+    "Director",
+    "Directora",
     "Dibujante",
     "Diseñador",
     "Diseñadora",
@@ -92,7 +94,7 @@ SPANISH_TITLE_START = (
 
 SOURCE_ROLE_LEAD_PATTERNS = (
     re.compile(
-        r"\b(?:busca|buscamos|seleccionamos|selecciona|necesita|necesitamos|"
+        r"\b(?:busca|buscamos|buscando|estamos\s+buscando|seleccionamos|selecciona|necesita|necesitamos|"
         r"sumar|incorporar|incorpora|incorporamos|contrata|requiere|"
         r"queremos\s+incorporar|rol\s*:|se\s+busca|nos\s+encontramos\s+en\s+b[uú]squeda\s+de)\s+"
         r"(?:(?:un|una|el|la|un/a)\s+)?(?P<tail>.{0,180})",
@@ -218,10 +220,6 @@ def _source_role_title(source_text: str) -> str:
     if not source:
         return ""
 
-    preserved = _preserved_english_title_from_source(source)
-    if preserved:
-        return preserved
-
     for pattern in SOURCE_ROLE_LEAD_PATTERNS:
         for lead in pattern.finditer(source):
             title_span = _source_title_span_from_tail(lead.group("tail"))
@@ -231,7 +229,17 @@ def _source_role_title(source_text: str) -> str:
             if title:
                 return title
 
+    preserved = _preserved_english_title_from_source(source)
+    if preserved:
+        return preserved
+
     return _spanish_title_from_text(source)
+
+
+def source_role_title_for_text(source_text: str) -> str:
+    """Return the explicit source role title span when the source contains one."""
+
+    return _source_role_title(source_text)
 
 
 def _preserved_english_title_from_source(source: str) -> str:
@@ -262,6 +270,8 @@ def _source_title_span_from_tail(text: str) -> str:
     candidate = re.split(r"[.;]", str(text or ""), maxsplit=1)[0]
     candidate = _clean_role_title(candidate)
     candidate = re.sub(r"^(?:un|una|el|la|un/a)\s+", "", candidate, flags=re.I)
+    if candidate.endswith(" clave"):
+        candidate = candidate[: -len(" clave")]
     candidate = candidate.strip(" -:.,;\t\r\n")
     if not candidate:
         return ""
@@ -321,8 +331,8 @@ def _looks_explicit_source_title_span(title: str) -> bool:
     )
     technical_or_role_token = bool(
         re.search(
-            r"\b(?:manager|specialist|consultant|engineer|owner|analyst|lead|writer|designer|"
-            r"developer|coordinator|architect|support|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
+            r"\b(?:manager|executive|specialist|consultant|engineer|owner|analyst|lead|writer|designer|"
+            r"developer|coordinator|architect|support|head|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
             clean,
             re.I,
         )

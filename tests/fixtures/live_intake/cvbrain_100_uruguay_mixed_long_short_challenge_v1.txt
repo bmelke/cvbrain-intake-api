@@ -1,0 +1,499 @@
+BUSQUEDA_001
+Estamos buscando un ACCOUNT MANAGER Semi Senior para desarrollar nuestra cartera de clientes y crear propuestas de valor al negocio con base en Montevideo para desarrollar su tarea en Montevideo, Canelones y principales cuentas del interior del país.
+Las principales responsabilidades del rol son: gestionar las principales cuentas del sector salud para la comercialización de equipos médicos y servicio técnico; asumir el ownership de las cuentas asignadas; gestionar la información comercial de manera eficiente a fin de incrementar la cartera de clientes trabajando en conjunto con Marketing, Generación de Demanda y Operaciones; actuar como interlocutor con las cuentas asignadas asegurando fluidez y claridad en la comunicación; relevar necesidades de clientes para ofrecer soluciones y anticiparse a posibles problemas; atender problemas e inquietudes de clientes y gestionar incidentes para encontrar soluciones; identificar necesidades en clientes para ampliar servicios; gestionar proyectos y relacionarse con equipos técnicos; promover estrategias de negocio para mejorar rentabilidad; realizar seguimiento y brindar soporte a clientes en soluciones técnicas.
+Requisitos: experiencia comprobable mínima de 3 años en el sector comercial de dispositivos médicos gestionando grandes cuentas; comprensión del pipeline y gestión de demanda; adaptación a sistema de fijo y comisiones; conocimiento de clientes del sector salud; conocimientos en venta técnica de dispositivos médicos; conocimiento de uso de software aplicativos de gestión empresarial ERP, CRM, base instalada, etc.; conocimiento de herramientas MS Office, Excel, Word y Power Point.
+Deseables: habilidades para realizar venta de servicios; inglés intermedio; experiencia en dispositivos médicos del sector imágenes o ultrasonido; cartera propia de clientes activa.
+Evaluaremos además las siguientes competencias excluyentes: excelentes relaciones interpersonales y capacidad para relacionarse en ambiente profesional con nivel CxO, médicos y técnicos; perfil de consultor de negocios; orientación a resultados e impulsor de soluciones; sentido de urgencia; habilidades de negociación y comunicación; manejo y resolución de situaciones conflictivas; capacidad para trabajar en equipo; capacidad para seguir procesos pautados por la empresa; flexibilidad para adaptarse al dinamismo de la empresa.
+Nivel: Semi Senior. Industria: dispositivos médicos, sector salud, servicio técnico y tecnología aplicada a salud. Tiempo de empleo: Full-time. Profesiones deseables: Ingeniero Industrial, Bioingeniero, Ingeniero Biomédico o Administrador de Empresas.
+END_BUSQUEDA_001
+
+BUSQUEDA_002
+Colegio privado de montevideo busca Director/a de Secundaria para una posición clave dentro de su operación en Uruguay, con foco en educación privada y coordinación con equipos internos y externos.
+Responsabilidades: liderar proyecto académico, convivencia, vínculo con familias, indicadores de aprendizaje y coordinación docente. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia obligatoria en gestión académica de secundaria, liderazgo docente, convivencia escolar e indicadores educativos; título docente habilitante excluyente. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: inglés avanzado, plataformas LMS y formación en gestión educativa. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: comunicación institucional, manejo de conflictos, criterio pedagógico y liderazgo de adultos. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Dirección. Industria: educación privada. Modalidad/ubicación: presencial Montevideo con actividades en Canelones. Tiempo de empleo: Full-time.
+END_BUSQUEDA_002
+
+BUSQUEDA_003
+Laboratorio farmacéutico con base en montevideo busca Key Account Manager para una posición clave dentro de su operación en Uruguay, con foco en pharma y salud institucional y coordinación con equipos internos y externos.
+Responsabilidades: gestionar cuentas institucionales, convenios, licitaciones, forecast y relación con decisores de salud. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en cuentas de salud, negociación B2B, CRM, licitaciones y pipeline comercial. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: inglés técnico, Salesforce y experiencia en dispositivos médicos. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: negociación consultiva, autonomía, orden documental y comunicación con nivel CxO. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Senior. Industria: pharma y salud institucional. Modalidad/ubicación: híbrido Montevideo con visitas a Canelones y Maldonado. Tiempo de empleo: Full-time.
+END_BUSQUEDA_003
+
+BUSQUEDA_004
+Empresa tecnológica de zonamérica busca Technical Support Specialist para una posición clave dentro de su operación en Uruguay, con foco en servicios tecnológicos B2B y coordinación con equipos internos y externos.
+Responsabilidades: atender incidentes L1/L2, documentar tickets, escalar casos y mantener base de conocimiento. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia mínima de 2 años en soporte técnico, Microsoft 365, Active Directory, redes básicas y mesa de ayuda. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: ITIL, Jira Service Management, Zendesk e inglés técnico. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: paciencia, orientación al servicio, priorización y manejo de presión. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Junior/Semi Senior. Industria: servicios tecnológicos B2B. Modalidad/ubicación: híbrido Montevideo/Zonamérica. Tiempo de empleo: Full-time.
+END_BUSQUEDA_004
+
+BUSQUEDA_005
+Startup saas de montevideo busca Senior Product Manager para una posición clave dentro de su operación en Uruguay, con foco en software B2B y coordinación con equipos internos y externos.
+Responsabilidades: definir roadmap, conducir discovery, priorizar backlog, medir adopción y coordinar con ingeniería, UX y Customer Success. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en Product Management SaaS, métricas, discovery, historias de usuario y trabajo ágil. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: SQL básico, BI, pricing, APIs e inglés avanzado. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: criterio estratégico, comunicación ejecutiva, foco en datos y empatía con usuarios. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Senior. Industria: software B2B. Modalidad/ubicación: híbrido Montevideo con remoto Uruguay parcial. Tiempo de empleo: Full-time.
+END_BUSQUEDA_005
+
+BUSQUEDA_006
+Industria alimenticia de canelones busca Jefe/a de Planta para una posición clave dentro de su operación en Uruguay, con foco en manufactura y alimentos y coordinación con equipos internos y externos.
+Responsabilidades: asegurar plan de producción, coordinar turnos, liderar supervisores, controlar seguridad y resolver desvíos. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia obligatoria en liderazgo de planta, producción continua, OEE, seguridad y mejora continua. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: Lean Manufacturing, SAP y formación en ingeniería o alimentos. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: liderazgo de piso, disciplina operativa, comunicación sindical y foco preventivo. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Jefatura. Industria: manufactura y alimentos. Modalidad/ubicación: presencial Canelones. Tiempo de empleo: Full-time.
+END_BUSQUEDA_006
+
+BUSQUEDA_007
+Operador logístico de ciudad de la costa busca Regional Operations Manager para una posición clave dentro de su operación en Uruguay, con foco en logística y distribución y coordinación con equipos internos y externos.
+Responsabilidades: coordinar cross-docking, transporte, SLA, rutas, costos, flota y proveedores. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en distribución, TMS, indicadores de entrega, liderazgo multi-sede y gestión de transportistas. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: WMS, Power BI, consumo masivo o e-commerce. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: planificación, negociación, gestión de crisis y mejora continua. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Gerencial. Industria: logística y distribución. Modalidad/ubicación: presencial con movilidad por Montevideo, Canelones e interior del país. Tiempo de empleo: Full-time.
+END_BUSQUEDA_007
+
+BUSQUEDA_008
+Institución financiera de montevideo busca Senior Compliance Officer para una posición clave dentro de su operación en Uruguay, con foco en finanzas y cumplimiento y coordinación con equipos internos y externos.
+Responsabilidades: actualizar matrices de riesgo, revisar alertas, preparar reportes y capacitar equipos internos. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia obligatoria en PLA, KYC, reportes regulatorios, análisis transaccional y normativa local de Uruguay. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: certificación AML, SQL, Power BI e inglés. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: criterio ético, confidencialidad, rigurosidad documental y comunicación con dirección. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Senior. Industria: finanzas y cumplimiento. Modalidad/ubicación: híbrido Montevideo. Tiempo de empleo: Full-time.
+END_BUSQUEDA_008
+
+BUSQUEDA_009
+Estudio legal corporativo de montevideo busca Abogado/a Corporativo/a Senior para una posición clave dentro de su operación en Uruguay, con foco en legal corporativo y coordinación con equipos internos y externos.
+Responsabilidades: redactar contratos, coordinar due diligence, asesorar directorios y participar en negociaciones. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: título de abogado habilitante excluyente y experiencia mínima de 5 años en contratos, sociedades y asesoramiento empresarial. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: inglés jurídico, M&A, compliance y tecnología. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: criterio jurídico, precisión, confidencialidad y negociación. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Senior. Industria: legal corporativo. Modalidad/ubicación: Montevideo con reuniones en Zonamérica. Tiempo de empleo: Full-time.
+END_BUSQUEDA_009
+
+BUSQUEDA_010
+Red de salud privada busca Clinical Operations Manager para una posición clave dentro de su operación en Uruguay, con foco en operaciones de salud y coordinación con equipos internos y externos.
+Responsabilidades: coordinar agenda médica, protocolos, reclamos, indicadores, profesionales y experiencia de pacientes. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en operaciones de salud, liderazgo asistencial, indicadores clínicos y cumplimiento de protocolos. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: administración de servicios de salud, Power BI y software HIS. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: empatía, orden operativo, comunicación médica y resolución de incidentes. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Gerencial. Industria: operaciones de salud. Modalidad/ubicación: Montevideo y Maldonado. Tiempo de empleo: Full-time.
+END_BUSQUEDA_010
+
+BUSQUEDA_011
+Laboratorio farmacéutico de montevideo busca Regulatory Affairs Coordinator para una posición clave dentro de su operación en Uruguay, con foco en regulatorio pharma y coordinación con equipos internos y externos.
+Responsabilidades: preparar dossiers, responder observaciones, mantener bases regulatorias y apoyar lanzamientos. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia obligatoria en registros sanitarios, GMP, documentación técnica y seguimiento de trámites. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: inglés técnico, Veeva, farmacovigilancia y experiencia regional. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: precisión, organización, comunicación técnica y criterio documental. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Semi Senior/Senior. Industria: regulatorio pharma. Modalidad/ubicación: híbrido Montevideo. Tiempo de empleo: Full-time.
+END_BUSQUEDA_011
+
+BUSQUEDA_012
+Cadena de retail con tiendas en uruguay busca Store Operations Manager para una posición clave dentro de su operación en Uruguay, con foco en retail operaciones y coordinación con equipos internos y externos.
+Responsabilidades: auditar tiendas, capacitar encargados, revisar stock, controlar merma y proponer mejoras. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en retail multi-tienda, indicadores, inventarios y liderazgo de encargados. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: ERP retail, BI, alimentos o moda y visual merchandising. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: liderazgo cercano, disciplina de ejecución y orientación a resultados. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Senior. Industria: retail operaciones. Modalidad/ubicación: Montevideo, Maldonado y Colonia. Tiempo de empleo: Full-time.
+END_BUSQUEDA_012
+
+BUSQUEDA_013
+Empresa de servicios financieros en zonamérica busca Lead BI Analyst para una posición clave dentro de su operación en Uruguay, con foco en data y finanzas y coordinación con equipos internos y externos.
+Responsabilidades: diseñar dashboards, integrar fuentes, validar calidad de datos y automatizar reportes. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia obligatoria en Power BI, SQL, modelado, ETL, métricas de negocio y stakeholders. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: Python, dbt, cloud data warehouse e inglés técnico. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: pensamiento analítico, curiosidad, autonomía y claridad de comunicación. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Lead/Senior. Industria: data y finanzas. Modalidad/ubicación: híbrido Montevideo/Zonamérica. Tiempo de empleo: Full-time.
+END_BUSQUEDA_013
+
+BUSQUEDA_014
+Empresa de ciberseguridad busca Security Operations Center Lead para una posición clave dentro de su operación en Uruguay, con foco en ciberseguridad gestionada y coordinación con equipos internos y externos.
+Responsabilidades: coordinar analistas SOC, revisar alertas SIEM, definir playbooks y liderar incident response. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en SOC, SIEM, hardening, incident response, playbooks y liderazgo técnico. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: Security+, Cisco, Microsoft, cloud security y scripting. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: criterio bajo presión, confidencialidad, documentación y liderazgo técnico. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Lead. Industria: ciberseguridad gestionada. Modalidad/ubicación: remoto Uruguay con reuniones en Montevideo. Tiempo de empleo: Full-time.
+END_BUSQUEDA_014
+
+BUSQUEDA_015
+Empresa de servicios tercerizados busca Responsable de Payroll para una posición clave dentro de su operación en Uruguay, con foco en RRHH y nómina y coordinación con equipos internos y externos.
+Responsabilidades: supervisar liquidaciones, controlar novedades, coordinar con BPS y responder consultas de clientes. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia obligatoria en payroll Uruguay, legislación laboral local, jornales, licencias, egresos y Excel avanzado. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: Meta4, SAP HCM, inglés y formación en RRHH o contabilidad. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: confidencialidad, precisión, planificación y orientación al cliente. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Senior/Jefatura. Industria: RRHH y nómina. Modalidad/ubicación: híbrido Montevideo. Tiempo de empleo: Full-time.
+END_BUSQUEDA_015
+
+BUSQUEDA_016
+Importadora industrial de montevideo busca Comprador Técnico para una posición clave dentro de su operación en Uruguay, con foco en compras técnicas e industria y coordinación con equipos internos y externos.
+Responsabilidades: relevar especificaciones, negociar proveedores, emitir órdenes y controlar entregas. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en compras técnicas, ERP, proveedores industriales, importaciones y base técnica mecánica o eléctrica. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: inglés técnico, SAP y comercio exterior. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: negociación, orden, criterio técnico y sentido de urgencia. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Semi Senior. Industria: compras técnicas e industria. Modalidad/ubicación: Montevideo con visitas a Pando y Canelones. Tiempo de empleo: Full-time.
+END_BUSQUEDA_016
+
+BUSQUEDA_017
+Constructora nacional busca Arquitecto/a de Obra para una posición clave dentro de su operación en Uruguay, con foco en construcción y proyectos y coordinación con equipos internos y externos.
+Responsabilidades: coordinar subcontratos, controlar cronograma, revisar avances, gestionar costos y asegurar seguridad. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: título habilitante excluyente y experiencia obligatoria en dirección de obra, planificación, presupuestos y documentación técnica. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: Revit, AutoCAD, BIM y experiencia en hotelería. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: liderazgo en obra, criterio técnico, planificación y resolución de problemas. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Senior. Industria: construcción y proyectos. Modalidad/ubicación: Montevideo y Punta del Este. Tiempo de empleo: Full-time.
+END_BUSQUEDA_017
+
+BUSQUEDA_018
+Software company de montevideo busca Enterprise Customer Success Manager para una posición clave dentro de su operación en Uruguay, con foco en SaaS B2B y coordinación con equipos internos y externos.
+Responsabilidades: liderar onboarding, QBRs, adopción, renovaciones, churn y oportunidades de expansión. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en Customer Success B2B, cuentas enterprise, CRM y comunicación ejecutiva. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: Salesforce, SQL básico, inglés avanzado e integraciones. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: ownership, escucha activa, negociación y orientación al cliente. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Senior. Industria: SaaS B2B. Modalidad/ubicación: híbrido Montevideo. Tiempo de empleo: Full-time.
+END_BUSQUEDA_018
+
+BUSQUEDA_019
+Industria alimenticia de canelones busca Jefe/a de Inocuidad y Calidad para una posición clave dentro de su operación en Uruguay, con foco en calidad alimentaria y coordinación con equipos internos y externos.
+Responsabilidades: coordinar controles, gestionar no conformidades, liderar auditorías y liberar producto. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia excluyente en HACCP, BPM, auditorías, desvíos, CAPA y liberación de producto. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: FSSC 22000, inglés técnico y sistemas documentales. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: rigurosidad, liderazgo, criterio técnico y comunicación con planta. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Jefatura. Industria: calidad alimentaria. Modalidad/ubicación: presencial Canelones. Tiempo de empleo: Full-time.
+END_BUSQUEDA_019
+
+BUSQUEDA_020
+Hotel de punta del este busca Operations Manager para una posición clave dentro de su operación en Uruguay, con foco en hospitality y hotelería y coordinación con equipos internos y externos.
+Responsabilidades: coordinar alojamiento, gastronomía, housekeeping, mantenimiento, eventos y experiencia de huéspedes. También deberá reportar avances, ordenar prioridades, documentar decisiones y colaborar con áreas de soporte.
+Requisitos: experiencia obligatoria en operaciones hoteleras, liderazgo de equipos grandes, indicadores de servicio e inglés avanzado excluyente. Se requiere capacidad para trabajar con indicadores, sostener conversaciones complejas y cumplir procesos definidos.
+Deseables: portugués, PMS hotelero y revenue management. Estos puntos suman valor, pero no deben desplazar los requisitos excluyentes.
+Competencias excluyentes: hospitalidad, liderazgo visible, manejo de presión y solución de conflictos. La evaluación considerará evidencia laboral e instancias de entrevista.
+Nivel: Gerencial. Industria: hospitality y hotelería. Modalidad/ubicación: Punta del Este, Maldonado. Tiempo de empleo: Full-time.
+END_BUSQUEDA_020
+
+BUSQUEDA_021
+Empresa de salud en Montevideo busca Key Account Manager con experiencia en cuentas institucionales, licitaciones y CRM. Inglés será valorable; no avanzar perfiles sin sector salud.
+END_BUSQUEDA_021
+
+BUSQUEDA_022
+Fintech de Zonamérica busca Strategic Account Manager para venta B2B enterprise. Excluyente negociación consultiva y Salesforce; modalidad híbrido Montevideo.
+END_BUSQUEDA_022
+
+BUSQUEDA_023
+SaaS local busca Enterprise Account Executive con discovery, demos y cierre de contratos corporativos. Inglés avanzado será un plus.
+END_BUSQUEDA_023
+
+BUSQUEDA_024
+Startup de Montevideo busca Senior Product Manager con roadmap, métricas y backlog. SQL o Power BI será valorable.
+END_BUSQUEDA_024
+
+BUSQUEDA_025
+Agencia digital busca Lead UX Designer para producto financiero. Excluyente research, Figma y trabajo con stakeholders; remoto Uruguay.
+END_BUSQUEDA_025
+
+BUSQUEDA_026
+Empresa de software busca Technical Support Specialist con Microsoft 365, Active Directory y tickets. Guardias coordinadas en Montevideo.
+END_BUSQUEDA_026
+
+BUSQUEDA_027
+Software company busca Customer Success Manager con onboarding, renovaciones y QBRs. Deseable Salesforce y cuentas SaaS B2B.
+END_BUSQUEDA_027
+
+BUSQUEDA_028
+Empresa técnica busca Field Service Coordinator para cuadrillas en Montevideo y Canelones. Libreta de conducir será valorable, no excluyente.
+END_BUSQUEDA_028
+
+BUSQUEDA_029
+Empresa energética busca Service Delivery Manager con SLA, proveedores y contratos. ITIL será un plus.
+END_BUSQUEDA_029
+
+BUSQUEDA_030
+Colegio privado busca Director/a de Secundaria con gestión académica y convivencia. Título docente habilitante es excluyente.
+END_BUSQUEDA_030
+
+BUSQUEDA_031
+Universidad privada busca Coordinador/a de Admisiones para entrevistas y documentación. Inglés avanzado será valorable.
+END_BUSQUEDA_031
+
+BUSQUEDA_032
+Empresa de servicios busca Responsable de Atención al Cliente para equipo multicanal. Excluyente indicadores, SLA y calidad.
+END_BUSQUEDA_032
+
+BUSQUEDA_033
+Importadora busca Ejecutivo de Licitaciones con pliegos, documentación y ofertas. Excel obligatorio.
+END_BUSQUEDA_033
+
+BUSQUEDA_034
+Aseguradora busca Liquidador/a de Siniestros con experiencia en autos o patrimoniales. Deseable proveedores y atención a clientes.
+END_BUSQUEDA_034
+
+BUSQUEDA_035
+Consultora tecnológica busca Reclutador IT con perfiles de software, entrevistas y hunting. Inglés será un plus; híbrido Montevideo.
+END_BUSQUEDA_035
+
+BUSQUEDA_036
+Producto digital busca Redactor UX para microcopy y flujos transaccionales. Figma y research serán valorables.
+END_BUSQUEDA_036
+
+BUSQUEDA_037
+Constructora busca Arquitecto/a de Obra con dirección, subcontratos y cronograma. AutoCAD o Revit será valorable.
+END_BUSQUEDA_037
+
+BUSQUEDA_038
+Industria de Pando busca Comprador Técnico con repuestos industriales, proveedores y ERP. Inglés técnico deseable.
+END_BUSQUEDA_038
+
+BUSQUEDA_039
+Empresa de payroll busca Payroll Specialist con nómina Uruguay, BPS y Excel avanzado. Modalidad híbrido Montevideo.
+END_BUSQUEDA_039
+
+BUSQUEDA_040
+Agencia creativa busca Diseñador/a UX/UI con Figma y design systems. No avanzar perfiles solo gráficos sin producto digital.
+END_BUSQUEDA_040
+
+BUSQUEDA_041
+Consultora ágil busca Scrum Master con ceremonias, métricas y mejora continua. Certificación Scrum valorable.
+END_BUSQUEDA_041
+
+BUSQUEDA_042
+Empresa de Maldonado busca Gerente Comercial con equipos de venta, forecast y canales B2B. CRM excluyente.
+END_BUSQUEDA_042
+
+BUSQUEDA_043
+Clínica busca Coordinador/a de Enfermería de Piso con título habilitante y turnos. Deseable gestión de indicadores.
+END_BUSQUEDA_043
+
+BUSQUEDA_044
+Laboratorio busca Regulatory Affairs Specialist con registros sanitarios y documentación técnica. Inglés técnico plus.
+END_BUSQUEDA_044
+
+BUSQUEDA_045
+Retail alimenticio busca Category Lead de Perecederos con surtido, merma y negociación. No avanzar perfiles sin retail alimenticio.
+END_BUSQUEDA_045
+
+BUSQUEDA_046
+Banco busca AML Monitoring Analyst con alertas, KYC y análisis transaccional. SQL valorable.
+END_BUSQUEDA_046
+
+BUSQUEDA_047
+Logística busca Senior Route Planner con rutas, GPS y ventanas horarias. TMS deseable.
+END_BUSQUEDA_047
+
+BUSQUEDA_048
+Mutualista busca Responsable de Calidad Asistencial con auditorías clínicas e indicadores. Título universitario valorable.
+END_BUSQUEDA_048
+
+BUSQUEDA_049
+Ciberseguridad busca SOC Analyst Senior con SIEM, incident response y playbooks. Inglés técnico valorable.
+END_BUSQUEDA_049
+
+BUSQUEDA_050
+Industria busca Técnico/a de Mantenimiento con electricidad, mecánica y turnos. Libreta profesional puede sumar.
+END_BUSQUEDA_050
+
+BUSQUEDA_051
+Empresa de Canelones busca Jefe/a de Turno con producción, calidad y liderazgo. Turnos rotativos excluyentes.
+END_BUSQUEDA_051
+
+BUSQUEDA_052
+Software factory busca QA Automation Lead con Playwright, Cypress y CI/CD. No avanzar testers solo manuales.
+END_BUSQUEDA_052
+
+BUSQUEDA_053
+Empresa de pagos busca Fraud Operations Lead con reglas antifraude y chargebacks. SQL deseable.
+END_BUSQUEDA_053
+
+BUSQUEDA_054
+Colegio bilingüe busca Head of English Department con coordinación docente. Inglés avanzado excluyente.
+END_BUSQUEDA_054
+
+BUSQUEDA_055
+Telecomunicaciones busca NOC Lead con monitoreo de red y guardias. Cisco valorable.
+END_BUSQUEDA_055
+
+BUSQUEDA_056
+Clínica odontológica busca Director/a Operativo/a con múltiples sedes y agenda. Base Maldonado.
+END_BUSQUEDA_056
+
+BUSQUEDA_057
+Agroindustria busca Encargado/a de Planta de Silos con secado y calidad de grano. Interior del país.
+END_BUSQUEDA_057
+
+BUSQUEDA_058
+Estudio contable busca Tax Manager con impuestos y balances. No avanzar liquidadores junior.
+END_BUSQUEDA_058
+
+BUSQUEDA_059
+Empresa de moda busca E-commerce Operations Specialist con catálogo y marketplaces. Shopify valorable.
+END_BUSQUEDA_059
+
+BUSQUEDA_060
+Hospital privado busca Coordinador/a de Guardia con turnos y protocolos. Título habilitante requerido.
+END_BUSQUEDA_060
+
+BUSQUEDA_061
+Industrial busca Lead Mechanical Engineer con diseño, planos y montaje. SolidWorks valorable.
+END_BUSQUEDA_061
+
+BUSQUEDA_062
+Importadora busca Regional Sales Manager para distribuidores y vendedores. CRM obligatorio; base Montevideo.
+END_BUSQUEDA_062
+
+BUSQUEDA_063
+Software busca Staff Frontend Engineer con React y design systems. TypeScript excluyente.
+END_BUSQUEDA_063
+
+BUSQUEDA_064
+Sanatorio busca Jefe/a de Block Quirúrgico con cirugías e insumos. Título habilitante requerido.
+END_BUSQUEDA_064
+
+BUSQUEDA_065
+Cadena gastronómica busca Director/a de Operaciones con múltiples locales y costos. Base Montevideo.
+END_BUSQUEDA_065
+
+BUSQUEDA_066
+Plataforma educativa busca Product Marketing Manager con lanzamientos y campañas. Inglés plus.
+END_BUSQUEDA_066
+
+BUSQUEDA_067
+Metalúrgica busca Responsable de Producción CNC con programación y planos. No avanzar perfiles sin CNC.
+END_BUSQUEDA_067
+
+BUSQUEDA_068
+Financiera busca Treasury Lead con flujo de fondos, pagos y conciliaciones. Excel avanzado excluyente.
+END_BUSQUEDA_068
+
+BUSQUEDA_069
+Organización social busca Coordinador/a Territorial con equipos de campo e indicadores. Interior del país.
+END_BUSQUEDA_069
+
+BUSQUEDA_070
+Retail alimenticio busca Category Manager con pricing y negociación. Power BI valorable.
+END_BUSQUEDA_070
+
+BUSQUEDA_071
+Software factory busca Engineering Manager con developers y delivery. Inglés valorable.
+END_BUSQUEDA_071
+
+BUSQUEDA_072
+Empresa B2B busca Customer Operations Manager con SLA y automatización. Híbrido Montevideo/Canelones.
+END_BUSQUEDA_072
+
+BUSQUEDA_073
+Laboratorio busca Quality Assurance Specialist con GMP, CAPA y control documental. Inglés técnico plus.
+END_BUSQUEDA_073
+
+BUSQUEDA_074
+Industrial busca Responsable de Costos Industriales con costos estándar e inventarios. Power BI valorable.
+END_BUSQUEDA_074
+
+BUSQUEDA_075
+Tecnología busca Solutions Architect con preventa, APIs y cloud. No avanzar vendedores sin base técnica.
+END_BUSQUEDA_075
+
+BUSQUEDA_076
+Mutualista busca Coordinador/a de Atención Ambulatoria con agenda médica e indicadores. Montevideo presencial.
+END_BUSQUEDA_076
+
+BUSQUEDA_077
+Alimentos busca Research & Development Manager con formulaciones e inocuidad. No avanzar perfiles sin alimentos.
+END_BUSQUEDA_077
+
+BUSQUEDA_078
+Aseguradora busca Key Broker Manager con brokers y pólizas corporativas. CRM deseable.
+END_BUSQUEDA_078
+
+BUSQUEDA_079
+Ingeniería busca Technical Project Manager con cronogramas, riesgos y presupuesto. Inglés técnico valorable.
+END_BUSQUEDA_079
+
+BUSQUEDA_080
+Institución educativa busca Coordinador/a de Admisiones Internacionales con entrevistas. Inglés avanzado valorable.
+END_BUSQUEDA_080
+
+BUSQUEDA_081
+Agroexportadora busca Export Operations Lead con booking y despachantes. Base Montevideo, viajes a Colonia.
+END_BUSQUEDA_081
+
+BUSQUEDA_082
+Software busca Senior Mobile Developer con React Native y APIs. Kotlin o Swift valorables.
+END_BUSQUEDA_082
+
+BUSQUEDA_083
+Industrial busca Responsable de Mantenimiento Predictivo con vibraciones y termografía. SAP PM plus.
+END_BUSQUEDA_083
+
+BUSQUEDA_084
+Consumo masivo busca Trade Marketing Manager con activaciones y POP. BI valorable.
+END_BUSQUEDA_084
+
+BUSQUEDA_085
+Banco busca Senior Business Analyst con procesos financieros e historias de usuario. Inglés deseable.
+END_BUSQUEDA_085
+
+BUSQUEDA_086
+Manufactura busca Industrial Automation Engineer con PLC, SCADA y robots. Siemens valorable.
+END_BUSQUEDA_086
+
+BUSQUEDA_087
+Startup SaaS busca Customer Onboarding Specialist con implementación y capacitación. SQL básico plus.
+END_BUSQUEDA_087
+
+BUSQUEDA_088
+Industrial busca Responsable de Seguridad e Higiene con planta y accidentes. No avanzar perfiles solo administrativos.
+END_BUSQUEDA_088
+
+BUSQUEDA_089
+Consultora tecnológica busca Lead Business Analyst con stakeholders y user stories. Híbrido Montevideo.
+END_BUSQUEDA_089
+
+BUSQUEDA_090
+Distribución busca Warehouse Excellence Manager con WMS y picking. Canelones presencial.
+END_BUSQUEDA_090
+
+BUSQUEDA_091
+Salud busca Clinical Operations Manager con pacientes y profesionales. Montevideo y Maldonado.
+END_BUSQUEDA_091
+
+BUSQUEDA_092
+Fintech busca Payments Product Manager con adquirencia e integraciones. Inglés plus.
+END_BUSQUEDA_092
+
+BUSQUEDA_093
+Industria química busca Técnico/a de Procesos con seguridad y turnos. Formación técnica valorable.
+END_BUSQUEDA_093
+
+BUSQUEDA_094
+Seguros busca Claims Operations Lead con siniestros e indicadores. No avanzar perfiles sin seguros.
+END_BUSQUEDA_094
+
+BUSQUEDA_095
+Software busca DevSecOps Engineer con CI/CD, cloud y contenedores. Kubernetes valorable.
+END_BUSQUEDA_095
+
+BUSQUEDA_096
+Colegio privado busca Coordinador/a de Convivencia con mediación y familias. Título docente valorable.
+END_BUSQUEDA_096
+
+BUSQUEDA_097
+Transporte busca Fleet Maintenance Planner con preventivo y KPIs. Base Las Piedras.
+END_BUSQUEDA_097
+
+BUSQUEDA_098
+Tecnológica busca Head of Customer Support con soporte B2B y SLA. Remoto Uruguay con reuniones en Montevideo.
+END_BUSQUEDA_098
+
+BUSQUEDA_099
+Constructora busca Coordinador/a de Postventa de Obra con garantías. Punta del Este y Maldonado.
+END_BUSQUEDA_099
+
+BUSQUEDA_100
+Servicios tercerizados busca Workforce Planning Manager con forecast y dotación. WFM valorable.
+END_BUSQUEDA_100

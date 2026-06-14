@@ -202,6 +202,74 @@ def test_busqueda_001_blockers_and_modifier_only_fragments_are_removed_from_requ
     assert_flat_matches_nested_requirements(normalized, flat)
 
 
+def test_long_input_section_labels_and_orphan_tails_are_removed_from_requirements():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Requisitos"),
+                requirement_item("Responsabilidades"),
+                requirement_item("Principales responsabilidades"),
+                requirement_item("Nivel"),
+                requirement_item("Industria"),
+                requirement_item("Tiempo de empleo"),
+                requirement_item("Profesiones deseables"),
+                requirement_item("Deseables"),
+                requirement_item("Evaluaremos además"),
+                requirement_item("Para desarrollar"),
+                requirement_item("A fin de"),
+                requirement_item("Experiencia comprobable mínima de 3 años"),
+            ],
+        },
+        source_text="Requisitos: Experiencia comprobable mínima de 3 años. Deseables: inglés intermedio.",
+    )
+
+    assert_not_in_requirements_or_credentials(
+        normalized,
+        flat,
+        "Requisitos",
+        "Responsabilidades",
+        "Principales responsabilidades",
+        "Nivel",
+        "Industria",
+        "Tiempo de empleo",
+        "Profesiones deseables",
+        "Deseables",
+        "Evaluaremos además",
+        "Para desarrollar",
+        "A fin de",
+    )
+    assert "experiencia comprobable minima de 3 anos" in fold(flat["must_have"])
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
+def test_competencias_excluyentes_become_required_soft_competencies_not_technical_requirements():
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [
+                requirement_item("Experiencia comercial en dispositivos médicos"),
+            ],
+            "soft_competencies": [
+                requirement_item("Orientación a resultados", "must_have"),
+            ],
+        },
+        source_text=(
+            "Requisitos: experiencia comercial en dispositivos médicos. "
+            "Evaluaremos además las siguientes competencias excluyentes: "
+            "excelentes relaciones interpersonales y habilidades de negociación."
+        ),
+    )
+
+    soft = normalized["requirements"]["soft_competencies"]
+    soft_text = fold(soft)
+    assert "experiencia comercial en dispositivos medicos" in fold(flat["must_have"])
+    assert "competencias excluyentes" not in all_requirement_and_credential_text(normalized, flat)
+    assert "excelentes relaciones interpersonales" in soft_text
+    assert "habilidades de negociacion" in soft_text
+    assert any(item["importance"] == "must_have" for item in soft)
+    assert all(item["hard_filter_candidate"] is False for item in soft)
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_busqueda_008_no_excluyente_and_no_avanzar_retail_exclusions_are_not_requirements():
     normalized, flat = normalize_and_flatten(
         {

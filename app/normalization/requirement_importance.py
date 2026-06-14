@@ -71,6 +71,10 @@ CREDENTIAL_PATTERN = re.compile(
 
 ORPHAN_FRAGMENT_PATTERN = re.compile(
     r"^(?:y|e|o|and|or)\b|"
+    r"^(?:requisitos?|responsabilidades|principales\s+responsabilidades|nivel|industria|"
+    r"tiempo\s+de\s+empleo|profesiones|profesiones\s+deseables|competencias(?:\s+excluyentes)?|"
+    r"deseables?|evaluaremos\s+adem[aá]s|se\s+valorar[aá])$|"
+    r"^(?:para\s+desarrollar|a\s+fin\s+de|etc\.?)$|"
     r"^(?:software|hardware|redes?\s+b[aá]sicas?|soporte\s+remoto)$|"
     r"^(?:la\s+persona\s+deber[aá]\s+liderar|la\s+persona\s+deber[aá]\s+haber\s+trabajado\s+con|"
     r"la\s+persona\s+deber[aá]|"
@@ -218,6 +222,11 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     }
     blockers = _normalize_blocker_list(requirements.get("blockers", []) or [])
     source_text = source_text or ""
+    soft_competencies = [
+        dict(item)
+        for item in requirements.get("soft_competencies", []) or []
+        if isinstance(item, Mapping)
+    ]
 
     for section_name, default in (
         ("must_have", MUST_HAVE),
@@ -255,6 +264,20 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
 
     if source_text:
         for source_item in _source_requirement_items(source_text):
+            competency_text = _mandatory_competency_text(source_item.text) or _mandatory_competency_text(
+                source_item.source_text
+            )
+            if competency_text:
+                source_mapping = _requirement_item_to_mapping(
+                    RequirementItem(
+                        text=competency_text,
+                        importance=MUST_HAVE,
+                        source_text=source_item.source_text,
+                    )
+                )
+                source_mapping["hard_filter_candidate"] = False
+                soft_competencies.append(source_mapping)
+                continue
             source_mapping = _requirement_item_to_mapping(source_item)
             target = _bucket_for_importance(source_item.importance)
             if source_item.blocker:
@@ -283,7 +306,7 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     requirements["nice_to_have"] = nice_to_have
     requirements["credentials"] = _unique_credentials_by_strongest_importance(buckets["credentials"])
     requirements["blockers"] = _normalize_blocker_list(blockers)
-    requirements["soft_competencies"] = _normalize_soft_competencies(requirements.get("soft_competencies", []))
+    requirements["soft_competencies"] = _normalize_soft_competencies(soft_competencies)
     requirements = _normalize_blockers_and_negations(requirements, source_text)
     requirements = _dedupe_requirement_concepts(requirements)
     output["requirements"] = requirements
@@ -597,6 +620,19 @@ def _requirement_item_to_mapping(item: RequirementItem) -> Dict[str, Any]:
     }
 
 
+def _mandatory_competency_text(text: str) -> str:
+    match = re.match(
+        r"^\s*(?:evaluaremos\s+adem[aá]s\s+(?:las\s+siguientes\s+)?)?"
+        r"competencias\s+excluyentes\s*:\s*(?P<body>.+)$",
+        str(text or "").strip(),
+        re.I | re.S,
+    )
+    if not match:
+        return ""
+    clean = re.sub(r"\s+", " ", match.group("body")).strip(" -:.,;\t\r\n")
+    return _capitalize_first(_normalize_accents(clean)) if clean else ""
+
+
 def _normalize_soft_competencies(items: Any) -> List[Dict[str, Any]]:
     output: List[Dict[str, Any]] = []
     if not isinstance(items, list):
@@ -836,7 +872,11 @@ def _has_dangling_connector_tail(text: str) -> bool:
 
 def _strip_section_heading(text: str) -> str:
     return re.sub(
-        r"^\s*(?:nice\s+to\s+have|must\s+have|required|requirements?|requisitos?|credenciales?(?:\s+(?:requerid[oa]s?|obligatori[oa]s?|excluyentes?))?|formaci[oó]n(?:\s+(?:requerid[oa]s?|obligatori[oa]s?|excluyentes?))?)\s*:\s*",
+        r"^\s*(?:nice\s+to\s+have|must\s+have|required|requirements?|requisitos?|"
+        r"responsabilidades|principales\s+responsabilidades|nivel|industria|tiempo\s+de\s+empleo|"
+        r"profesiones\s+deseables|competencias(?:\s+excluyentes)?|deseables?|"
+        r"credenciales?(?:\s+(?:requerid[oa]s?|obligatori[oa]s?|excluyentes?))?|"
+        r"formaci[oó]n(?:\s+(?:requerid[oa]s?|obligatori[oa]s?|excluyentes?))?)\s*:\s*",
         "",
         text.strip(),
         flags=re.I,

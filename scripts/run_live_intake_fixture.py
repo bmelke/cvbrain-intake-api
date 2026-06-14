@@ -61,6 +61,7 @@ FAIL_FALLBACK = "FAIL_FALLBACK"
 FAIL_EMPTY = "FAIL_EMPTY"
 FAIL_PUBLIC_ARTIFACT = "FAIL_PUBLIC_ARTIFACT"
 FAIL_TITLE_CASING = "FAIL_TITLE_CASING"
+FAIL_TITLE_SOURCE_SPAN = "FAIL_TITLE_SOURCE_SPAN"
 FAIL_ORPHAN_FRAGMENTS = "FAIL_ORPHAN_FRAGMENTS"
 FAIL_IMPORTANCE = "FAIL_IMPORTANCE"
 
@@ -368,6 +369,8 @@ def classify_result(source_text: str, record: ResponseRecord, expect_live_ai: bo
 
     title_notes = title_casing_notes_for(source_text, data)
     if title_notes:
+        if any(note.startswith("title_source_span_mismatch:") for note in title_notes):
+            return FAIL_TITLE_SOURCE_SPAN, title_notes
         return FAIL_TITLE_CASING, title_notes
 
     orphan_notes = orphan_fragment_notes(data)
@@ -438,7 +441,7 @@ def _explicit_source_role_title_span(source_text: str) -> str:
         return ""
     patterns = (
         re.compile(
-            r"\b(?:busca|buscamos|selecciona|seleccionamos|incorpora|incorporar|"
+            r"\b(?:busca|buscamos|buscando|estamos\s+buscando|selecciona|seleccionamos|incorpora|incorporar|"
             r"contrata|requiere|necesita|necesitamos|rol\s*:|se\s+busca)\s+"
             r"(?:(?:un|una|el|la|un/a)\s+)?(?P<tail>.{0,180})",
             re.I | re.S,
@@ -467,6 +470,8 @@ def _source_title_from_tail(text: str) -> str:
         flags=re.I | re.S,
     )
     title = re.sub(r"^(?:un|una|el|la|un/a)\s+", "", title.strip(), flags=re.I)
+    if title.endswith(" clave"):
+        title = title[: -len(" clave")]
     title = re.sub(r"\s+", " ", title).strip(" -:.,;\t\r\n")
     if not title or len(title.split()) > 9:
         return ""
@@ -489,14 +494,14 @@ def _looks_source_title_span(title: str) -> bool:
     if re.search(
         r"\b(?:administrativ[oa]|abogad[oa]|agente|analista|arquitect[oa]|asistente|comprador[ae]?|"
         r"coordinador[ae]?|consultor[ae]?|dibujante|disenador[ae]?|diseñador[ae]?|ejecutiv[oa]|"
-        r"encargad[oa]|gerente|ingenier[oa]|jefe|jefa|licenciad[oa]|operari[oa]|planificador[ae]?|"
+        r"director[ae]?|encargad[oa]|gerente|ingenier[oa]|jefe|jefa|licenciad[oa]|operari[oa]|planificador[ae]?|"
         r"responsable|supervisor[ae]?|tecnic[oa]|t[eé]cnic[oa]|vendedor[ae]?)\b",
         folded,
     ):
         return True
     return bool(
         re.search(
-            r"\b(?:manager|specialist|consultant|engineer|owner|analyst|lead|writer|designer|"
+            r"\b(?:manager|executive|specialist|consultant|engineer|owner|analyst|lead|head|writer|designer|"
             r"developer|coordinator|architect|support|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
             folded,
         )

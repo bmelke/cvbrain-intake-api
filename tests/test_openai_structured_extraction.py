@@ -373,6 +373,7 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "QA, UX, UI, UX/UI, IT, CRM, ERP, TMS, WMS, BI, AWS, Azure, GCP, SAP" in system_prompt
     assert "Coordinador/a de Admisiones" in system_prompt
     assert "Technical Support Specialist" in system_prompt
+    assert "Director/a de Secundaria" in system_prompt
     assert "Consultora tecnológica" in system_prompt
     assert "Public output contract:" in system_prompt
     assert "Source_text_span_missing_from_rules" in system_prompt
@@ -388,8 +389,18 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Debe manejar métricas, calidad, ausentismo, turnos, coaching" in system_prompt
     assert "Es excluyente experiencia en RRHH generalista, con exposición a conflictos laborales" in system_prompt
     assert "Hard cues beat weak/contextual experience heuristics" in system_prompt
+    assert "Long input segmentation contract:" in system_prompt
+    assert "role title, responsibilities, requirements, desirable items, competencies" in system_prompt
+    assert "Responsibilities, tasks, and accountabilities should inform job_tasks" in system_prompt
+    assert "Do not turn every bullet, sentence, responsibility, or section item into must_have." in system_prompt
+    assert "Competency contract:" in system_prompt
+    assert "competencias excluyentes" in system_prompt
+    assert "mandatory soft competencies" in system_prompt
+    assert "must not become technical hard filters or blockers" in system_prompt
     assert "Orphan fragment contract:" in system_prompt
     assert "La persona deberá" in system_prompt
+    assert "Forbidden naked section labels include Requisitos" in system_prompt
+    assert "Para desarrollar" in system_prompt
     assert "La persona deberá liderar pagos" in system_prompt
     assert "Empresa digital busca UX/UI Designer con experiencia en producto" in system_prompt
     assert "Industria alimenticia busca Especialista en Compras para gestionar proveedores" in system_prompt
@@ -581,6 +592,75 @@ def test_common_english_title_in_spanish_source_is_preserved_when_source_uses_it
     assert result["role_title"] == source_title
     assert result["job_intelligence"]["job_profile"]["job_title"] == source_title
     assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == source_title
+
+
+@pytest.mark.parametrize(
+    "source_title",
+    [
+        "Key Account Manager",
+        "Strategic Account Manager",
+        "Enterprise Account Executive",
+        "Senior Product Manager",
+        "Lead UX Designer",
+        "Principal Backend Engineer",
+        "Technical Support Specialist",
+        "Customer Success Manager",
+        "Field Service Coordinator",
+        "Service Delivery Manager",
+        "Regional Operations Manager",
+        "Corporate Legal Manager",
+    ],
+)
+def test_leading_title_modifiers_are_preserved_from_explicit_source_span(source_title):
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload("Account Manager")}),
+    )
+
+    result = extractor.extract(request(f"Empresa regional busca {source_title} con experiencia B2B."))
+
+    assert result["role_title"] == source_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == source_title
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == source_title
+
+
+def test_key_account_manager_full_title_span_wins_over_inner_preserved_title():
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload("Account Manager")}),
+    )
+
+    result = extractor.extract(
+        request(
+            "Empresa farmacéutica busca Key Account Manager con experiencia en cuentas institucionales, "
+            "licitaciones, negociación, forecast y relación con distribuidores."
+        )
+    )
+
+    assert result["role_title"] == "Key Account Manager"
+    assert result["job_intelligence"]["job_profile"]["job_title"] == "Key Account Manager"
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == "Key Account Manager"
+
+
+def test_long_form_account_manager_source_span_preserves_uppercase_and_seniority():
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        client=FakeOpenAIClient(response={"output_parsed": role_title_payload("Account Manager")}),
+    )
+
+    result = extractor.extract(
+        request(
+            "Estamos buscando un ACCOUNT MANAGER Semi Senior para desarrollar nuestra cartera de clientes "
+            "con base en Montevideo. Requisitos: experiencia mínima de 3 años en dispositivos médicos."
+        )
+    )
+
+    assert result["role_title"] == "ACCOUNT MANAGER Semi Senior"
+    assert result["job_intelligence"]["job_profile"]["job_title"] == "ACCOUNT MANAGER Semi Senior"
+    assert result["job_intelligence"]["job_profile"]["normalized_role_title"] == "ACCOUNT MANAGER Semi Senior"
 
 
 @pytest.mark.parametrize(
@@ -936,11 +1016,16 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "For output, incoming source case wins." in repair_prompt
     assert "Do not return a public API envelope" in repair_prompt
     assert "Agente Comercial" in repair_prompt
+    assert "Director/a de Secundaria" in repair_prompt
+    assert "Never respond with ok=false for normal recruiter prose" in repair_prompt
     assert "Public output contract:" in repair_prompt
     assert "Source_text_span_missing_from_rules" in repair_prompt
     assert "classification_rationale_id_missing" in repair_prompt
     assert "Requirement list inheritance contract:" in repair_prompt
     assert "Libreta de conducir será valorable si debe recorrer servicios" in repair_prompt
+    assert "Long input segmentation contract:" in repair_prompt
+    assert "Competency contract:" in repair_prompt
+    assert "competencias excluyentes" in repair_prompt
     assert "Orphan fragment contract:" in repair_prompt
     assert "Duplicate/component contract:" in repair_prompt
     assert "Negative-fragment contract:" in repair_prompt
@@ -974,6 +1059,43 @@ def test_ai_schema_repair_recovers_from_public_error_stub_for_normal_recruiter_p
     assert result["ai_schema_repaired"] is True
     assert result["role_title"] == "Agente Comercial"
     assert len(fake_client.responses.calls) == 2
+
+
+def test_ai_schema_stub_recovery_handles_directora_de_secundaria_after_failed_repairs():
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"output_parsed": {"ok": False, "warnings": ["ai_schema_validation_failed"], "engine": "openai"}},
+            {"output_parsed": {"ok": False, "warnings": ["ai_schema_validation_failed"], "engine": "openai"}},
+            {"output_parsed": {"ok": False, "warnings": ["ai_schema_validation_failed"], "engine": "openai"}},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+    source_text = (
+        "Colegio privado busca Director/a de Secundaria con experiencia obligatoria en gestión académica, "
+        "liderazgo docente, convivencia, relación con familias e indicadores educativos. "
+        "Título docente habilitante es excluyente."
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert result["ai_schema_repaired"] is True
+    assert result["role_title"] == "Director/a de Secundaria"
+    assert result["job_intelligence"]["job_profile"]["job_title"] == "Director/a de Secundaria"
+    assert "Experiencia obligatoria en gestión académica" in result["must_have"]
+    assert "Liderazgo docente" in result["must_have"]
+    assert "Convivencia" in result["must_have"]
+    assert "Relación con familias" in result["must_have"]
+    assert "Indicadores educativos" in result["must_have"]
+    assert "Título docente habilitante es excluyente" in result["credentials"]["required"]
+    assert len(fake_client.responses.calls) == 3
 
 
 def test_ai_invalid_json_repair_success_returns_openai_result_with_marker():

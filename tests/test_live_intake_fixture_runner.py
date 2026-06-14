@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -12,6 +13,9 @@ FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_100_busque
 CHALLENGE_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_50_challenge_plus_regressions.txt"
 CHALLENGE_V2_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_50_challenge_v2_plus_failures.txt"
 CHALLENGE_V3_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_50_challenge_v3_plus_importance_regression.txt"
+CHALLENGE_V4_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_100_challenge_v4_plus_v3_failures.txt"
+URUGUAY_MIXED_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_100_uruguay_mixed_long_short_challenge_v1.txt"
+FORBIDDEN_ARGENTINA_LOCATION_PATTERN = re.compile(r"\b(?:Buenos\s+Aires|CABA|GBA|Argentina|AMBA)\b", re.I)
 
 spec = importlib.util.spec_from_file_location("run_live_intake_fixture", RUNNER_PATH)
 runner = importlib.util.module_from_spec(spec)
@@ -108,6 +112,67 @@ def test_challenge_v3_fixture_reads_51_cases_and_keeps_importance_regression_exa
         assert "END_BUSQUEDA_" not in case.source_text
         assert "role_hint" not in case.source_text.lower()
     assert challenge_cases[-1].source_text == previous_cases["BUSQUEDA_001"]
+
+
+def test_challenge_v4_fixture_reads_102_cases_and_keeps_v3_failures_exact():
+    v3_cases = {case.id: case.source_text for case in runner.parse_fixture(CHALLENGE_V3_FIXTURE_PATH)}
+    challenge_cases = runner.parse_fixture(CHALLENGE_V4_FIXTURE_PATH)
+    raw_first_line = CHALLENGE_V4_FIXTURE_PATH.read_text(encoding="utf-8").splitlines()[0]
+
+    runner.validate_case_sequence(challenge_cases, 102)
+    assert raw_first_line == "BUSQUEDA_001"
+    assert len(challenge_cases[:100]) == 100
+    for case in challenge_cases:
+        assert case.source_text.strip()
+        assert "BUSQUEDA_" not in case.source_text
+        assert "END_BUSQUEDA_" not in case.source_text
+        assert "role_hint" not in case.source_text.lower()
+
+    by_id = {case.id: case.source_text for case in challenge_cases}
+    assert by_id["BUSQUEDA_101"] == v3_cases["BUSQUEDA_028"]
+    assert by_id["BUSQUEDA_102"] == v3_cases["BUSQUEDA_046"]
+
+
+def test_uruguay_mixed_long_short_fixture_reads_100_cases_without_metadata_or_forbidden_locations():
+    cases = runner.parse_fixture(URUGUAY_MIXED_FIXTURE_PATH)
+    raw_lines = URUGUAY_MIXED_FIXTURE_PATH.read_text(encoding="utf-8").splitlines()
+    serialized = "\n".join(case.source_text for case in cases)
+
+    runner.validate_case_sequence(cases, 100)
+    assert raw_lines[0] == "BUSQUEDA_001"
+    assert len(cases[:20]) == 20
+    assert len(cases[20:]) == 80
+    assert all(len(case.source_text.split()) >= 120 for case in cases[:20])
+    assert all(len(case.source_text.split()) <= 40 for case in cases[20:])
+    assert all(_sentence_count(case.source_text) <= 4 for case in cases[20:])
+    assert not FORBIDDEN_ARGENTINA_LOCATION_PATTERN.search(serialized)
+    for case in cases:
+        assert case.source_text.strip()
+        assert "BUSQUEDA_" not in case.source_text
+        assert "END_BUSQUEDA_" not in case.source_text
+        assert "role_hint" not in case.source_text.lower()
+        assert "TASK " not in case.source_text
+
+
+def test_uruguay_mixed_fixture_first_long_account_manager_case_is_uruguay_adaptation():
+    first_case = runner.parse_fixture(URUGUAY_MIXED_FIXTURE_PATH)[0]
+    payload = runner.build_request(first_case)
+
+    assert first_case.id == "BUSQUEDA_001"
+    assert "ACCOUNT MANAGER Semi Senior" in first_case.source_text
+    assert "Montevideo" in first_case.source_text
+    assert "Canelones" in first_case.source_text
+    assert "interior del país" in first_case.source_text
+    assert "dispositivos médicos" in first_case.source_text
+    assert "competencias excluyentes" in first_case.source_text.lower()
+    assert not FORBIDDEN_ARGENTINA_LOCATION_PATTERN.search(first_case.source_text)
+    assert payload["source_text"] == first_case.source_text
+    assert payload["locale"] == "es-UY"
+    assert "role_hint" not in json.dumps(payload, ensure_ascii=False).lower()
+
+
+def _sentence_count(text):
+    return len([chunk for chunk in runner.re.split(r"[.!?]+", text) if chunk.strip()])
 
 
 def test_build_request_sends_only_real_hr_text_and_allowed_payload_fields():
@@ -555,8 +620,19 @@ def test_runner_fails_when_role_title_misses_explicit_source_span(source_text, w
         expect_live_ai=True,
     )
 
-    assert classification == runner.FAIL_TITLE_CASING
+    assert classification == runner.FAIL_TITLE_SOURCE_SPAN
     assert notes == [f"title_source_span_mismatch:{expected_title}!={wrong_title}"]
+
+
+def test_runner_fails_when_key_account_manager_title_span_is_clipped():
+    classification, notes = runner.classify_result(
+        "Empresa farmacéutica busca Key Account Manager con experiencia en cuentas institucionales.",
+        successful_record(role_title="Account Manager"),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_TITLE_SOURCE_SPAN
+    assert notes == ["title_source_span_mismatch:Key Account Manager!=Account Manager"]
 
 
 def test_runner_accepts_exact_role_title_source_casing():
