@@ -275,6 +275,28 @@ def test_504_empty_body_is_classified_as_timeout_not_invalid_json():
     assert "invalid_json" not in record.error
 
 
+def test_provider_timeout_warning_is_classified_as_timeout_not_provider_error():
+    record = runner.ResponseRecord(
+        200,
+        {
+            "ok": False,
+            "warnings": ["ai_provider_timeout"],
+            "engine": "openai",
+            "fallback_used": False,
+        },
+        "{}",
+    )
+
+    classification, notes = runner.classify_result(
+        "Texto normal de recruiter que agotó el timeout del proveedor.",
+        record,
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_TIMEOUT
+    assert notes == ["ai_provider_timeout"]
+
+
 def test_runner_records_timeout_failure_metadata_for_empty_504(tmp_path):
     source = "Texto largo de recruiter. " * 200
     cases = [runner.Case("BUSQUEDA_001", source)]
@@ -452,6 +474,48 @@ def test_runner_accepts_busqueda_091_deseable_group_as_should_have():
     classification, notes = runner.classify_result(
         "Deseable inglés, protocolo y experiencia con eventos empresariales.",
         successful_record(should_have=["Inglés", "Protocolo", "Experiencia con eventos empresariales"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_accepts_deseables_section_item_even_when_it_overlaps_hard_section_terms():
+    source_text = (
+        "Requisitos excluyentes: experiencia comercial en salud, laboratorios, equipamiento médico, "
+        "dispositivos médicos o servicios vinculados al sector.\n"
+        "Deseables: Experiencia en dispositivos médicos del sector imágenes o ultrasonido."
+    )
+
+    classification, notes = runner.classify_result(
+        source_text,
+        successful_record(
+            must_have=[
+                "Experiencia comercial en salud, laboratorios, equipamiento médico, dispositivos médicos o servicios vinculados al sector"
+            ],
+            should_have=["Experiencia en dispositivos médicos del sector imágenes o ultrasonido"],
+        ),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_accepts_responsibility_overlap_when_hard_requirement_is_represented_elsewhere():
+    source_text = (
+        "Requisitos excluyentes: experiencia en SOC, SIEM, hardening, incident response, playbooks "
+        "y liderazgo técnico.\n"
+        "Responsabilidades: definir playbooks y liderar incident response."
+    )
+
+    classification, notes = runner.classify_result(
+        source_text,
+        successful_record(
+            must_have=["Experiencia en SOC, SIEM, hardening, incident response, playbooks y liderazgo técnico"],
+            should_have=["Definir playbooks y liderar incident response"],
+        ),
         expect_live_ai=True,
     )
 

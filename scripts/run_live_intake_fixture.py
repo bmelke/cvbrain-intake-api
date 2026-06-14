@@ -126,6 +126,46 @@ BLOCKER_CLAUSE_PATTERN = re.compile(
     r"\b(no\s+avanzar|no\s+presentarse\s+si\s+no|no\s+considerar)\b",
     re.I,
 )
+PROVIDER_TIMEOUT_WARNINGS = {"ai_provider_timeout", "ai_timeout", "request_timeout"}
+SOFT_SECTION_LABELS = {
+    "deseable",
+    "deseables",
+    "valorable",
+    "valorables",
+    "se valora",
+    "se valorara",
+    "se valorará",
+    "plus",
+    "nice to have",
+    "nice-to-have",
+}
+RESPONSIBILITY_SECTION_LABELS = {
+    "responsabilidad",
+    "responsabilidades",
+    "principales responsabilidades",
+    "tareas",
+    "funciones",
+    "principales funciones",
+}
+HARD_SECTION_LABELS = {
+    "requisito",
+    "requisitos",
+    "requisitos excluyentes",
+    "excluyentes",
+    "credenciales requeridas",
+    "competencias excluyentes",
+    "must have",
+    "must-have",
+}
+SECTION_HEADING_PATTERN = re.compile(
+    r"^\s*(?P<label>"
+    r"requisitos(?:\s+excluyentes)?|excluyentes|credenciales\s+requeridas|"
+    r"competencias\s+excluyentes|deseables?|valorables?|se\s+valora|se\s+valorar[aá]|"
+    r"plus|nice[-\s]to[-\s]have|responsabilidades?|principales\s+responsabilidades|"
+    r"tareas|funciones|principales\s+funciones|must[-\s]have"
+    r")\s*:\s*(?P<body>.*)$",
+    re.I,
+)
 METADATA_ARTIFACT_PATTERN = re.compile(
     r"\b(?:source(?:[_\s-]*text)?[_\s-]*span(?:[_\s-]*(?:missing|hint|not[_\s-]*provided|from[_\s-]*rules|for[_\s-]*blocker|\d+))*|"
     r"hard[_\s-]*filter[_\s-]*(?:candidate|approved)[_\s-]*as[_\s-]*written|"
@@ -140,6 +180,12 @@ METADATA_ARTIFACT_PATTERN = re.compile(
 class Case:
     id: str
     source_text: str
+
+
+@dataclass(frozen=True)
+class SectionedClause:
+    section: str
+    text: str
 
 
 @dataclass
@@ -430,11 +476,15 @@ def classify_result(source_text: str, record: ResponseRecord, expect_live_ai: bo
     if record.data is None:
         return FAIL_TECHNICAL, [record.error or "response_not_valid_json"]
     if data.get("ok") is not True:
+        if any(warning in PROVIDER_TIMEOUT_WARNINGS for warning in warnings):
+            return FAIL_TIMEOUT, warnings
         if "ai_schema_validation_failed" in warnings:
             return FAIL_SCHEMA, warnings
         if "ai_provider_error" in warnings:
             return FAIL_PROVIDER, warnings
         return FAIL_TECHNICAL, warnings or ["ok_not_true"]
+    if any(warning in PROVIDER_TIMEOUT_WARNINGS for warning in warnings):
+        return FAIL_TIMEOUT, warnings
     if "ai_schema_validation_failed" in warnings:
         return FAIL_SCHEMA, warnings
     if "ai_provider_error" in warnings:
@@ -650,9 +700,16 @@ def _public_strings(value: Any, path: str = "$") -> List[tuple[str, str]]:
 
 def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]:
     notes: List[str] = []
+    sectioned = sectioned_clauses(source_text)
+    soft_section_clauses = [clause.text for clause in sectioned if clause.section == "soft"]
+    responsibility_clauses = [clause.text for clause in sectioned if clause.section == "responsibility"]
     weak_clauses = modifier_clauses(source_text, WEAK_MODIFIER_PATTERN, exclude=STRONG_PREFERENCE_PATTERN)
-    preference_clauses = modifier_clauses(source_text, STRONG_PREFERENCE_PATTERN) + weak_clauses
-    hard_clauses = modifier_clauses(source_text, HARD_MODIFIER_PATTERN)
+    preference_clauses = modifier_clauses(source_text, STRONG_PREFERENCE_PATTERN) + weak_clauses + soft_section_clauses
+    hard_clauses = [
+        clause.text
+        for clause in sectioned
+        if HARD_MODIFIER_PATTERN.search(clause.text) and clause.section not in {"soft", "responsibility"}
+    ]
 
     for bucket, item in _requirement_and_credential_items(data):
         if BLOCKER_CLAUSE_PATTERN.search(item):
@@ -662,12 +719,23 @@ def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]
         for item in _string_list(data.get(bucket, [])):
             if _explicit_hard_cue_governs_item(item, hard_clauses):
                 continue
+            if any(_clause_strongly_matches_item(clause, item) for clause in soft_section_clauses):
+                if bucket == "should_have":
+                    continue
+                notes.append(f"weak_modifier_over_promoted:{bucket}:{item}")
+                continue
             if any(_clause_matches_item(clause, item) for clause in weak_clauses):
                 notes.append(f"weak_modifier_over_promoted:{bucket}:{item}")
 
     for bucket in ("should_have", "nice_to_have"):
         for item in _string_list(data.get(bucket, [])):
             if any(_clause_matches_item(clause, item) for clause in preference_clauses):
+                continue
+            if any(_clause_matches_item(clause, item) for clause in responsibility_clauses) and _hard_requirement_represented_elsewhere(
+                item,
+                hard_clauses,
+                data,
+            ):
                 continue
             if any(_clause_matches_item(clause, item) for clause in hard_clauses):
                 notes.append(f"hard_modifier_under_promoted:{bucket}:{item}")
@@ -781,6 +849,59 @@ def modifier_clauses(
     return clauses
 
 
+def sectioned_clauses(source_text: str) -> List[SectionedClause]:
+    clauses: List[SectionedClause] = []
+    current_section = ""
+    for line in re.split(r"\n+", source_text or ""):
+        raw_line = line.strip()
+        if not raw_line:
+            continue
+        heading = SECTION_HEADING_PATTERN.match(raw_line)
+        if heading:
+            current_section = _section_kind(heading.group("label"))
+            raw_line = heading.group("body").strip()
+            if not raw_line:
+                continue
+        for part in re.split(r"[.;]+", raw_line):
+            clean = part.strip()
+            if not clean:
+                continue
+            inline_heading = SECTION_HEADING_PATTERN.match(clean)
+            if inline_heading:
+                current_section = _section_kind(inline_heading.group("label"))
+                clean = inline_heading.group("body").strip()
+                if not clean:
+                    continue
+            clauses.append(SectionedClause(current_section, clean))
+    return clauses
+
+
+def _section_kind(label: str) -> str:
+    clean = _fold(label).replace("-", " ")
+    clean = re.sub(r"\s+", " ", clean).strip(" :")
+    if clean in {_fold(value).replace("-", " ") for value in SOFT_SECTION_LABELS}:
+        return "soft"
+    if clean in {_fold(value).replace("-", " ") for value in RESPONSIBILITY_SECTION_LABELS}:
+        return "responsibility"
+    if clean in {_fold(value).replace("-", " ") for value in HARD_SECTION_LABELS}:
+        return "hard"
+    return ""
+
+
+def _hard_requirement_represented_elsewhere(item: str, hard_clauses: Iterable[str], data: Mapping[str, Any]) -> bool:
+    matching_hard_clauses = [clause for clause in hard_clauses if _clause_matches_item(clause, item)]
+    if not matching_hard_clauses:
+        return False
+    hard_outputs = _string_list(data.get("must_have", []))
+    credentials = data.get("credentials", {}) if isinstance(data.get("credentials"), Mapping) else {}
+    hard_outputs.extend(_string_list(credentials.get("required", [])))
+    return any(
+        _clause_matches_item(clause, hard_item)
+        for clause in matching_hard_clauses
+        for hard_item in hard_outputs
+    )
+
+
 def _explicit_hard_cue_governs_item(item: str, hard_clauses: Iterable[str]) -> bool:
     if EXPLICIT_HARD_CUE_PATTERN.search(item):
         return True
@@ -797,6 +918,18 @@ def _clause_matches_item(clause: str, item: str) -> bool:
         return False
     overlap = clause_tokens & item_tokens
     return len(overlap) >= min(2, len(item_tokens))
+
+
+def _clause_strongly_matches_item(clause: str, item: str) -> bool:
+    clause_tokens = _meaningful_tokens(clause)
+    item_tokens = _meaningful_tokens(item)
+    if not clause_tokens or not item_tokens:
+        return False
+    overlap = clause_tokens & item_tokens
+    threshold = min(len(clause_tokens), len(item_tokens))
+    if threshold <= 2:
+        return len(overlap) == threshold
+    return len(overlap) >= threshold - 1
 
 
 def _meaningful_tokens(text: str) -> set[str]:

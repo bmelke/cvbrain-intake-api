@@ -149,6 +149,19 @@ PUBLIC_NEGATIVE_FRAGMENT_PATTERN = re.compile(
     re.I,
 )
 
+META_POLICY_FRAGMENT_PATTERN = re.compile(
+    r"\b("
+    r"estos\s+puntos\s+suman\s+valor|"
+    r"estos\s+puntos\s+ser[aá]n\s+considerados|"
+    r"pero\s+no\s+deben\s+desplazar\s+los\s+requisitos\s+excluyentes|"
+    r"no\s+deben\s+desplazar(?:\s+los\s+requisitos\s+excluyentes)?|"
+    r"la\s+evaluaci[oó]n\s+considerar[aá]\s+evidencia\s+laboral(?:\s+e\s+instancias\s+de\s+entrevista)?|"
+    r"se\s+evaluar[aá]\s+durante\s+entrevista|"
+    r"suman\s+valor[\s,;:-]+pero"
+    r")\b",
+    re.I,
+)
+
 
 @dataclass(frozen=True)
 class RequirementItem:
@@ -1108,12 +1121,13 @@ def _is_alternative_requirement_text(text: str) -> bool:
 def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     text = normalize_requirement_text(str(item.get("text", "")).strip())
     source_text = str(item.get("source_text", "")).strip()
-    if not text or _is_metadata_artifact_text(text):
+    if not text or _is_metadata_artifact_text(text) or _is_meta_policy_fragment(text):
         return {}
     if (
         _is_orphan_requirement_text(text)
         or _is_modifier_only_fragment(text)
         or _is_modifier_only_fragment(source_text)
+        or _is_meta_policy_fragment(source_text)
     ):
         return {}
     if _is_metadata_artifact_text(source_text):
@@ -1285,6 +1299,8 @@ def _clean_requirement_items(items: Any, blockers: List[str]) -> tuple[List[Dict
             _is_modifier_only_fragment(text)
             or _is_modifier_only_fragment(source_text)
             or _is_orphan_requirement_text(text)
+            or _is_meta_policy_fragment(text)
+            or _is_meta_policy_fragment(source_text)
             or _has_negative_filter_modifier(text)
             or _has_negative_filter_modifier(source_text)
         ):
@@ -1328,6 +1344,8 @@ def _normalize_blocker_text(text: str) -> str:
     had_final_period = raw.strip().endswith(".")
     clean = _normalize_accents(raw)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;\t\r\n")
+    if _is_meta_policy_fragment(clean):
+        return ""
     clean = re.sub(r"^(no\s+(?:solo|solamente)\s+.+?)\s+\1$", r"\1", clean, flags=re.I)
     clean = re.sub(r"^criterio\s+de\s+no\s+avanzar\b", "No avanzar", clean, flags=re.I)
     clean = re.sub(r"\bcriterio\s+de\s*\.?\s*", "", clean, flags=re.I)
@@ -1429,7 +1447,16 @@ def _is_modifier_only_fragment(text: str) -> bool:
         return True
     if _is_metadata_artifact_text(clean):
         return True
+    if _is_meta_policy_fragment(clean):
+        return True
     return any(pattern.match(clean) for pattern in MODIFIER_ONLY_FRAGMENT_PATTERNS)
+
+
+def _is_meta_policy_fragment(text: str) -> bool:
+    clean = str(text).strip(" -:.,;\t\r\n")
+    if not clean:
+        return False
+    return bool(META_POLICY_FRAGMENT_PATTERN.search(clean))
 
 
 def _is_metadata_artifact_text(text: str) -> bool:
@@ -1454,12 +1481,12 @@ def _sanitize_public_output_contract(value: Any, key: str = "") -> Any:
     if isinstance(value, list):
         output = []
         for item in value:
-            if isinstance(item, str) and _contains_metadata_artifact_text(item):
+            if isinstance(item, str) and (_contains_metadata_artifact_text(item) or _is_meta_policy_fragment(item)):
                 continue
             output.append(_sanitize_public_output_contract(item, key))
         return output
     if isinstance(value, str):
-        if _contains_metadata_artifact_text(value):
+        if _contains_metadata_artifact_text(value) or _is_meta_policy_fragment(value):
             return ""
         if key == "source_text" and _contains_public_negative_fragment(value):
             return ""

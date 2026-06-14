@@ -170,6 +170,31 @@ def all_user_facing_text(normalized, flat):
     )
 
 
+def test_recruiter_meta_policy_sentences_are_removed_from_public_requirement_arrays():
+    fragments = [
+        "Estos puntos suman valor",
+        "Pero no deben desplazar los requisitos excluyentes",
+        "Estos puntos serán considerados",
+        "La evaluación considerará evidencia laboral e instancias de entrevista",
+        "Se evaluará durante entrevista",
+        "Suman valor, pero no son excluyentes",
+    ]
+    normalized, flat = normalize_and_flatten(
+        {
+            "must_have": [requirement_item(fragments[0]), requirement_item(fragments[1])],
+            "should_have": [requirement_item(fragments[2], "preferred")],
+            "nice_to_have": [requirement_item(fragments[3], "nice_to_have")],
+            "blockers": [fragments[4]],
+            "soft_competencies": [requirement_item(fragments[5], "preferred")],
+        }
+    )
+
+    haystack = all_user_facing_text(normalized, flat)
+    for fragment in fragments:
+        assert fold(fragment) not in haystack
+    assert_flat_matches_nested_requirements(normalized, flat)
+
+
 def test_busqueda_001_blockers_and_modifier_only_fragments_are_removed_from_requirements():
     normalized, flat = normalize_and_flatten(
         {

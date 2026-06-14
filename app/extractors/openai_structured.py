@@ -11,7 +11,7 @@ import hashlib
 import json
 import logging
 import re
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Callable, Dict, Mapping, Optional
 
 from app.extractors.base import ExtractorError, ExtractorRequest
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
@@ -23,13 +23,48 @@ from app.schemas.job_intelligence_v1_contract import (
 )
 
 
-DEFAULT_TIMEOUT_SECONDS = 20.0
+DEFAULT_TIMEOUT_SECONDS = 90.0
+DEFAULT_MEDIUM_TIMEOUT_SECONDS = 150.0
+DEFAULT_LONG_TIMEOUT_SECONDS = 240.0
+DEFAULT_MAX_TIMEOUT_SECONDS = 300.0
 DEFAULT_MAX_INPUT_CHARS = 12000
 DEFAULT_MAX_OUTPUT_TOKENS = 4096
 DEFAULT_SCHEMA_REPAIR_ATTEMPTS = 2
+DEFAULT_PROVIDER_RETRY_ATTEMPTS = 1
 RAW_OUTPUT_PREVIEW_CHARS = 500
 OPENAI_API_SHAPE = "responses.create:text.format.json_schema"
 LOGGER = logging.getLogger("cvbrain.openai_structured")
+
+
+def provider_timeout_for_source_chars(
+    source_chars: int,
+    configured_timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    max_timeout_seconds: float = DEFAULT_MAX_TIMEOUT_SECONDS,
+) -> float:
+    """Return a bounded OpenAI request timeout based on source length."""
+
+    try:
+        chars = max(0, int(source_chars))
+    except (TypeError, ValueError):
+        chars = 0
+    try:
+        configured = max(0.0, float(configured_timeout_seconds))
+    except (TypeError, ValueError):
+        configured = 0.0
+    try:
+        max_timeout = max(1.0, float(max_timeout_seconds))
+    except (TypeError, ValueError):
+        max_timeout = DEFAULT_MAX_TIMEOUT_SECONDS
+
+    if chars <= 2000:
+        dynamic = DEFAULT_TIMEOUT_SECONDS
+    elif chars <= 6000:
+        dynamic = DEFAULT_MEDIUM_TIMEOUT_SECONDS
+    elif chars <= 12000:
+        dynamic = DEFAULT_LONG_TIMEOUT_SECONDS
+    else:
+        dynamic = DEFAULT_MAX_TIMEOUT_SECONDS
+    return min(max_timeout, max(dynamic, configured))
 
 
 SYSTEM_INSTRUCTIONS = """You are CVBrain Job Intake extraction.
@@ -132,6 +167,7 @@ PUBLIC_EXTRACTION_CONTRACT = """Public output contract:
 Long input segmentation contract:
 - For long or mixed-format recruiter inputs, first segment the source into role title, responsibilities, requirements, desirable items, competencies, seniority, location, industry, employment type, and desired professions.
 - Responsibilities, tasks, and accountabilities should inform job_tasks, work_activities, summary, search context, or interview questions unless a phrase explicitly states they are required evidence.
+- If a responsibilities/task section overlaps with a hard requirements section, keep the hard evidence under requirements and the task wording under tasks/context. Do not convert the task wording itself into a hard filter.
 - Requirements/Requisitos carry more requirement weight than Responsabilidades/Principales responsabilidades.
 - Do not turn every bullet, sentence, responsibility, or section item into must_have.
 - Desired professions/profesiones deseables are desirable/preferred unless the source explicitly says the degree/title is excluyente, obligatorio, requerido, or imprescindible.
@@ -145,6 +181,7 @@ Requirement list inheritance contract:
 - Soft should_have cues include deseable, idealmente, and preferentemente.
 - Weak/nice cues include se valorara, se valorará, sera/será valorable, valorable, plus, suma, puede sumar, and sera/será un plus.
 - When a weak/nice cue introduces a list, every sibling inherits nice_to_have unless that sibling has its own stronger local cue.
+- Section-level soft cues apply until a new section heading: Deseables, Valorables, Se valorará, Plus, and Nice to have sections stay should_have/nice_to_have, never must_have, unless the same item has an explicit local hard cue.
 - "Se valorará experiencia con TMS, WMS, Excel y tableros" means Experiencia con TMS, Experiencia con WMS, Experiencia con Excel, and Experiencia con tableros are all nice_to_have.
 - "Debe manejar métricas, calidad, ausentismo, turnos, coaching" means every listed item is must_have.
 - "Debe manejar Adobe y/o Figma" is must_have.
@@ -178,6 +215,8 @@ Orphan fragment contract:
 - Avoid "Industria alimenticia busca Especialista en Compras para gestionar proveedores"; write role_title "Especialista en Compras" and requirement/task "Gestionar proveedores".
 - Avoid "Empresa de servicios busca Responsable de Atención al Cliente para liderar equipo multicanal"; write role_title "Responsable de Atención al Cliente" and requirement/task "Liderar equipo multicanal".
 - Do not emit the full recruiter lead sentence as must_have, should_have, nice_to_have, credentials, or soft_competencies.
+- Do not emit recruiter process/meta sentences as requirements, credentials, blockers, or competencies.
+- Forbidden meta sentences include Estos puntos suman valor, Pero no deben desplazar los requisitos excluyentes, Estos puntos serán considerados, La evaluación considerará evidencia laboral e instancias de entrevista, Se evaluará durante entrevista, No deben desplazar, and Suman valor, pero.
 
 Negative-fragment contract:
 - Negative blocker language belongs in blockers or internal rationale, not in soft_competencies or public source_text fields.
@@ -257,6 +296,7 @@ class OpenAIStructuredExtractor:
             "request_start",
             request_payload=ai_payload,
             parse_path="not_started",
+            provider_timeout_seconds=self._request_timeout_for_payload(ai_payload),
         )
 
         try:
@@ -313,16 +353,27 @@ class OpenAIStructuredExtractor:
             raise _schema_validation_failed_error() from error
         except TimeoutError as error:
             self._log_exception(
-                "timeout",
+                "provider_timeout",
                 error,
                 request_payload=ai_payload,
             )
             raise ExtractorError(
-                "ai_timeout",
+                "ai_provider_timeout",
                 "OpenAI structured extraction timed out.",
-                warnings=["ai_timeout"],
+                warnings=["ai_provider_timeout"],
             ) from error
         except Exception as error:
+            if _is_provider_timeout_error(error):
+                self._log_exception(
+                    "provider_timeout",
+                    error,
+                    request_payload=ai_payload,
+                )
+                raise ExtractorError(
+                    "ai_provider_timeout",
+                    "OpenAI structured extraction timed out.",
+                    warnings=["ai_provider_timeout"],
+                ) from error
             self._log_exception(
                 "provider_error",
                 error,
@@ -477,7 +528,6 @@ class OpenAIStructuredExtractor:
         raise _schema_validation_failed_error() from current_error
 
     def _responses_parse(self, ai_payload: Mapping[str, Any]) -> Any:
-        client = self._client()
         input_messages = [
             {"role": "system", "content": _system_instructions_for_payload(ai_payload)},
             {
@@ -487,19 +537,23 @@ class OpenAIStructuredExtractor:
             },
         ]
 
-        return client.responses.create(
-            model=self.model,
-            input=input_messages,
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "cvbrain_job_intelligence_v1",
-                    "description": "CVBrain Job Intelligence v1 extraction output.",
-                    "schema": job_intelligence_v1_response_schema(),
-                    "strict": self.strict_schema_enabled,
-                }
-            },
-            max_output_tokens=self.max_output_tokens,
+        return self._call_provider_with_retry(
+            ai_payload,
+            operation="responses_parse",
+            call=lambda: self._client_for_payload(ai_payload).responses.create(
+                model=self.model,
+                input=input_messages,
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "cvbrain_job_intelligence_v1",
+                        "description": "CVBrain Job Intelligence v1 extraction output.",
+                        "schema": job_intelligence_v1_response_schema(),
+                        "strict": self.strict_schema_enabled,
+                    }
+                },
+                max_output_tokens=self.max_output_tokens,
+            ),
         )
 
     def _responses_repair(
@@ -509,7 +563,6 @@ class OpenAIStructuredExtractor:
         error: BaseException,
         attempt: int,
     ) -> Any:
-        client = self._client()
         input_messages = [
             {"role": "system", "content": _repair_instructions_for_payload(ai_payload)},
             {
@@ -525,25 +578,70 @@ class OpenAIStructuredExtractor:
             },
         ]
 
-        return client.responses.create(
-            model=self.model,
-            input=input_messages,
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "cvbrain_job_intelligence_v1",
-                    "description": "Repaired CVBrain Job Intelligence v1 extraction output.",
-                    "schema": job_intelligence_v1_response_schema(),
-                    "strict": self.strict_schema_enabled,
-                }
-            },
-            max_output_tokens=self.max_output_tokens,
+        return self._call_provider_with_retry(
+            ai_payload,
+            operation="responses_repair",
+            call=lambda: self._client_for_payload(ai_payload).responses.create(
+                model=self.model,
+                input=input_messages,
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "cvbrain_job_intelligence_v1",
+                        "description": "Repaired CVBrain Job Intelligence v1 extraction output.",
+                        "schema": job_intelligence_v1_response_schema(),
+                        "strict": self.strict_schema_enabled,
+                    }
+                },
+                max_output_tokens=self.max_output_tokens,
+            ),
         )
 
     def _client(self) -> Any:
         if self.client is None:
             self.client = self._default_client()
         return self.client
+
+    def _client_for_payload(self, ai_payload: Mapping[str, Any]) -> Any:
+        client = self._client()
+        timeout = self._request_timeout_for_payload(ai_payload)
+        with_options = getattr(client, "with_options", None)
+        if callable(with_options):
+            return with_options(timeout=timeout)
+        return client
+
+    def _request_timeout_for_payload(self, ai_payload: Mapping[str, Any]) -> float:
+        return provider_timeout_for_source_chars(
+            len(str(ai_payload.get("source_text", ""))),
+            configured_timeout_seconds=self.timeout_seconds,
+        )
+
+    def _call_provider_with_retry(
+        self,
+        ai_payload: Mapping[str, Any],
+        operation: str,
+        call: Callable[[], Any],
+    ) -> Any:
+        max_attempts = DEFAULT_PROVIDER_RETRY_ATTEMPTS + 1
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return call()
+            except Exception as error:
+                retryable = _is_retryable_provider_error(error)
+                if not retryable or attempt >= max_attempts:
+                    raise
+                self._log_event(
+                    "provider_retryable_error",
+                    request_payload=ai_payload,
+                    operation=operation,
+                    provider_attempt=attempt,
+                    provider_max_attempts=max_attempts,
+                    provider_timeout_seconds=self._request_timeout_for_payload(ai_payload),
+                    exception_class=error.__class__.__name__,
+                    sanitized_exception_message=_sanitize_text(str(error)),
+                    http_status=getattr(error, "status_code", None),
+                    openai_request_id=getattr(error, "request_id", None),
+                )
 
     def _default_client(self) -> Any:
         try:
@@ -715,6 +813,43 @@ def detect_source_language(source_text: str) -> str:
     if spanish_chars or len(spanish_markers) > len(english_markers):
         return "Spanish"
     return "English"
+
+
+def _is_retryable_provider_error(error: BaseException) -> bool:
+    if _is_provider_timeout_error(error):
+        return True
+    status = _provider_status_code(error)
+    return status in {408, 429, 500, 502, 503, 504}
+
+
+def _is_provider_timeout_error(error: BaseException) -> bool:
+    if isinstance(error, TimeoutError):
+        return True
+    if _provider_status_code(error) in {408, 504}:
+        return True
+    error_text = " ".join(
+        str(part)
+        for part in (
+            error.__class__.__name__,
+            str(error),
+            getattr(error, "code", ""),
+            getattr(error, "type", ""),
+            getattr(error, "body", ""),
+        )
+        if part is not None
+    )
+    return bool(re.search(r"\b(timeout|timed\s*out|read\s+timeout|gateway\s+timeout)\b", error_text, re.I))
+
+
+def _provider_status_code(error: BaseException) -> Optional[int]:
+    for attr in ("status_code", "status"):
+        value = getattr(error, attr, None)
+        try:
+            if value is not None:
+                return int(value)
+        except (TypeError, ValueError):
+            continue
+    return None
 
 
 def _language_contract_for_payload(ai_payload: Mapping[str, Any]) -> str:

@@ -8,7 +8,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.extractors import ExtractorRequest, ExtractorRouter
-from app.extractors.openai_structured import OpenAIStructuredExtractor, job_intelligence_v1_response_schema
+from app.extractors.openai_structured import (
+    OpenAIStructuredExtractor,
+    job_intelligence_v1_response_schema,
+    provider_timeout_for_source_chars,
+)
 from app.main import app
 
 
@@ -32,13 +36,22 @@ class FakeResponses:
         if self.error:
             raise self.error
         if len(self.response_queue) > 1:
-            return self.response_queue.pop(0)
-        return self.response_queue[0]
+            result = self.response_queue.pop(0)
+        else:
+            result = self.response_queue[0]
+        if isinstance(result, BaseException):
+            raise result
+        return result
 
 
 class FakeOpenAIClient:
     def __init__(self, response=None, responses=None, error=None):
         self.responses = FakeResponses(response=response, responses=responses, error=error)
+        self.with_options_calls = []
+
+    def with_options(self, **kwargs):
+        self.with_options_calls.append(kwargs)
+        return self
 
 
 def load_output(name):
@@ -392,7 +405,10 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Long input segmentation contract:" in system_prompt
     assert "role title, responsibilities, requirements, desirable items, competencies" in system_prompt
     assert "Responsibilities, tasks, and accountabilities should inform job_tasks" in system_prompt
+    assert "If a responsibilities/task section overlaps with a hard requirements section" in system_prompt
     assert "Do not turn every bullet, sentence, responsibility, or section item into must_have." in system_prompt
+    assert "Section-level soft cues apply until a new section heading" in system_prompt
+    assert "Deseables, Valorables, Se valorará, Plus, and Nice to have sections" in system_prompt
     assert "Competency contract:" in system_prompt
     assert "competencias excluyentes" in system_prompt
     assert "mandatory soft competencies" in system_prompt
@@ -404,6 +420,8 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "La persona deberá liderar pagos" in system_prompt
     assert "Empresa digital busca UX/UI Designer con experiencia en producto" in system_prompt
     assert "Industria alimenticia busca Especialista en Compras para gestionar proveedores" in system_prompt
+    assert "Forbidden meta sentences include Estos puntos suman valor" in system_prompt
+    assert "Pero no deben desplazar los requisitos excluyentes" in system_prompt
     assert "Duplicate/component contract:" in system_prompt
     assert "Base técnica comprobable en redes" in system_prompt
     assert "Certificación Security+" in system_prompt
@@ -1300,6 +1318,76 @@ def test_schema_failure_logs_safe_internal_diagnostics(caplog):
     assert "sk-test-secret-should-not-log" not in log_output
 
 
+def test_provider_timeout_for_source_chars_uses_bounded_dynamic_policy():
+    assert provider_timeout_for_source_chars(1000, configured_timeout_seconds=60) == 90
+    assert provider_timeout_for_source_chars(3000, configured_timeout_seconds=60) == 150
+    assert provider_timeout_for_source_chars(8000, configured_timeout_seconds=60) == 240
+    assert provider_timeout_for_source_chars(15000, configured_timeout_seconds=60) == 300
+    assert provider_timeout_for_source_chars(1000, configured_timeout_seconds=180) == 180
+    assert provider_timeout_for_source_chars(1000, configured_timeout_seconds=500) == 300
+
+
+def test_provider_timeout_retries_once_and_uses_dynamic_client_timeout():
+    fixture = load_output("uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json")
+    source_text = (
+        "Empresa busca Account Manager Semi Senior con experiencia en dispositivos médicos. "
+        "Mínima de 3 años. "
+    ) * 35
+    fake_client = FakeOpenAIClient(
+        responses=[
+            TimeoutError("simulated read timeout"),
+            {"output_parsed": fixture},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        timeout_seconds=60,
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request(source_text))
+
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert len(fake_client.responses.calls) == 2
+    assert [call["timeout"] for call in fake_client.with_options_calls] == [150.0, 150.0]
+
+
+def test_provider_timeout_fails_cleanly_after_one_retry_without_fallback():
+    fake_client = FakeOpenAIClient(
+        responses=[
+            TimeoutError("simulated read timeout"),
+            TimeoutError("simulated read timeout again"),
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        timeout_seconds=60,
+        fallback_enabled=False,
+        client=fake_client,
+    )
+    router = ExtractorRouter(
+        env={
+            "CVBRAIN_EXTRACTOR_MODE": "ai",
+            "OPENAI_API_KEY": "test-key-not-used",
+            "CVBRAIN_OPENAI_MODEL": "test-model-not-used",
+            "CVBRAIN_AI_FALLBACK_ENABLED": "false",
+        },
+        ai_extractor=extractor,
+    )
+
+    result = router.extract(request("Empresa busca Soporte IT. Excluyente experiencia en tickets."))
+
+    assert result["ok"] is False
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert result["warnings"] == ["ai_provider_timeout"]
+    assert len(fake_client.responses.calls) == 2
+
+
 def test_ai_timeout_fallback_and_clean_error_paths():
     extractor = OpenAIStructuredExtractor(
         api_key="test-key-not-used",
@@ -1320,7 +1408,7 @@ def test_ai_timeout_fallback_and_clean_error_paths():
     assert fallback["ok"] is True
     assert fallback["engine"] == "deterministic"
     assert fallback["fallback_used"] is True
-    assert "ai_timeout" in fallback["warnings"]
+    assert "ai_provider_timeout" in fallback["warnings"]
 
     error_router = ExtractorRouter(
         env={
@@ -1334,7 +1422,7 @@ def test_ai_timeout_fallback_and_clean_error_paths():
     error = error_router.extract(request())
     assert error["ok"] is False
     assert error["engine"] == "openai"
-    assert "ai_timeout" in error["warnings"]
+    assert "ai_provider_timeout" in error["warnings"]
 
 
 def test_provider_error_logs_safe_diagnostics_without_public_detail(caplog):
