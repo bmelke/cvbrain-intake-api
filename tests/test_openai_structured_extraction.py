@@ -427,6 +427,11 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Industria alimenticia busca Especialista en Compras para gestionar proveedores" in system_prompt
     assert "Forbidden meta sentences include Estos puntos suman valor" in system_prompt
     assert "Pero no deben desplazar los requisitos excluyentes" in system_prompt
+    assert "Si el input es escaso, debe salir baja confianza" in system_prompt
+    assert "No schema fail" in system_prompt
+    assert "No inventar años" in system_prompt
+    assert "Generar recruiter_questions" in system_prompt
+    assert "must never become candidate requirements" in system_prompt
     assert "Duplicate/component contract:" in system_prompt
     assert "Base técnica comprobable en redes" in system_prompt
     assert "Certificación Security+" in system_prompt
@@ -1052,6 +1057,8 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "Competency contract:" in repair_prompt
     assert "competencias excluyentes" in repair_prompt
     assert "Orphan fragment contract:" in repair_prompt
+    assert "Si el input es escaso, debe salir baja confianza" in repair_prompt
+    assert "No inventar años" in repair_prompt
     assert "Duplicate/component contract:" in repair_prompt
     assert "Negative-fragment contract:" in repair_prompt
     assert "Software Architect" in repair_user_prompt

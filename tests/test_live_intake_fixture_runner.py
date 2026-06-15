@@ -715,6 +715,41 @@ def test_runner_does_not_flag_explicit_hard_cue_as_weak_over_promoted(source_tex
     assert notes == []
 
 
+@pytest.mark.parametrize(
+    ("source_text", "must_item"),
+    [
+        (
+            "Requisitos: experiencia en calidad asistencial, auditorías clínicas, indicadores, protocolos y seguridad del paciente.",
+            "Experiencia en calidad asistencial",
+        ),
+        (
+            "Requisitos: experiencia en operaciones de salud, coordinación de equipos asistenciales, trato con pacientes, indicadores y mejora de procesos.",
+            "Experiencia en operaciones de salud",
+        ),
+    ],
+)
+def test_runner_allows_experience_in_hard_requirements_section(source_text, must_item):
+    classification, notes = runner.classify_result(
+        source_text,
+        successful_record(must_have=[must_item]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.PASS
+    assert notes == []
+
+
+def test_runner_still_fails_experience_promoted_from_soft_section_to_must_have():
+    classification, notes = runner.classify_result(
+        "Deseables: experiencia en calidad asistencial.",
+        successful_record(must_have=["Experiencia en calidad asistencial"]),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_IMPORTANCE
+    assert any(note.startswith("weak_modifier_over_promoted:must_have:") for note in notes)
+
+
 def test_runner_keeps_failing_true_weak_over_promoted_experience():
     classification, notes = runner.classify_result(
         "Se valorará experiencia en mejora continua y Lean.",

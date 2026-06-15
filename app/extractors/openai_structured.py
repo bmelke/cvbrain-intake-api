@@ -231,6 +231,8 @@ Orphan fragment contract:
 - Do not emit the full recruiter lead sentence as must_have, should_have, nice_to_have, credentials, or soft_competencies.
 - Do not emit recruiter process/meta sentences as requirements, credentials, blockers, or competencies.
 - Forbidden meta sentences include Estos puntos suman valor, Pero no deben desplazar los requisitos excluyentes, Estos puntos serán considerados, La evaluación considerará evidencia laboral e instancias de entrevista, Se evaluará durante entrevista, No deben desplazar, and Suman valor, pero.
+- Also exclude testing/process instructions such as Si el input es escaso, debe salir baja confianza, No schema fail, No fallar schema, No inventar años, Devolver preguntas, Generar recruiter_questions, and Mantener ok=true from all public requirements, credentials, blockers, competencies, and source_text fields.
+- These meta/process instructions may inform quality_control, warnings, missing_information, or recruiter questions, but they must never become candidate requirements.
 
 Negative-fragment contract:
 - Negative blocker language belongs in blockers or internal rationale, not in soft_competencies or public source_text fields.

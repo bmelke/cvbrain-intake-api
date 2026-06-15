@@ -701,6 +701,7 @@ def _public_strings(value: Any, path: str = "$") -> List[tuple[str, str]]:
 def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]:
     notes: List[str] = []
     sectioned = sectioned_clauses(source_text)
+    hard_section_clauses = [clause.text for clause in sectioned if clause.section == "hard"]
     soft_section_clauses = [clause.text for clause in sectioned if clause.section == "soft"]
     responsibility_clauses = [clause.text for clause in sectioned if clause.section == "responsibility"]
     weak_clauses = modifier_clauses(source_text, WEAK_MODIFIER_PATTERN, exclude=STRONG_PREFERENCE_PATTERN)
@@ -719,13 +720,17 @@ def importance_notes_for(source_text: str, data: Mapping[str, Any]) -> List[str]
         for item in _string_list(data.get(bucket, [])):
             if _explicit_hard_cue_governs_item(item, hard_clauses):
                 continue
+            if _hard_section_governs_item_without_local_weak(item, hard_section_clauses):
+                continue
+            weak_clause_matches = [clause for clause in weak_clauses if _clause_matches_item(clause, item)]
             if any(_clause_strongly_matches_item(clause, item) for clause in soft_section_clauses):
                 if bucket == "should_have":
                     continue
                 notes.append(f"weak_modifier_over_promoted:{bucket}:{item}")
                 continue
-            if any(_clause_matches_item(clause, item) for clause in weak_clauses):
+            if weak_clause_matches:
                 notes.append(f"weak_modifier_over_promoted:{bucket}:{item}")
+                continue
 
     for bucket in ("should_have", "nice_to_have"):
         for item in _string_list(data.get(bucket, [])):
@@ -909,6 +914,16 @@ def _explicit_hard_cue_governs_item(item: str, hard_clauses: Iterable[str]) -> b
         EXPLICIT_HARD_CUE_PATTERN.search(clause) and _clause_matches_item(clause, item)
         for clause in hard_clauses
     )
+
+
+def _hard_section_governs_item_without_local_weak(item: str, hard_section_clauses: Iterable[str]) -> bool:
+    for clause in hard_section_clauses:
+        if not _clause_matches_item(clause, item):
+            continue
+        if WEAK_MODIFIER_PATTERN.search(clause) or STRONG_PREFERENCE_PATTERN.search(clause):
+            continue
+        return True
+    return False
 
 
 def _clause_matches_item(clause: str, item: str) -> bool:

@@ -178,14 +178,21 @@ def test_recruiter_meta_policy_sentences_are_removed_from_public_requirement_arr
         "La evaluación considerará evidencia laboral e instancias de entrevista",
         "Se evaluará durante entrevista",
         "Suman valor, pero no son excluyentes",
+        "Si el input es escaso, debe salir baja confianza, no schema fail",
+        "Salir baja confianza",
+        "No inventar años si no están indicados",
+        "Devolver preguntas de aclaración",
+        "Generar recruiter_questions",
+        "Mantener ok=true",
     ]
     normalized, flat = normalize_and_flatten(
         {
-            "must_have": [requirement_item(fragments[0]), requirement_item(fragments[1])],
+            "must_have": [requirement_item(fragments[0]), requirement_item(fragments[1]), requirement_item(fragments[11])],
             "should_have": [requirement_item(fragments[2], "preferred")],
-            "nice_to_have": [requirement_item(fragments[3], "nice_to_have")],
-            "blockers": [fragments[4]],
-            "soft_competencies": [requirement_item(fragments[5], "preferred")],
+            "nice_to_have": [requirement_item(fragments[3], "nice_to_have"), requirement_item(fragments[6], "nice_to_have")],
+            "blockers": [fragments[4], fragments[7]],
+            "soft_competencies": [requirement_item(fragments[5], "preferred"), requirement_item(fragments[8], "preferred")],
+            "credentials": [requirement_item(fragments[9], "must_have"), requirement_item(fragments[10], "preferred")],
         }
     )
 

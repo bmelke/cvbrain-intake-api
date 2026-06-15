@@ -157,6 +157,15 @@ META_POLICY_FRAGMENT_PATTERN = re.compile(
     r"no\s+deben\s+desplazar(?:\s+los\s+requisitos\s+excluyentes)?|"
     r"la\s+evaluaci[oó]n\s+considerar[aá]\s+evidencia\s+laboral(?:\s+e\s+instancias\s+de\s+entrevista)?|"
     r"se\s+evaluar[aá]\s+durante\s+entrevista|"
+    r"si\s+el\s+input\s+es\s+escaso|"
+    r"debe\s+salir\s+baja\s+confianza|"
+    r"salir\s+baja\s+confianza|"
+    r"no\s+schema\s+fail|"
+    r"no\s+fallar\s+schema|"
+    r"no\s+inventar\s+a[nñ]os|"
+    r"devolver\s+preguntas|"
+    r"generar\s+recruiter[_\s-]*questions|"
+    r"mantener\s+ok\s*=\s*true|"
     r"suman\s+valor[\s,;:-]+pero"
     r")\b",
     re.I,
