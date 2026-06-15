@@ -15,7 +15,11 @@ from typing import Any, Callable, Dict, Mapping, Optional
 
 from app.extractors.base import ExtractorError, ExtractorRequest
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
-from app.normalization.requirement_importance import normalize_job_intelligence_requirements, resolve_requirements_from_text
+from app.normalization.requirement_importance import (
+    blocker_text_for_clause,
+    normalize_job_intelligence_requirements,
+    resolve_requirements_from_text,
+)
 from app.normalization.role_title import normalize_role_title_for_source, source_role_title_for_text
 from app.schemas.job_intelligence_v1_contract import (
     JobIntelligenceValidationError,
@@ -115,6 +119,11 @@ Do not return a public API envelope such as ok=false, warnings, engine, or
 fallback_used. Return the Job Intelligence schema object itself.
 If the invalid output was an empty error stub but the source text is normal
 recruiter prose, rebuild a valid Job Intelligence schema from the source text.
+Sparse but valid recruiter prose must produce the best valid schema, not an
+empty API error envelope. If the source has an explicit role title plus at least
+one domain, task, location, credential, or blocker signal, repair it into a
+low-confidence valid Job Intelligence object and ask clarifying questions for
+missing details.
 For normal education or leadership prose such as Director/a de Secundaria,
 Director/a de Inicial, Coordinador/a de Primaria, Director/a Técnico/a
 Asistencial, Head of English Department, or Responsable de Carreras de Posgrado,
@@ -165,6 +174,11 @@ PUBLIC_EXTRACTION_CONTRACT = """Public output contract:
 - Apply this public-output contract recursively to role_title, job_profile fields, requirements, credentials, blockers, soft_competencies, public source_text fields, recruiter questions, warnings, and diagnostics shown to users or runner output.
 
 Long input segmentation contract:
+- Sparse valid intake contract:
+- Sparse recruiter text is still valid input when it contains an explicit role title plus at least one domain, task, location, credential, or blocker signal.
+- Sparse input should lower confidence and add missing_information/company_clarification_questions. It must not return ok=false, an empty public API envelope, or ai_schema_validation_failed merely because details are missing.
+- For sparse valid input, extract the explicit role_title, preserve stated domain/task/location/credential/blocker facts, leave unknown details missing, and set search_readiness to exploratory, usable_with_warnings, or insufficient_for_precise_search with proceed_allowed=true.
+- Do not invent years, modality, tools, credentials, location, industry, or requirements for sparse input.
 - For long or mixed-format recruiter inputs, first segment the source into role title, responsibilities, requirements, desirable items, competencies, seniority, location, industry, employment type, and desired professions.
 - Responsibilities, tasks, and accountabilities should inform job_tasks, work_activities, summary, search context, or interview questions unless a phrase explicitly states they are required evidence.
 - If a responsibilities/task section overlaps with a hard requirements section, keep the hard evidence under requirements and the task wording under tasks/context. Do not convert the task wording itself into a hard filter.
@@ -496,7 +510,7 @@ class OpenAIStructuredExtractor:
             )
             return repair_response, repair_parsed_payload, repair_job_intelligence
 
-        if _can_recover_schema_stub(
+        if not self.fallback_enabled and _can_recover_schema_stub(
             request=request,
             response=current_response,
             parsed_payload=current_parsed_payload,
@@ -885,7 +899,8 @@ def _can_recover_schema_stub(
     parsed_payload: Optional[Mapping[str, Any]],
     error: BaseException,
 ) -> bool:
-    if not _source_looks_like_recruiter_prose(request.source_text):
+    source_text = str(request.source_text or "")
+    if not _source_looks_like_recruiter_prose(source_text):
         return False
     if isinstance(error, ExtractorError) and error.code not in {"ai_schema_validation_failed", "ai_invalid_json"}:
         return False
@@ -894,7 +909,9 @@ def _can_recover_schema_stub(
         output_parsed = _get_response_value(response, "output_parsed")
         if isinstance(output_parsed, Mapping):
             payload = output_parsed
-    return _looks_like_public_error_stub(payload)
+    if _looks_like_public_error_stub(payload):
+        return True
+    return _source_looks_like_sparse_valid_recruiter_intake(source_text) and _looks_like_empty_schema_stub(payload)
 
 
 def _looks_like_public_error_stub(payload: Optional[Mapping[str, Any]]) -> bool:
@@ -904,6 +921,26 @@ def _looks_like_public_error_stub(payload: Optional[Mapping[str, Any]]) -> bool:
     if payload.get("ok") is False and ("warnings" in payload or "engine" in payload or "fallback_used" in payload):
         return True
     return bool(keys and keys.issubset({"ok", "warnings", "engine", "fallback_used", "ai_model", "version"}))
+
+
+def _looks_like_empty_schema_stub(payload: Optional[Mapping[str, Any]]) -> bool:
+    if payload is None:
+        return True
+    if not isinstance(payload, Mapping):
+        return False
+    keys = {str(key) for key in payload.keys()}
+    if not keys:
+        return True
+    schema_keys = {
+        "schema_version",
+        "job_profile",
+        "location_intelligence",
+        "requirements",
+        "search_strategy",
+        "search_readiness",
+        "quality_control",
+    }
+    return not bool(keys & schema_keys)
 
 
 def _source_looks_like_recruiter_prose(source_text: str) -> bool:
@@ -916,6 +953,23 @@ def _source_looks_like_recruiter_prose(source_text: str) -> bool:
             r"busca|buscamos|selecciona|seleccionamos|requiere|necesita|rol\s*:|"
             r"experiencia|excluyente|obligatori[oa]|deseable|valorable|t[ií]tulo)\b",
             text,
+            re.I,
+        )
+    )
+
+
+def _source_looks_like_sparse_valid_recruiter_intake(source_text: str) -> bool:
+    if not source_role_title_for_text(source_text):
+        return False
+    return bool(
+        _sparse_context_terms_from_source(source_text)
+        or _source_blockers(source_text)
+        or re.search(
+            r"\b(?:montevideo|maldonado|canelones|punta\s+del\s+este|uruguay|"
+            r"t[ií]tulo|formaci[oó]n|certificaci[oó]n|licencia|libreta|"
+            r"auditor[ií]as?|indicadores?|formulaciones?|inocuidad|pacientes?|profesionales?|"
+            r"seguridad|turnos?)\b",
+            source_text,
             re.I,
         )
     )
@@ -938,9 +992,10 @@ def _schema_stub_recovery_job_intelligence(request: ExtractorRequest) -> Dict[st
     )
     should_have = _unique_strings(resolved.get("should_have", []))
     nice_to_have = _unique_strings(resolved.get("nice_to_have", []))
-    blockers = _unique_strings(resolved.get("blockers", []))
+    blockers = _unique_strings(resolved.get("blockers", []) + _source_blockers(source_text))
     location = _stub_location_intelligence(source_text, request)
     seniority = _stub_seniority(source_text)
+    context_terms = _sparse_context_terms_from_source(source_text, role_title)
 
     credential_items = [
         _schema_requirement_item(text, "must_have")
@@ -950,6 +1005,10 @@ def _schema_stub_recovery_job_intelligence(request: ExtractorRequest) -> Dict[st
         for text in credentials_preferred
         if _fold_text(text) not in {_fold_text(required) for required in credentials_required}
     ]
+    confidence = _stub_confidence(source_text, must_have, should_have, nice_to_have, blockers, credential_items)
+    search_readiness = _stub_search_readiness(source_text, confidence)
+    missing_information = _stub_missing_information(source_text)
+    clarification_questions = _stub_company_clarification_questions(source_language, missing_information)
 
     return {
         "schema_version": "cvbrain_job_intelligence_v1",
@@ -977,25 +1036,17 @@ def _schema_stub_recovery_job_intelligence(request: ExtractorRequest) -> Dict[st
         },
         "search_strategy": {
             "target_titles": [role_title],
-            "search_terms": _unique_strings([role_title] + must_have + should_have + nice_to_have + credentials_required),
-            "semantic_terms": [],
+            "search_terms": _unique_strings([role_title] + context_terms + must_have + should_have + nice_to_have + credentials_required),
+            "semantic_terms": _unique_strings(context_terms),
             "negative_terms": blockers,
         },
-        "missing_information": [],
-        "company_clarification_questions": [],
+        "missing_information": missing_information,
+        "company_clarification_questions": clarification_questions,
         "candidate_screening_questions": [],
-        "search_readiness": {
-            "status": "usable_with_warnings",
-            "proceed_allowed": True,
-            "recommended_action": "continue_anyway",
-            "recruiter_decision_required": False,
-            "continued_with_missing_information": False,
-            "recruiter_override_reason": None,
-            "decision_options": ["continue_anyway", "answer_clarifying_questions", "ask_company", "use_manual_search", "cancel"],
-        },
+        "search_readiness": search_readiness,
         "quality_control": {
             "warnings": [],
-            "confidence": 0.55,
+            "confidence": confidence,
             "contains_candidate_data": False,
             "contains_candidate_pii": False,
         },
@@ -1033,6 +1084,146 @@ def _restore_schema_stub_credentials(payload: Mapping[str, Any], source_text: st
     requirements["credentials"] = credentials
     output["requirements"] = requirements
     return output
+
+
+def _source_blockers(source_text: str) -> list[str]:
+    blockers: list[str] = []
+    for clause in re.split(r"[\n.;]+", source_text or ""):
+        blocker = blocker_text_for_clause(clause)
+        if blocker:
+            blockers.append(blocker)
+    return _unique_strings(blockers)
+
+
+def _sparse_context_terms_from_source(source_text: str, role_title: str = "") -> list[str]:
+    text = str(source_text or "")
+    title = role_title or source_role_title_for_text(text)
+    if not title:
+        return []
+
+    terms: list[str] = []
+    folded_title = _fold_text(title)
+    for sentence in re.split(r"[\n.;]+", text):
+        clean_sentence = re.sub(r"\s+", " ", sentence).strip(" -:,\t\r\n")
+        if not clean_sentence:
+            continue
+        folded_sentence = _fold_text(clean_sentence)
+        title_index = folded_sentence.find(folded_title)
+        if title_index < 0:
+            continue
+        tail = clean_sentence[title_index + len(title) :]
+        tail = re.sub(r"^\s*(?:con|para|en|de)\s+", "", tail, flags=re.I).strip(" -:,\t\r\n")
+        if not tail or blocker_text_for_clause(tail):
+            continue
+        for part in _split_requirement_list(tail):
+            context = _clean_sparse_context_term(part)
+            if context:
+                terms.append(context)
+    return _unique_strings(terms)
+
+
+def _clean_sparse_context_term(value: str) -> str:
+    clean = re.sub(r"\s+", " ", str(value or "")).strip(" -:.,;\t\r\n")
+    if not clean:
+        return ""
+    if len(clean) < 3:
+        return ""
+    if re.search(r"\b(?:t[ií]tulo|formaci[oó]n|certificaci[oó]n|libreta|licencia)\b", clean, re.I):
+        return ""
+    if re.search(r"\b(?:montevideo|maldonado|canelones|punta\s+del\s+este|uruguay)\b", clean, re.I):
+        return ""
+    if clean.lower() in {"con", "para", "de", "en"}:
+        return ""
+    return _capitalize_first(clean)
+
+
+def _stub_confidence(
+    source_text: str,
+    must_have: list[str],
+    should_have: list[str],
+    nice_to_have: list[str],
+    blockers: list[str],
+    credentials: list[Mapping[str, Any]],
+) -> float:
+    evidence_count = sum(
+        1
+        for value in (
+            bool(must_have),
+            bool(should_have),
+            bool(nice_to_have),
+            bool(blockers),
+            bool(credentials),
+            bool(_sparse_context_terms_from_source(source_text)),
+        )
+        if value
+    )
+    if not must_have and not should_have and evidence_count <= 3 and len(str(source_text or "")) < 180:
+        return 0.45
+    if not must_have and len(str(source_text or "")) < 240:
+        return 0.48
+    return 0.55
+
+
+def _stub_search_readiness(source_text: str, confidence: float) -> Dict[str, Any]:
+    if confidence < 0.5:
+        status = "exploratory" if _sparse_context_terms_from_source(source_text) else "insufficient_for_precise_search"
+        recommended_action = "answer_clarifying_questions"
+        recruiter_decision_required = True
+        continued_with_missing_information = True
+    else:
+        status = "usable_with_warnings"
+        recommended_action = "continue_anyway"
+        recruiter_decision_required = False
+        continued_with_missing_information = False
+    return {
+        "status": status,
+        "proceed_allowed": True,
+        "recommended_action": recommended_action,
+        "recruiter_decision_required": recruiter_decision_required,
+        "continued_with_missing_information": continued_with_missing_information,
+        "recruiter_override_reason": None,
+        "decision_options": ["continue_anyway", "answer_clarifying_questions", "ask_company", "use_manual_search", "cancel"],
+    }
+
+
+def _stub_missing_information(source_text: str) -> list[Dict[str, str]]:
+    folded = _fold_text(source_text)
+    missing: list[Dict[str, str]] = []
+    if not re.search(r"\b\d+\s*(?:anos?|años?|years?)\b", folded):
+        missing.append(
+            {
+                "field": "experience.minimum_years",
+                "suggested_question": "¿Cuántos años mínimos de experiencia debería tener el perfil?",
+            }
+        )
+    if not re.search(r"\b(?:presencial|hibrido|remoto|hybrid|remote|onsite)\b", folded):
+        missing.append(
+            {
+                "field": "work_modality",
+                "suggested_question": "¿La modalidad de trabajo es presencial, híbrida o remota?",
+            }
+        )
+    if not re.search(r"\b(?:excluyente|imprescindible|obligatori[oa]|requerid[oa]|debe\s+tener|debe\s+contar)\b", folded):
+        missing.append(
+            {
+                "field": "requirements.must_have",
+                "suggested_question": "¿Qué requisitos son realmente excluyentes para avanzar?",
+            }
+        )
+    return missing[:3]
+
+
+def _stub_company_clarification_questions(source_language: str, missing_information: list[Dict[str, str]]) -> list[str]:
+    questions = [
+        str(item.get("suggested_question", "")).strip()
+        for item in missing_information
+        if isinstance(item, Mapping) and str(item.get("suggested_question", "")).strip()
+    ]
+    if questions:
+        return questions
+    if source_language == "Spanish":
+        return ["¿Hay requisitos excluyentes adicionales para precisar la búsqueda?"]
+    return ["Are there additional must-have requirements to make the search more precise?"]
 
 
 def _hard_experience_requirements_from_source(source_text: str) -> list[str]:
@@ -1082,7 +1273,7 @@ def _schema_requirement_item(text: str, importance: str) -> Dict[str, Any]:
 def _stub_location_intelligence(source_text: str, request: ExtractorRequest) -> Dict[str, Any]:
     folded = _fold_text(source_text)
     locations = []
-    for city in ("Montevideo", "Canelones", "Uruguay"):
+    for city in ("Montevideo", "Maldonado", "Punta del Este", "Canelones", "Uruguay"):
         if _fold_text(city) in folded:
             locations.append(city)
     remote_allowed: Optional[bool] = None

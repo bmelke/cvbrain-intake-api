@@ -13,6 +13,7 @@ from app.extractors.openai_structured import (
     job_intelligence_v1_response_schema,
     provider_timeout_for_source_chars,
 )
+from app.normalization.role_title import source_role_title_for_text
 from app.main import app
 
 
@@ -395,6 +396,10 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "classification_rationale_id_missing" in system_prompt
     assert "public source_text fields" in system_prompt
     assert "Never invent a placeholder to satisfy the schema." in system_prompt
+    assert "Sparse valid intake contract:" in system_prompt
+    assert "Sparse recruiter text is still valid input" in system_prompt
+    assert "Sparse input should lower confidence" in system_prompt
+    assert "Do not invent years, modality, tools, credentials, location, industry, or requirements" in system_prompt
     assert "Requirement list inheritance contract:" in system_prompt
     assert "A parent cue applies to every sibling in its comma/OR list" in system_prompt
     assert "Experiencia con WMS" in system_prompt
@@ -1036,6 +1041,8 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "Agente Comercial" in repair_prompt
     assert "Director/a de Secundaria" in repair_prompt
     assert "Never respond with ok=false for normal recruiter prose" in repair_prompt
+    assert "Sparse but valid recruiter prose must produce the best valid schema" in repair_prompt
+    assert "low-confidence valid Job Intelligence object" in repair_prompt
     assert "Public output contract:" in repair_prompt
     assert "Source_text_span_missing_from_rules" in repair_prompt
     assert "classification_rationale_id_missing" in repair_prompt
@@ -1113,6 +1120,117 @@ def test_ai_schema_stub_recovery_handles_directora_de_secundaria_after_failed_re
     assert "Relación con familias" in result["must_have"]
     assert "Indicadores educativos" in result["must_have"]
     assert "Título docente habilitante es excluyente" in result["credentials"]["required"]
+
+
+@pytest.mark.parametrize(
+    ("source_text", "expected_title"),
+    [
+        (
+            "Mutualista busca Responsable de Calidad Asistencial con auditorías clínicas e indicadores. Título universitario valorable.",
+            "Responsable de Calidad Asistencial",
+        ),
+        (
+            "Alimentos busca Research & Development Manager con formulaciones e inocuidad. No avanzar perfiles sin alimentos.",
+            "Research & Development Manager",
+        ),
+        (
+            "Salud busca Clinical Operations Manager con pacientes y profesionales. Montevideo y Maldonado.",
+            "Clinical Operations Manager",
+        ),
+        (
+            "Industria química busca Técnico/a de Procesos con seguridad y turnos. Formación técnica valorable.",
+            "Técnico/a de Procesos",
+        ),
+    ],
+)
+def test_sparse_valid_source_title_extraction_examples(source_text, expected_title):
+    assert source_role_title_for_text(source_text) == expected_title
+
+
+@pytest.mark.parametrize(
+    ("source_text", "expected_title", "expected_terms", "expected_credentials", "expected_blockers", "expected_location"),
+    [
+        (
+            "Mutualista busca Responsable de Calidad Asistencial con auditorías clínicas e indicadores. Título universitario valorable.",
+            "Responsable de Calidad Asistencial",
+            ["Auditorías clínicas", "Indicadores"],
+            ["Título universitario valorable"],
+            [],
+            "",
+        ),
+        (
+            "Alimentos busca Research & Development Manager con formulaciones e inocuidad. No avanzar perfiles sin alimentos.",
+            "Research & Development Manager",
+            ["Formulaciones", "Inocuidad"],
+            [],
+            ["No avanzar perfiles sin alimentos"],
+            "",
+        ),
+        (
+            "Salud busca Clinical Operations Manager con pacientes y profesionales. Montevideo y Maldonado.",
+            "Clinical Operations Manager",
+            ["Pacientes", "Profesionales"],
+            [],
+            [],
+            "Montevideo, Maldonado",
+        ),
+        (
+            "Industria química busca Técnico/a de Procesos con seguridad y turnos. Formación técnica valorable.",
+            "Técnico/a de Procesos",
+            ["Seguridad", "Turnos"],
+            ["Formación técnica valorable"],
+            [],
+            "",
+        ),
+    ],
+)
+def test_sparse_valid_inputs_recover_from_empty_schema_stubs_without_fallback(
+    source_text,
+    expected_title,
+    expected_terms,
+    expected_credentials,
+    expected_blockers,
+    expected_location,
+):
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"output_parsed": {"ok": False, "warnings": ["ai_schema_validation_failed"], "engine": "openai"}},
+            {"output_parsed": {"ok": False, "warnings": ["ai_schema_validation_failed"], "engine": "openai"}},
+            {"output_parsed": {"ok": False, "warnings": ["ai_schema_validation_failed"], "engine": "openai"}},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request(source_text))
+    serialized = fold(result)
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert result["ai_schema_repaired"] is True
+    assert "ai_schema_validation_failed" not in result["warnings"]
+    assert result["role_title"] == expected_title
+    assert result["job_intelligence"]["job_profile"]["job_title"] == expected_title
+    assert result["confidence"] < 0.5
+    assert result["job_intelligence"]["search_readiness"]["proceed_allowed"] is True
+    assert result["recruiter_questions"]
+    assert result["experience"]["minimum_years"] is None
+    assert result["location"]["remote_allowed"] is None
+    assert result["location"]["hybrid_allowed"] is None
+    assert result["must_have"] == []
+    assert result["should_have"] == []
+    assert result["nice_to_have"] == []
+    assert result["credentials"]["preferred"] == expected_credentials
+    assert result["blockers"] == expected_blockers
+    assert result["location"]["normalized"] == expected_location
+    for term in expected_terms:
+        assert fold(term) in serialized
+    assert len(fake_client.responses.calls) == 3
     assert len(fake_client.responses.calls) == 3
 
 
