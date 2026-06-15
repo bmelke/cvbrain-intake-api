@@ -15,6 +15,7 @@ CHALLENGE_V2_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbra
 CHALLENGE_V3_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_50_challenge_v3_plus_importance_regression.txt"
 CHALLENGE_V4_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_100_challenge_v4_plus_v3_failures.txt"
 URUGUAY_MIXED_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_100_uruguay_mixed_long_short_challenge_v1.txt"
+ULTIMATE_FIXTURE_PATH = ROOT / "tests" / "fixtures" / "live_intake" / "cvbrain_ultimate_100_mixed_long_short_v1.txt"
 FORBIDDEN_ARGENTINA_LOCATION_PATTERN = re.compile(r"\b(?:Buenos\s+Aires|CABA|GBA|Argentina|AMBA)\b", re.I)
 
 spec = importlib.util.spec_from_file_location("run_live_intake_fixture", RUNNER_PATH)
@@ -169,6 +170,26 @@ def test_uruguay_mixed_fixture_first_long_account_manager_case_is_uruguay_adapta
     assert payload["source_text"] == first_case.source_text
     assert payload["locale"] == "es-UY"
     assert "role_hint" not in json.dumps(payload, ensure_ascii=False).lower()
+
+
+def test_ultimate_mixed_long_short_fixture_reads_100_uruguay_cases_without_metadata_or_forbidden_locations():
+    cases = runner.parse_fixture(ULTIMATE_FIXTURE_PATH)
+    raw_lines = ULTIMATE_FIXTURE_PATH.read_text(encoding="utf-8").splitlines()
+    serialized = "\n".join(case.source_text for case in cases)
+
+    runner.validate_case_sequence(cases, 100)
+    assert raw_lines[0] == "BUSQUEDA_001"
+    assert len(cases[:60]) == 60
+    assert len(cases[60:]) == 40
+    assert all(len(case.source_text.split()) <= 45 for case in cases[:60])
+    assert all(len(case.source_text.split()) >= 55 for case in cases[60:])
+    assert not FORBIDDEN_ARGENTINA_LOCATION_PATTERN.search(serialized)
+    for case in cases:
+        assert case.source_text.strip()
+        assert "BUSQUEDA_" not in case.source_text
+        assert "END_BUSQUEDA_" not in case.source_text
+        assert "role_hint" not in case.source_text.lower()
+        assert "TASK " not in case.source_text
 
 
 def _sentence_count(text):
