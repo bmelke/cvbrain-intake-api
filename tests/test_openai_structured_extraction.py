@@ -389,6 +389,9 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "Technical Support Specialist" in system_prompt
     assert "Director/a de Secundaria" in system_prompt
     assert "Consultora tecnológica" in system_prompt
+    assert "Employer, client, industry, or organization descriptors" in system_prompt
+    assert "Senior Talent Partner" in system_prompt
+    assert "Clinical Operations Manager" in system_prompt
     assert "Public output contract:" in system_prompt
     assert "Source_text_span_missing_from_rules" in system_prompt
     assert "Source_text_" in system_prompt
@@ -425,6 +428,9 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "La persona deberá liderar pagos" in system_prompt
     assert "Empresa digital busca UX/UI Designer con experiencia en producto" in system_prompt
     assert "Industria alimenticia busca Especialista en Compras para gestionar proveedores" in system_prompt
+    assert "Empresa de salud busca Clinical Operations Manager con pacientes" in system_prompt
+    assert "Trabajo con pacientes y profesionales" in system_prompt
+    assert "Consultora de RRHH busca Senior Talent Partner" in system_prompt
     assert "Forbidden meta sentences include Estos puntos suman valor" in system_prompt
     assert "Pero no deben desplazar los requisitos excluyentes" in system_prompt
     assert "Si el input es escaso, debe salir baja confianza" in system_prompt
@@ -546,6 +552,21 @@ def test_nested_spanish_job_title_wins_over_english_normalized_title(source_text
             "Empresa de software busca Technical Support Specialist con experiencia en soporte B2B.",
             "soporte B2B",
             "Technical Support Specialist",
+        ),
+        (
+            "Consultora de RRHH busca Senior Talent Partner para selección ejecutiva y tecnológica.",
+            "Consultora de RRHH",
+            "Senior Talent Partner",
+        ),
+        (
+            "Empresa de salud busca Clinical Operations Manager con pacientes, profesionales e indicadores operativos.",
+            "Empresa de salud",
+            "Clinical Operations Manager",
+        ),
+        (
+            "Industria de Pando busca Comprador Técnico con proveedores industriales.",
+            "Industria de Pando",
+            "Comprador Técnico",
         ),
         (
             "Consultora tecnológica busca Scrum Master con experiencia facilitando ceremonias ágiles.",
@@ -1143,6 +1164,18 @@ def test_ai_schema_stub_recovery_handles_directora_de_secundaria_after_failed_re
         (
             "Salud busca Clinical Operations Manager con pacientes y profesionales. Montevideo y Maldonado.",
             "Clinical Operations Manager",
+        ),
+        (
+            "Consultora de RRHH busca Senior Talent Partner para selección ejecutiva y tecnológica.",
+            "Senior Talent Partner",
+        ),
+        (
+            "Empresa de salud busca Clinical Operations Manager con pacientes, profesionales e indicadores operativos.",
+            "Clinical Operations Manager",
+        ),
+        (
+            "Industria de Pando busca Comprador Técnico con proveedores industriales.",
+            "Comprador Técnico",
         ),
         (
             "Industria química busca Técnico/a de Procesos con seguridad y turnos. Formación técnica valorable.",

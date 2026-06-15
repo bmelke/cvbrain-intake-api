@@ -416,6 +416,9 @@ def split_requirement_clauses(text: str) -> List[str]:
     """Split compound requirement prose into item-like clauses."""
 
     chunks: List[str] = []
+    if _has_recruiter_lead_context(text):
+        clean = str(text or "").strip(" -:\t\r\n")
+        return [clean] if clean else []
     for sentence in re.split(r"[\n.;]+", text):
         sentence = _strip_section_heading(sentence)
         if _is_alternative_requirement_text(sentence):
@@ -475,8 +478,24 @@ def _remove_recruiter_lead_context(text: str) -> str:
         return clean
     if connector == "con" and re.match(r"^(?:experiencia|conocimiento|manejo|dominio)\b", body, re.I):
         return body
+    if connector == "con":
+        return _context_body_requirement(body)
     if connector == "para":
         return body
+    return clean
+
+
+def _context_body_requirement(body: str) -> str:
+    clean = re.sub(r"\s+", " ", str(body or "")).strip(" -:.,;\t\r\n")
+    if not clean:
+        return ""
+    if re.match(
+        r"^(?:pacientes|clientes|usuarios|profesionales|familias|estudiantes|proveedores|decisores|asegurados)\b",
+        clean,
+        re.I,
+    ):
+        clean = re.sub(r"\s*,\s*", " y ", clean)
+        return f"Trabajo con {clean}"
     return clean
 
 

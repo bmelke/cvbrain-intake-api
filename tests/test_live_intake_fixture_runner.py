@@ -839,6 +839,21 @@ def test_runner_fails_when_role_title_casing_does_not_match_source_span():
             "Technical Support Specialist",
         ),
         (
+            "Consultora de RRHH busca Senior Talent Partner para selección ejecutiva y tecnológica.",
+            "Consultora de RRHH",
+            "Senior Talent Partner",
+        ),
+        (
+            "Empresa de salud busca Clinical Operations Manager con pacientes, profesionales e indicadores operativos.",
+            "Empresa de salud",
+            "Clinical Operations Manager",
+        ),
+        (
+            "Industria de Pando busca Comprador Técnico con proveedores industriales.",
+            "Industria de Pando",
+            "Comprador Técnico",
+        ),
+        (
             "Consultora tecnológica busca Scrum Master con experiencia facilitando ceremonias ágiles.",
             "Consultora tecnológica",
             "Scrum Master",
@@ -865,6 +880,31 @@ def test_runner_fails_when_key_account_manager_title_span_is_clipped():
 
     assert classification == runner.FAIL_TITLE_SOURCE_SPAN
     assert notes == ["title_source_span_mismatch:Key Account Manager!=Account Manager"]
+
+
+def test_runner_fails_when_employer_descriptor_is_role_title_even_without_source_span():
+    classification, notes = runner.classify_result(
+        "Se requiere cubrir una posición para coordinar operaciones clínicas.",
+        successful_record(role_title="Empresa de salud"),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_TITLE_SOURCE_SPAN
+    assert notes == ["title_employer_context_descriptor:Empresa de salud"]
+
+
+def test_runner_fails_when_public_requirement_repeats_recruiter_lead_sentence():
+    classification, notes = runner.classify_result(
+        "Empresa de salud busca Clinical Operations Manager con pacientes, profesionales e indicadores operativos.",
+        successful_record(
+            role_title="Clinical Operations Manager",
+            must_have=["Empresa de salud busca Clinical Operations Manager con pacientes"],
+        ),
+        expect_live_ai=True,
+    )
+
+    assert classification == runner.FAIL_ORPHAN_FRAGMENTS
+    assert notes == ["lead_sentence_requirement:must_have:Empresa de salud busca Clinical Operations Manager con pacientes"]
 
 
 def test_runner_accepts_exact_role_title_source_casing():

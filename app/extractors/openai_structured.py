@@ -150,12 +150,15 @@ Case contract:
 - For output, incoming source case wins.
 - If the recruiter source contains an explicit role title span, preserve that source span's casing and punctuation in role_title, job_profile.job_title, and job_profile.normalized_role_title.
 - The canonical displayed title must be the literal extracted source title span after safe trimming, not a reconstructed or generated title.
-- For source patterns like "[employer/context] busca/incorpora/selecciona/requiere [role title] con/para ...", the full role title span is before con/para and must be preserved.
+- For source patterns like "[employer/context] busca/incorpora/selecciona/contrata/requiere [role title] con/para ...", the role_title must be the explicit role title span immediately after the hiring verb and before con/para/responsibilities.
+- Employer, client, industry, or organization descriptors before the hiring verb are context only and must never be role_title when an explicit role title span exists.
+- Reject employer/context descriptors as role_title, including Consultora de RRHH, Consultora tecnológica, Empresa de salud, Empresa industrial, Clínica privada, Mutualista, Industria alimenticia, Agencia digital, Colegio privado, Software factory, and similar employer/client/industry descriptors.
 - Preserve complete title spans such as Coordinador/a de Admisiones, Arquitecto/a de Obra, Comprador Técnico, Payroll Specialist, Diseñador/a UX/UI, Technical Support Specialist, Scrum Master, and Agente Comercial.
+- Preserve complete English source title spans such as Senior Talent Partner, Clinical Operations Manager, Key Account Manager, Strategic Account Manager, Enterprise Account Executive, Account Manager Semi Senior, Technical Support Specialist, and Customer Success Manager.
 - Preserve education and leadership title spans such as Director/a de Secundaria, Director/a de Inicial, Coordinador/a de Primaria, Head of English Department, and Responsable de Carreras de Posgrado.
 - Preserve long-form source title spans such as ACCOUNT MANAGER Semi Senior exactly as written, including capitalization and seniority.
 - Do not reduce source titles to a single generic head noun such as Coordinador, Arquitecto, Técnico, Diseñador, or soporte B2B.
-- Do not use employer/context descriptors as role_title, such as Consultora de RRHH, Consultora tecnológica, Empresa de software, or Startup.
+- Do not use employer/context descriptors as role_title, such as Consultora de RRHH, Consultora tecnológica, Empresa de software, Empresa de salud, Clínica privada, Mutualista, Industria alimenticia, Software factory, or Startup.
 - Do not lowercase it.
 - Do not uppercase it.
 - Do not title-case Spanish titles unless the source itself is title-cased.
@@ -228,6 +231,8 @@ Orphan fragment contract:
 - Avoid "Empresa digital busca UX/UI Designer con experiencia en producto"; write role_title "UX/UI Designer" and requirement "Experiencia en producto".
 - Avoid "Industria alimenticia busca Especialista en Compras para gestionar proveedores"; write role_title "Especialista en Compras" and requirement/task "Gestionar proveedores".
 - Avoid "Empresa de servicios busca Responsable de Atención al Cliente para liderar equipo multicanal"; write role_title "Responsable de Atención al Cliente" and requirement/task "Liderar equipo multicanal".
+- Avoid "Empresa de salud busca Clinical Operations Manager con pacientes, profesionales e indicadores operativos"; write role_title "Clinical Operations Manager" and split the context into requirements such as "Trabajo con pacientes y profesionales" and "Gestión de indicadores operativos".
+- Avoid "Consultora de RRHH busca Senior Talent Partner para selección ejecutiva y tecnológica"; write role_title "Senior Talent Partner" and requirement/task "Selección ejecutiva y tecnológica".
 - Do not emit the full recruiter lead sentence as must_have, should_have, nice_to_have, credentials, or soft_competencies.
 - Do not emit recruiter process/meta sentences as requirements, credentials, blockers, or competencies.
 - Forbidden meta sentences include Estos puntos suman valor, Pero no deben desplazar los requisitos excluyentes, Estos puntos serán considerados, La evaluación considerará evidencia laboral e instancias de entrevista, Se evaluará durante entrevista, No deben desplazar, and Suman valor, pero.

@@ -1042,6 +1042,14 @@ def test_boilerplate_subject_prefix_is_removed_from_public_requirements():
             "Empresa de servicios busca Responsable de Atención al Cliente para liderar equipo multicanal",
             "Liderar equipo multicanal",
         ),
+        (
+            "Empresa de salud busca Clinical Operations Manager con pacientes, profesionales e indicadores operativos",
+            "Trabajo con pacientes y profesionales e indicadores operativos",
+        ),
+        (
+            "Consultora de RRHH busca Senior Talent Partner para selección ejecutiva y tecnológica",
+            "Selección ejecutiva y tecnológica",
+        ),
     ],
 )
 def test_recruiter_lead_title_context_sentence_is_split_into_actual_requirement(
@@ -1061,6 +1069,8 @@ def test_recruiter_lead_title_context_sentence_is_split_into_actual_requirement(
     assert "busca ux/ui designer" not in output
     assert "busca especialista en compras" not in output
     assert "busca responsable de atencion al cliente" not in output
+    assert "busca clinical operations manager" not in output
+    assert "busca senior talent partner" not in output
     assert_flat_matches_nested_requirements(normalized, flat)
 
 

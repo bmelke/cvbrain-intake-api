@@ -174,6 +174,24 @@ METADATA_ARTIFACT_PATTERN = re.compile(
     r"schema[_\s-]*repair|debug[_\s-]*placeholder|internal[_\s-]*diagnostic)",
     re.I,
 )
+EMPLOYER_CONTEXT_DESCRIPTOR_PATTERN = re.compile(
+    r"^(?:"
+    r"empresa(?:\s+(?:de|industrial|tecnologica|saas|medica|constructora|digital|agroindustrial|energetica|editorial))?\b|"
+    r"consultora\s+(?:de\s+)?(?:rrhh|recursos\s+humanos|tecnologica)\b|"
+    r"industria\s+|clinica\s+|mutualista\b|agencia\s+|colegio\s+|software\s+factory\b|"
+    r"laboratorio\s+|fintech\b|banco\b|supermercado\b|medio\s+digital\b|"
+    r"estudio\s+juridico\b|institucion\s+educativa\b|cadena\s+hotelera\b|"
+    r"hotel\s+|operador\s+logistico\b|plataforma\s+de\b"
+    r")",
+    re.I,
+)
+RECRUITER_LEAD_REQUIREMENT_PATTERN = re.compile(
+    r"\b(?:empresa|consultora|industria|cl[ií]nica|mutualista|agencia|colegio|software\s+factory|"
+    r"laboratorio|fintech|banco|supermercado|medio\s+digital|estudio\s+jur[ií]dico|"
+    r"instituci[oó]n|cadena|hotel|operador|plataforma|startup)\b.{0,120}?"
+    r"\b(?:busca|buscamos|selecciona|seleccionamos|incorpora|incorporar|contrata|requiere|necesita)\b",
+    re.I | re.S,
+)
 
 
 @dataclass(frozen=True)
@@ -502,9 +520,16 @@ def classify_result(source_text: str, record: ResponseRecord, expect_live_ai: bo
 
     title_notes = title_casing_notes_for(source_text, data)
     if title_notes:
-        if any(note.startswith("title_source_span_mismatch:") for note in title_notes):
+        if any(
+            note.startswith("title_source_span_mismatch:") or note.startswith("title_employer_context_descriptor:")
+            for note in title_notes
+        ):
             return FAIL_TITLE_SOURCE_SPAN, title_notes
         return FAIL_TITLE_CASING, title_notes
+
+    lead_requirement_notes = lead_sentence_requirement_notes_for(data)
+    if lead_requirement_notes:
+        return FAIL_ORPHAN_FRAGMENTS, lead_requirement_notes
 
     orphan_notes = orphan_fragment_notes(data)
     if orphan_notes:
@@ -575,10 +600,21 @@ def title_casing_notes_for(source_text: str, data: Mapping[str, Any]) -> List[st
         if _fold(explicit_source_title) == _fold(role_title):
             return [f"title_casing_mismatch:{explicit_source_title}!={role_title}"]
         return [f"title_source_span_mismatch:{explicit_source_title}!={role_title}"]
+    if _is_rejected_source_title(role_title):
+        return [f"title_employer_context_descriptor:{role_title}"]
     source_span = _matching_source_span(source_text, role_title)
     if source_span and source_span != role_title:
         return [f"title_casing_mismatch:{source_span}!={role_title}"]
     return []
+
+
+def lead_sentence_requirement_notes_for(data: Mapping[str, Any]) -> List[str]:
+    notes: List[str] = []
+    for bucket in ("must_have", "should_have", "nice_to_have"):
+        for item in _string_list(data.get(bucket, [])):
+            if RECRUITER_LEAD_REQUIREMENT_PATTERN.search(item):
+                notes.append(f"lead_sentence_requirement:{bucket}:{item[:160]}")
+    return notes
 
 
 def orphan_fragment_notes(data: Mapping[str, Any]) -> List[str]:
@@ -643,6 +679,7 @@ def _is_rejected_source_title(title: str) -> bool:
     return bool(
         not folded
         or folded in {"empresa", "consultora", "startup", "agencia", "empresa de software"}
+        or EMPLOYER_CONTEXT_DESCRIPTOR_PATTERN.search(folded)
         or re.match(r"^(?:empresa|consultora|startup|agencia|soporte\s+b2b)\b", folded)
     )
 
@@ -660,7 +697,7 @@ def _looks_source_title_span(title: str) -> bool:
     return bool(
         re.search(
             r"\b(?:manager|executive|specialist|consultant|engineer|owner|analyst|lead|head|writer|designer|"
-            r"developer|coordinator|architect|support|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
+            r"developer|coordinator|architect|support|partner|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
             folded,
         )
     )

@@ -156,6 +156,18 @@ REJECTED_TITLE_PREFIX_PATTERN = re.compile(
     re.I,
 )
 
+EMPLOYER_CONTEXT_DESCRIPTOR_PATTERN = re.compile(
+    r"^(?:"
+    r"empresa(?:\s+(?:de|industrial|tecnol[oó]gica|saas|m[eé]dica|constructora|digital|agroindustrial|energ[eé]tica|editorial))?\b|"
+    r"consultora\s+(?:de\s+)?(?:rrhh|recursos\s+humanos|tecnol[oó]gica)\b|"
+    r"industria\s+|cl[ií]nica\s+|mutualista\b|agencia\s+|colegio\s+|software\s+factory\b|"
+    r"laboratorio\s+|fintech\b|banco\b|supermercado\b|medio\s+digital\b|"
+    r"estudio\s+jur[ií]dico\b|instituci[oó]n\s+educativa\b|cadena\s+hotelera\b|"
+    r"hotel\s+|operador\s+log[ií]stico\b|plataforma\s+de\b"
+    r")",
+    re.I,
+)
+
 
 def normalize_role_title_for_source(payload: Mapping[str, Any], source_text: str) -> Dict[str, Any]:
     """Prefer the role title phrase used by Spanish recruiter source text."""
@@ -332,7 +344,7 @@ def _looks_explicit_source_title_span(title: str) -> bool:
     technical_or_role_token = bool(
         re.search(
             r"\b(?:manager|executive|specialist|consultant|engineer|owner|analyst|lead|writer|designer|"
-            r"developer|coordinator|architect|support|head|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
+            r"developer|coordinator|architect|support|head|partner|scrum|payroll|qa|ux/ui|ux|ui|it|rrhh)\b",
             clean,
             re.I,
         )
@@ -354,6 +366,8 @@ def _is_rejected_title(title: str) -> bool:
     if not folded:
         return True
     if folded in {_fold(value) for value in REJECTED_TITLE_EXACT}:
+        return True
+    if EMPLOYER_CONTEXT_DESCRIPTOR_PATTERN.search(folded):
         return True
     return bool(REJECTED_TITLE_PREFIX_PATTERN.search(folded))
 
