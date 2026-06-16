@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Mapping
 
+from app.mappers.recruiter_display_plan import build_recruiter_display_plan
 from app.normalization.requirement_importance import normalize_job_intelligence_requirements
 from app.normalization.role_title import display_role_title_from_job_profile
 from app.schemas.job_intelligence_v1_contract import validate_job_intelligence_v1
@@ -34,7 +35,7 @@ def derive_flat_compatibility(payload: Mapping[str, Any]) -> Dict[str, Any]:
         + _readiness_warnings(readiness)
     )
 
-    return {
+    flat = {
         "ok": True,
         "version": FLAT_VERSION,
         "role_title": display_role_title_from_job_profile(job_profile),
@@ -72,6 +73,8 @@ def derive_flat_compatibility(payload: Mapping[str, Any]) -> Dict[str, Any]:
         "warnings": warnings,
         "confidence": float(quality_control.get("confidence", 0.0)),
     }
+    flat["display_plan"] = build_recruiter_display_plan(validated, flat)
+    return flat
 
 
 def _credentials(items: Iterable[Any]) -> Dict[str, List[str]]:

@@ -399,6 +399,11 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "classification_rationale_id_missing" in system_prompt
     assert "public source_text fields" in system_prompt
     assert "Never invent a placeholder to satisfy the schema." in system_prompt
+    assert "Recruiter display/search plan contract:" in system_prompt
+    assert "CVBrain, not WordPress, owns the intelligence needed for recruiter-facing display plans." in system_prompt
+    assert "inútil presentarse" in system_prompt
+    assert "Search concepts must be short searchable concepts" in system_prompt
+    assert "Candidate interview/screening questions belong only in candidate_screening_questions" in system_prompt
     assert "Sparse valid intake contract:" in system_prompt
     assert "Sparse recruiter text is still valid input" in system_prompt
     assert "Sparse input should lower confidence" in system_prompt
@@ -1072,6 +1077,10 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "Public output contract:" in repair_prompt
     assert "Source_text_span_missing_from_rules" in repair_prompt
     assert "classification_rationale_id_missing" in repair_prompt
+    assert "Recruiter display/search plan contract:" in repair_prompt
+    assert "CVBrain, not WordPress, owns the intelligence needed for recruiter-facing display plans." in repair_prompt
+    assert "inútil presentarse" in repair_prompt
+    assert "Search concepts must be short searchable concepts" in repair_prompt
     assert "Requirement list inheritance contract:" in repair_prompt
     assert "Libreta de conducir será valorable si debe recorrer servicios" in repair_prompt
     assert "Long input segmentation contract:" in repair_prompt

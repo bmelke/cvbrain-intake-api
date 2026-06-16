@@ -26,7 +26,7 @@ HARD_PATTERN = re.compile(
     r"indispensable|m[ií]nim[oa]|requisito(?:\s+excluyente)?|"
     r"se\s+requiere(?:n)?|debe(?:\s+(?:manejar|contar\s+con|tener))?|"
     r"sin\s+.+?\s+no\s+avanzar|no\s+avanzar\s+si\s+no\s+.+|"
-    r"no\s+presentarse\s+si\s+no\s+.+|no\s+presentarse\s+a\s+menos\s+que\s+.+|"
+    r"no\s+presentarse\s+si\s+no\s+.+|no\s+presentarse\s+a\s+menos\s+que\s+.+|in[uú]til\s+presentarse\s+.+|"
     r"solo\s+avanzar\s+si\s+.+|con\s+experiencia\s+en\s+.+"
     r")\b",
     re.I,
@@ -88,6 +88,7 @@ ORPHAN_FRAGMENT_PATTERN = re.compile(
 
 NO_AVANZAR_PATTERN = re.compile(r"\bno\s+avanzar\b.*", re.I)
 NO_PRESENTARSE_BLOCKER_PATTERN = re.compile(r"\bno\s+presentarse\s+si\s+no\b.*", re.I)
+INUTIL_PRESENTARSE_BLOCKER_PATTERN = re.compile(r"\bin[uú]til\s+presentarse\b.*", re.I)
 SIN_NO_AVANZAR_PATTERN = re.compile(r"\bsin\s+.+?\s+no\s+avanzar\b.*", re.I)
 NO_SOLO_BLOCKER_PATTERN = re.compile(r"\bno\s+(?:solo|solamente)\b.*", re.I)
 NI_NEGATIVE_FRAGMENT_PATTERN = re.compile(r"^\s*ni\s+(.+)", re.I)
@@ -536,7 +537,7 @@ def _is_blocker_only_clause(text: str) -> bool:
         return False
     return bool(
         re.search(
-            r"\bno\s+avanzar\b|\bno\s+presentarse\s+si\s+no\b|"
+            r"\bno\s+avanzar\b|\bno\s+presentarse\s+si\s+no\b|\bin[uú]til\s+presentarse\b|"
             r"\bsin\s+.+?\s+no\s+avanzar\b|\bno\s+considerar\b|"
             r"\bno\s+(?:solo|solamente)\b|^\s*ni\s+",
             lowered,
@@ -1356,6 +1357,7 @@ def _extract_blocker_fragment(text: str) -> str:
     for pattern in (
         NO_AVANZAR_PATTERN,
         NO_PRESENTARSE_BLOCKER_PATTERN,
+        INUTIL_PRESENTARSE_BLOCKER_PATTERN,
         SIN_NO_AVANZAR_PATTERN,
         NO_SOLO_BLOCKER_PATTERN,
     ):
@@ -1378,6 +1380,11 @@ def _normalize_blocker_text(text: str) -> str:
     clean = re.sub(r"^criterio\s+de\s+no\s+avanzar\b", "No avanzar", clean, flags=re.I)
     clean = re.sub(r"\bcriterio\s+de\s*\.?\s*", "", clean, flags=re.I)
     clean = re.sub(r"\s+ni\s+", " y ", clean, flags=re.I)
+    if re.search(r"^in[uú]til\s+presentarse\b", clean, re.I):
+        if re.search(r"\bsin\s+credenciales?\b", clean, re.I):
+            clean = "No avanzar sin credenciales requeridas"
+        else:
+            clean = re.sub(r"^in[uú]til\s+presentarse\b", "No avanzar", clean, flags=re.I)
     clean = re.sub(
         r"^no\s+(?:solo|solamente)\s+(.+)$",
         r"No avanzar perfiles centrados solo en \1",
@@ -1437,7 +1444,7 @@ def _should_replace_duplicate_blocker(existing: str, candidate: str) -> bool:
 def _blocker_concept_key(text: str) -> str:
     clean = _requirement_concept_key(text)
     clean = re.sub(
-        r"^(?:no\s+avanzar|no\s+presentarse\s+si\s+no|no\s+considerar)\s+",
+        r"^(?:no\s+avanzar|no\s+presentarse\s+si\s+no|in[uú]til\s+presentarse|no\s+considerar)\s+",
         "",
         clean,
     )

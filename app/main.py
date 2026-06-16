@@ -7,6 +7,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 from app.extractors import ExtractorRequest, ExtractorRouter
+from app.mappers.recruiter_display_plan import build_recruiter_display_plan
 from app.normalization.requirement_importance import resolve_requirements_from_text
 
 
@@ -272,7 +273,7 @@ def analyze_text(text: str) -> Dict[str, Any]:
     if warnings:
         confidence = 0.45
 
-    return {
+    result = {
         "ok": True,
         "version": SERVICE_VERSION,
         "role_title": role_title,
@@ -294,6 +295,8 @@ def analyze_text(text: str) -> Dict[str, Any]:
         "warnings": warnings,
         "confidence": confidence,
     }
+    result["display_plan"] = build_recruiter_display_plan(flat=result)
+    return result
 
 
 def require_api_key(api_key: Optional[str]) -> None:

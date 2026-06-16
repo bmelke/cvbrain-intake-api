@@ -26,6 +26,7 @@ def test_flat_contract_required_keys_are_documented():
         "location",
         "search_terms",
         "semantic_terms",
+        "display_plan",
         "warnings",
         "confidence",
     }.issubset(required)

@@ -1,0 +1,358 @@
+import json
+import unicodedata
+
+from app.extractors import ExtractorRequest
+from app.extractors.openai_structured import OpenAIStructuredExtractor
+from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
+from app.mappers.recruiter_display_plan import build_recruiter_display_plan
+from app.normalization.requirement_importance import normalize_job_intelligence_requirements
+from app.normalization.role_title import normalize_role_title_for_source
+
+
+class FakeResponses:
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return self.response
+
+
+class FakeOpenAIClient:
+    def __init__(self, response):
+        self.responses = FakeResponses(response)
+
+    def with_options(self, **kwargs):
+        return self
+
+
+def fold(value):
+    text = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else str(value)
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch)).casefold()
+
+
+def requirement_item(text, importance="must_have", source_text=None):
+    return {
+        "text": text,
+        "source_text": source_text or text,
+        "importance": importance,
+        "explicit": True,
+        "hard_filter_candidate": importance == "must_have",
+        "hard_filter_approved": False,
+    }
+
+
+def question_item(question, field="requirements"):
+    return {
+        "id": field.replace(".", "_"),
+        "question": question,
+        "related_fields": [field],
+        "blocking_level": "advisory",
+        "asked_to": "hiring_company",
+    }
+
+
+def missing_item(field, question):
+    return {
+        "id": field.replace(".", "_"),
+        "field": field,
+        "description": field,
+        "suggested_question": question,
+        "can_continue_without_answer": True,
+    }
+
+
+def base_job_intelligence(role_title="Sanitized Role"):
+    return {
+        "schema_version": "cvbrain_job_intelligence_v1",
+        "job_profile": {
+            "job_title": role_title,
+            "normalized_role_title": role_title,
+            "role_family": "",
+            "seniority": "",
+            "summary": "",
+            "primary_industries": [],
+            "work_modality": None,
+        },
+        "location_intelligence": {
+            "raw": "",
+            "normalized": "",
+            "country_code": "UY",
+            "remote_allowed": None,
+            "hybrid_allowed": None,
+            "onsite_required": None,
+            "country_context_mismatch": False,
+            "hard_filter_candidate": False,
+            "hard_filter_approved": False,
+            "warnings": [],
+        },
+        "requirements": {
+            "must_have": [],
+            "should_have": [],
+            "nice_to_have": [],
+            "credentials": [],
+            "blockers": [],
+            "experience": {"minimum_years": None, "seniority": ""},
+            "soft_competencies": [],
+        },
+        "search_strategy": {
+            "target_titles": [role_title],
+            "search_terms": [role_title],
+            "semantic_terms": [],
+            "negative_terms": [],
+        },
+        "missing_information": [],
+        "company_clarification_questions": [],
+        "candidate_screening_questions": [],
+        "search_readiness": {
+            "status": "usable_with_warnings",
+            "proceed_allowed": True,
+            "recommended_action": "continue_anyway",
+            "recruiter_decision_required": False,
+            "continued_with_missing_information": False,
+            "recruiter_override_reason": None,
+            "decision_options": ["continue_anyway", "answer_clarifying_questions", "ask_company", "use_manual_search", "cancel"],
+        },
+        "quality_control": {
+            "warnings": [],
+            "confidence": 0.74,
+            "contains_candidate_data": False,
+            "contains_candidate_pii": False,
+        },
+    }
+
+
+def normalized_flat_and_plan(payload, source_text=""):
+    normalized = normalize_job_intelligence_requirements(payload, source_text=source_text)
+    normalized = normalize_role_title_for_source(normalized, source_text=source_text)
+    flat = derive_flat_compatibility(normalized)
+    return normalized, flat, flat["display_plan"]
+
+
+def all_plan_text(plan):
+    return fold(plan)
+
+
+def test_display_plan_cleans_engineering_manager_intake_for_recruiter_ui():
+    source = (
+        "ingeniero recibido para Montevideo. Coordinar un grupo de diseñadores de motores. "
+        "Mínimo 3 años de experiencia en gerencia. Minimo 3 años de experiencia rn gerencia es necesario. "
+        "Inutil presentarse sin credenciales. Amplia experiencia en motores de fuerza es indispensable. MBS preferido."
+    )
+    payload = base_job_intelligence("Ingeniero recibido")
+    payload["job_profile"]["summary"] = "Ingeniero para coordinar diseño de motores y gerencia técnica."
+    payload["location_intelligence"]["raw"] = "Montevideo"
+    payload["location_intelligence"]["normalized"] = "Montevideo"
+    payload["requirements"]["must_have"] = [
+        requirement_item("Coordinar un grupo de diseñadores de motores"),
+        requirement_item("Mínimo 3 años de experiencia en gerencia"),
+        requirement_item("Minimo 3 años de experiencia rn gerencia es necesario"),
+        requirement_item("Inutil presentarse sin credenciales"),
+        requirement_item("Amplia experiencia en motores de fuerza es indispensable"),
+    ]
+    payload["requirements"]["nice_to_have"] = [requirement_item("MBS preferido", "nice_to_have")]
+    payload["requirements"]["experience"] = {"minimum_years": 3, "seniority": ""}
+    payload["search_strategy"] = {
+        "target_titles": ["Ingeniero recibido", "Ingeniero"],
+        "search_terms": ["ingeniero", "motores de fuerza", "MBS", "Mínimo 3 años de experiencia en gerencia"],
+        "semantic_terms": ["diseño de motores", "coordinación de equipo", "gerencia"],
+        "negative_terms": [],
+    }
+
+    _, flat, plan = normalized_flat_and_plan(payload, source_text=source)
+
+    assert plan["role_title"] in {"Ingeniero recibido", "Ingeniero"}
+    assert plan["market"] == "Uruguay"
+    assert plan["location_modality"] == "Montevideo"
+    assert "Coordinar un grupo de diseñadores de motores" in plan["must_have"]
+    assert "Mínimo 3 años de experiencia en gerencia" in plan["must_have"]
+    assert "amplia experiencia en motores de fuerza" in all_plan_text(plan["must_have"])
+    assert "mbs" in all_plan_text(plan["nice_to_have"] + plan["preferred"])
+    assert "No avanzar sin credenciales requeridas" in plan["blockers"]
+    assert "¿Qué credenciales exactas son requeridas?" in plan["questions"]
+    assert "¿Qué significa MBS y cómo se valida?" in plan["questions"]
+    for concept in ["ingeniero", "motores de fuerza", "diseño de motores", "coordinación de equipo", "gerencia", "MBS"]:
+        assert fold(concept) in all_plan_text(plan["search_concepts"])
+    forbidden = [
+        "rn",
+        "Inutil presentarse",
+        "Cumplís con",
+        "search_readiness_",
+        "low_confidence:",
+        "ai_schema_",
+        "ai_provider_",
+    ]
+    for term in forbidden:
+        assert fold(term) not in all_plan_text(plan)
+    assert flat["display_plan"] == plan
+
+
+def test_display_plan_uses_source_title_not_employer_context_for_senior_talent_partner():
+    source = (
+        "Consultora de RRHH busca Senior Talent Partner con experiencia en selección ejecutiva, hunting, "
+        "entrevistas por competencias, perfiles tecnológicos y gestión con hiring managers."
+    )
+    payload = base_job_intelligence("Consultora de RRHH")
+    payload["requirements"]["must_have"] = [
+        requirement_item("Consultora de RRHH busca Senior Talent Partner con experiencia en selección ejecutiva")
+    ]
+    payload["search_strategy"]["search_terms"] = ["Consultora de RRHH", "Senior Talent Partner", "hunting"]
+
+    _, _, plan = normalized_flat_and_plan(payload, source_text=source)
+
+    assert plan["role_title"] == "Senior Talent Partner"
+    assert "Consultora de RRHH busca Senior Talent Partner" not in all_plan_text(plan["must_have"])
+
+
+def test_display_plan_strips_clinical_operations_lead_sentence_from_requirement():
+    source = "Empresa de salud busca Clinical Operations Manager con pacientes, profesionales e indicadores operativos."
+    payload = base_job_intelligence("Clinical Operations Manager")
+    payload["requirements"]["must_have"] = [
+        requirement_item("Empresa de salud busca Clinical Operations Manager con pacientes, profesionales e indicadores operativos")
+    ]
+    payload["search_strategy"]["search_terms"] = ["Clinical Operations Manager", "pacientes", "indicadores operativos"]
+
+    _, _, plan = normalized_flat_and_plan(payload, source_text=source)
+
+    assert plan["role_title"] == "Clinical Operations Manager"
+    assert "Empresa de salud busca Clinical Operations Manager" not in all_plan_text(plan["must_have"])
+    assert "pacientes" in all_plan_text(plan["must_have"] + plan["search_concepts"])
+
+
+def test_display_plan_sparse_responsable_calidad_input_is_ok_and_clean():
+    payload = base_job_intelligence("Responsable de Calidad Asistencial")
+    payload["job_profile"]["summary"] = "Responsable de Calidad Asistencial para mutualista."
+    payload["job_profile"]["primary_industries"] = ["salud"]
+    payload["requirements"]["must_have"] = [
+        requirement_item("Auditorías clínicas"),
+        requirement_item("Indicadores"),
+        requirement_item("Seniority: sin especificar"),
+    ]
+    payload["missing_information"] = [
+        missing_item("work_modality", "¿Cuál es la ciudad/zona y la modalidad de trabajo?")
+    ]
+
+    _, flat, plan = normalized_flat_and_plan(
+        payload,
+        source_text="Mutualista busca Responsable de Calidad Asistencial con auditorías clínicas e indicadores.",
+    )
+
+    assert flat["ok"] is True
+    assert plan["role_title"] == "Responsable de Calidad Asistencial"
+    assert "seniority sin especificar" not in all_plan_text(plan["must_have"])
+    assert "search_readiness_" not in all_plan_text(plan)
+    assert plan["questions"] == ["¿Cuál es la ciudad/zona y la modalidad de trabajo?"]
+
+
+def test_display_plan_preserves_key_account_manager_and_deseables_as_optional():
+    payload = base_job_intelligence("Key Account Manager")
+    payload["requirements"]["must_have"] = [requirement_item("Gestión de grandes cuentas")]
+    payload["requirements"]["should_have"] = [requirement_item("CRM deseable", "preferred")]
+    payload["requirements"]["nice_to_have"] = [requirement_item("Inglés será valorable", "nice_to_have")]
+    payload["search_strategy"]["search_terms"] = ["Key Account Manager", "KAM", "grandes cuentas", "CRM"]
+
+    _, _, plan = normalized_flat_and_plan(
+        payload,
+        source_text="Empresa busca Key Account Manager con gestión de grandes cuentas. CRM deseable. Inglés será valorable.",
+    )
+
+    assert plan["role_title"] == "Key Account Manager"
+    assert "crm" in all_plan_text(plan["preferred"])
+    assert "ingles" in all_plan_text(plan["nice_to_have"])
+    assert "CRM" not in all_plan_text(plan["must_have"])
+
+
+def test_display_plan_does_not_turn_plain_responsibilities_into_must_have():
+    payload = base_job_intelligence("Coordinador de Operaciones")
+    payload["job_profile"]["summary"] = "Coordinar proveedores, reportar indicadores y apoyar mejora continua."
+    payload["requirements"]["must_have"] = [requirement_item("Experiencia en operaciones")]
+    payload["search_strategy"]["search_terms"] = ["Coordinador de Operaciones", "operaciones", "proveedores", "indicadores"]
+
+    _, _, plan = normalized_flat_and_plan(
+        payload,
+        source_text="Coordinador de Operaciones. Responsabilidades: coordinar proveedores, reportar indicadores y apoyar mejora continua. Requisitos: experiencia en operaciones.",
+    )
+
+    assert plan["must_have"] == ["Experiencia en operaciones"]
+    assert "coordinar proveedores" not in all_plan_text(plan["must_have"])
+
+
+def test_display_plan_long_account_manager_jd_is_clean_and_compact():
+    payload = base_job_intelligence("ACCOUNT MANAGER Semi Senior")
+    payload["job_profile"]["seniority"] = "Semi Senior"
+    payload["job_profile"]["summary"] = "Account Manager Semi Senior para cartera de clientes del sector salud."
+    payload["job_profile"]["primary_industries"] = ["dispositivos médicos", "salud"]
+    payload["location_intelligence"]["normalized"] = "Montevideo, Canelones"
+    payload["requirements"]["must_have"] = [
+        requirement_item("Experiencia mínima de 3 años en dispositivos médicos"),
+        requirement_item("Grandes cuentas"),
+        requirement_item("Venta técnica"),
+        requirement_item("CRM y MS Office"),
+    ]
+    payload["requirements"]["nice_to_have"] = [
+        requirement_item("Inglés deseable", "nice_to_have"),
+        requirement_item("Experiencia en ultrasonido", "nice_to_have"),
+    ]
+    payload["requirements"]["experience"] = {"minimum_years": 3, "seniority": "Semi Senior"}
+    payload["search_strategy"]["search_terms"] = [
+        "ACCOUNT MANAGER Semi Senior",
+        "Account Manager",
+        "dispositivos médicos",
+        "sector salud",
+        "CRM",
+        "MS Office",
+        "ultrasonido",
+    ]
+
+    _, _, plan = normalized_flat_and_plan(
+        payload,
+        source_text="Estamos buscando un ACCOUNT MANAGER Semi Senior para desarrollar cartera de clientes del sector salud en Montevideo, Canelones e interior. Requisitos: experiencia mínima de 3 años en dispositivos médicos, grandes cuentas, venta técnica, CRM y MS Office. Deseable inglés, cartera propia y experiencia en ultrasonido.",
+    )
+
+    assert plan["role_title"] == "ACCOUNT MANAGER Semi Senior"
+    assert plan["market"] == "Uruguay"
+    assert "Montevideo" in plan["location_modality"]
+    assert len(plan["search_concepts"]) <= 14
+    assert "search_readiness_" not in all_plan_text(plan)
+
+
+def test_openai_response_path_returns_display_plan_from_normalized_payload():
+    payload = base_job_intelligence("Consultora de RRHH")
+    payload["requirements"]["must_have"] = [
+        requirement_item("No avanzar perfiles sin experiencia en selección ejecutiva"),
+        requirement_item("No excluyente"),
+        requirement_item("Consultora de RRHH busca Senior Talent Partner con experiencia en selección ejecutiva"),
+    ]
+    payload["requirements"]["nice_to_have"] = [requirement_item("Hunting será un plus", "nice_to_have")]
+    payload["search_strategy"]["search_terms"] = ["Senior Talent Partner", "search_readiness_exploratory", "hunting"]
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model",
+        client=FakeOpenAIClient(response={"output_parsed": payload}),
+        fallback_enabled=False,
+    )
+
+    result = extractor.extract(
+        ExtractorRequest(
+            source_text="Consultora de RRHH busca Senior Talent Partner con experiencia en selección ejecutiva. Hunting será un plus. No avanzar perfiles sin experiencia en selección ejecutiva.",
+            locale="es-UY",
+            country_context="UY",
+            candidate_market="UY",
+            employer_market="UY",
+            source_filename="",
+            source_mime_type="text/plain",
+            recruiter_notes="",
+        )
+    )
+
+    plan = result["display_plan"]
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert plan["role_title"] == "Senior Talent Partner"
+    assert "No avanzar perfiles sin experiencia en selección ejecutiva" in plan["blockers"]
+    assert "No avanzar" not in all_plan_text(plan["must_have"] + plan["preferred"] + plan["nice_to_have"])
+    assert "No excluyente" not in all_plan_text(plan)
+    assert "search_readiness_" not in all_plan_text(plan)

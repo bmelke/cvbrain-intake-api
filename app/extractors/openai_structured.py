@@ -176,6 +176,16 @@ PUBLIC_EXTRACTION_CONTRACT = """Public output contract:
 - Never invent a placeholder to satisfy the schema.
 - Apply this public-output contract recursively to role_title, job_profile fields, requirements, credentials, blockers, soft_competencies, public source_text fields, recruiter questions, warnings, and diagnostics shown to users or runner output.
 
+Recruiter display/search plan contract:
+- CVBrain, not WordPress, owns the intelligence needed for recruiter-facing display plans.
+- Produce normalized source fields so the API can derive a display_plan without WordPress doing semantic cleanup.
+- Employer/context before busca/incorpora/selecciona/contrata/requiere is not the role title when a title span follows the hiring verb.
+- Lead/title/context sentences must be split into role_title plus the actual requirement, responsibility, or context. Do not emit the full lead sentence as a requirement.
+- Phrases such as no avanzar, inútil presentarse, no presentarse, sin credenciales, and sin experiencia are blockers/no avanzar criteria, not must_have or preferred requirements.
+- Missing placeholders such as sin especificar, no indicado, no informado, unspecified, source_text_span_missing, or span_missing are missing information/questions, not requirements or chips.
+- Search concepts must be short searchable concepts, titles, skills, tools, industries, or synonyms. Do not use full requirement sentences as search concepts.
+- Recruiter/company questions should clarify the search brief. Candidate interview/screening questions belong only in candidate_screening_questions, not company_clarification_questions.
+
 Long input segmentation contract:
 - Sparse valid intake contract:
 - Sparse recruiter text is still valid input when it contains an explicit role title plus at least one domain, task, location, credential, or blocker signal.
