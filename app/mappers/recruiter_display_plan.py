@@ -14,7 +14,7 @@ READY_LABELS = {
     "ready": ("Lista para buscar", "success"),
     "usable_with_warnings": ("Usable con advertencias", "warning"),
     "exploratory": ("Exploratoria", "info"),
-    "insufficient_for_precise_search": ("Insuficiente para una busqueda precisa", "warning"),
+    "insufficient_for_precise_search": ("Requiere confirmación antes de una búsqueda precisa", "warning"),
     "blocked_for_safety_or_technical_reason": ("Bloqueada por seguridad o falla tecnica", "error"),
 }
 
@@ -66,8 +66,10 @@ def build_recruiter_display_plan(
     seniority = _clean_display_text(
         job_profile.get("seniority") or _mapping(flat.get("experience")).get("seniority")
     )
+    professional_grade = _clean_display_text(job_profile.get("professional_grade"))
     market = _market_label(location, flat)
     location_modality = _location_modality_label(location, job_profile, _mapping(flat.get("location")))
+    summary = _clean_candidate_summary(flat.get("summary") or job_profile.get("summary"), role_title)
 
     found_blockers: List[str] = []
     must_have, found_blockers = _clean_requirement_bucket(
@@ -89,7 +91,7 @@ def build_recruiter_display_plan(
     blockers = _dedupe_display_items(_texts(flat.get("blockers")) + found_blockers)
 
     questions = _display_questions(job_intelligence, blockers, search_strategy)
-    tie_breakers = _tie_breakers(preferred, nice_to_have, _texts(job_profile.get("primary_industries")))
+    tie_breakers = _tie_breakers(preferred, nice_to_have)
     search_concepts = _search_concepts(
         role_title=role_title,
         search_strategy=search_strategy,
@@ -103,16 +105,18 @@ def build_recruiter_display_plan(
     return {
         "role_title": role_title,
         "seniority": seniority,
+        "professional_grade": professional_grade,
         "market": market,
         "location_modality": location_modality,
-        "summary": _what_to_search(role_title, _clean_display_text(flat.get("summary") or job_profile.get("summary"))),
-        "what_to_search": _what_to_search(role_title, _clean_display_text(flat.get("summary") or job_profile.get("summary"))),
+        "summary": summary,
+        "what_to_search": summary,
         "must_have": must_have,
         "preferred": preferred,
         "nice_to_have": nice_to_have,
         "blockers": blockers,
         "tie_breakers": tie_breakers,
         "questions": questions,
+        "question_registry": _display_question_registry(job_intelligence),
         "search_concepts": search_concepts,
         "criteria_review": criteria_review,
         "readiness": _readiness(readiness, flat),
@@ -285,6 +289,18 @@ def _what_to_search(role_title: str, summary: str) -> str:
     return "Candidatos alineados a la búsqueda recibida, separando requisitos, descartes y dudas para revisión."
 
 
+def _clean_candidate_summary(value: Any, role_title: str) -> str:
+    clean = _clean_display_text(value)
+    if clean:
+        sentences = [
+            part.strip(" -:.,;")
+            for part in re.split(r"(?<=[.;])\s+|[\n\r]+", clean)
+            if part.strip(" -:.,;") and not _looks_non_search_context(part)
+        ]
+        clean = _clean_display_text(" ".join(sentences))
+    return _what_to_search(role_title, clean)
+
+
 def _display_questions(
     job_intelligence: Mapping[str, Any],
     blockers: List[str],
@@ -334,10 +350,10 @@ def _question_topic(value: str) -> str:
     return ""
 
 
-def _tie_breakers(preferred: List[str], nice_to_have: List[str], industries: List[str]) -> List[str]:
+def _tie_breakers(preferred: List[str], nice_to_have: List[str]) -> List[str]:
     grounded = [
         item
-        for item in nice_to_have + preferred + industries
+        for item in nice_to_have + preferred
         if not _looks_non_search_context(item)
     ]
     return _dedupe_display_items(grounded, limit=6)
@@ -387,6 +403,7 @@ def _criteria_review(job_intelligence: Mapping[str, Any]) -> List[Dict[str, Any]
                     "bucket": bucket,
                     "importance": _structured_value(item.get("importance", "")),
                     "precision_status": _structured_value(item.get("precision_status", "precise")) or "precise",
+                    "review_status": _structured_value(item.get("review_status", "")),
                     "hard_filter_candidate": bool(item.get("hard_filter_candidate")),
                     "hard_filter_approved": bool(item.get("hard_filter_approved")),
                     "clarification_question_id": question_ref,
@@ -396,6 +413,37 @@ def _criteria_review(job_intelligence: Mapping[str, Any]) -> List[Dict[str, Any]
     return _dedupe_review_items(output)
 
 
+def _display_question_registry(job_intelligence: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    output: List[Dict[str, Any]] = []
+    for item in job_intelligence.get("company_clarification_questions", []) or []:
+        if not isinstance(item, Mapping):
+            continue
+        question = _clean_display_text(item.get("question", ""))
+        question_id = _structured_identifier(item.get("question_id") or item.get("id", ""))
+        if not question or not question_id or _looks_candidate_interview_question(question):
+            continue
+        output.append(
+            {
+                "question_id": question_id,
+                "question": question,
+                "audience": "hiring_company",
+                "category": _structured_value(item.get("category", "")) or "search_precision",
+                "criterion_refs": [
+                    str(ref)
+                    for ref in item.get("criterion_refs", []) or []
+                    if str(ref).strip()
+                ],
+                "missing_dimensions": [
+                    str(dimension)
+                    for dimension in item.get("missing_dimensions", []) or []
+                    if str(dimension).strip()
+                ],
+                "blocking_level": _clean_display_text(item.get("blocking_level", "")) or "advisory",
+            }
+        )
+    return output
+
+
 def _question_lookup(items: Any) -> Dict[str, Mapping[str, Any]]:
     output: Dict[str, Mapping[str, Any]] = {}
     if not isinstance(items, list):
@@ -403,9 +451,14 @@ def _question_lookup(items: Any) -> Dict[str, Mapping[str, Any]]:
     for item in items:
         if not isinstance(item, Mapping):
             continue
+        refs = item.get("criterion_refs") if isinstance(item.get("criterion_refs"), list) else []
         criterion_id = str(item.get("criterion_id") or "").strip()
-        if criterion_id and criterion_id not in output:
-            output[criterion_id] = item
+        if criterion_id:
+            refs = list(refs) + [criterion_id]
+        for ref in refs:
+            clean_ref = str(ref or "").strip()
+            if clean_ref and clean_ref not in output:
+                output[clean_ref] = item
     return output
 
 
@@ -417,7 +470,7 @@ def _question_for_criterion(
     question_item = questions.get(criterion_id) if criterion_id else None
     if question_item:
         return (
-            _clean_display_text(question_item.get("id", "")),
+            _structured_identifier(question_item.get("question_id") or question_item.get("id", "")),
             _clean_display_text(question_item.get("question", "")),
         )
     question = _clean_display_text(item.get("clarification_question", ""))
@@ -429,6 +482,11 @@ def _question_for_criterion(
 def _structured_value(value: Any) -> str:
     clean = re.sub(r"[^a-z0-9_-]+", "", str(value or "").strip().casefold())
     return clean[:80]
+
+
+def _structured_identifier(value: Any) -> str:
+    clean = re.sub(r"[^A-Za-z0-9_-]+", "", str(value or "").strip())
+    return clean[:120]
 
 
 def _dedupe_review_items(items: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:

@@ -83,6 +83,35 @@ def test_mocked_ai_outputs_validate_and_derive_flat_contract(fixture):
     assert "candidate_ids" not in flat
 
 
+@pytest.mark.parametrize("fixture", FIXTURES, ids=[fixture["fixture_id"] for fixture in FIXTURES])
+def test_mocked_ai_outputs_preserve_canonical_review_referential_integrity(fixture):
+    flat = derive_flat_compatibility(fixture)
+    display_plan = flat["display_plan"]
+    criteria = display_plan.get("criteria_review", [])
+    questions = display_plan.get("question_registry", [])
+
+    criterion_ids = [item.get("criterion_id") for item in criteria if item.get("criterion_id")]
+    question_ids = [item.get("question_id") for item in questions if item.get("question_id")]
+
+    assert len(criterion_ids) == len(set(criterion_ids))
+    assert len(question_ids) == len(set(question_ids))
+    assert "candidate_screening_questions" in flat
+    assert "recruiter_questions" in flat
+
+    question_id_set = set(question_ids)
+    for item in criteria:
+        if item.get("precision_status") == "needs_clarification":
+            assert item.get("clarification_question_id") in question_id_set
+            assert item.get("review_status") == "pending_recruiter_confirmation"
+            assert item.get("hard_filter_approved") is False
+        else:
+            assert not item.get("clarification_question_id")
+
+    recruiter_text = normalize(flat.get("recruiter_questions", []) + display_plan.get("questions", []))
+    assert "ask the candidate" not in recruiter_text
+    assert "can you provide" not in recruiter_text
+
+
 def test_mocked_ai_fixture_set_is_complete_and_sanitized():
     expected_names = {
         "uy_account_manager_medical_devices_montevideo_hybrid_ai_output.json",

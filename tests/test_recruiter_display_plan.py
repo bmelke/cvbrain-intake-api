@@ -420,7 +420,7 @@ def test_display_plan_questions_come_from_one_pass_precision_contract_and_are_de
     assert all(question in all_questions for question in questions)
     assert all_questions.count(questions[3]) == 1
     assert flat["recruiter_questions"].count(questions[3]) == 1
-    assert normalized["search_readiness"]["status"] == "usable_with_warnings"
+    assert normalized["search_readiness"]["status"] == "insufficient_for_precise_search"
     assert "cumplis" not in all_plan_text(all_questions)
     assert "podes ampliar" not in all_plan_text(all_questions)
     assert "search_readiness_" not in all_plan_text(plan)
@@ -484,6 +484,7 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
     questions = [
         "¿Qué categoría, certificación o experiencia valida que el candidato sea oficial de primera?",
         "¿Cuántos años mínimos o qué evidencia concreta se considera suficiente para demostrar la experiencia?",
+        "¿Qué alcance concreto de reparaciones debe poder realizar?",
         "¿Qué categoría de licencia de conducir se requiere?",
         "¿Qué documentación exacta debe tener el candidato en regla?",
     ]
@@ -494,10 +495,10 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
         imprecise_requirement_item(
             "Con experiencia demostrable que haga todo tipo de reparaciones y con carnet de conducir",
             "must_have",
-            ["duration", "evidence", "license_category"],
-            questions[1],
+            ["duration", "evidence", "scope", "license_category"],
+            questions[2],
         ),
-        imprecise_requirement_item("Papeles en regla", "must_have", ["legal_documentation"], questions[3]),
+        imprecise_requirement_item("Papeles en regla", "must_have", ["legal_documentation"], questions[4]),
         requirement_item("Asalariado o autónomo"),
         requirement_item("Salario según convenio"),
     ]
@@ -506,9 +507,9 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
             "Carnet de conducir (categoría no especificada)",
             "must_have",
             ["license_category"],
-            questions[2],
+            questions[3],
         ),
-        imprecise_requirement_item("Carnet B", "must_have", ["license_category"], questions[2]),
+        imprecise_requirement_item("Carnet B", "must_have", ["license_category"], questions[3]),
     ]
     payload["requirements"]["blockers"] = ["No avanzar sin papeles en regla"]
     payload["search_strategy"]["search_terms"] = [
@@ -521,9 +522,10 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
     payload["company_clarification_questions"] = [
         question_item(questions[0], "requirements.must_have"),
         question_item(questions[1], "requirements.must_have"),
-        question_item(questions[2], "requirements.credentials"),
-        question_item(questions[2], "requirements.credentials"),
-        question_item(questions[3], "requirements.must_have"),
+        question_item(questions[2], "requirements.must_have"),
+        question_item(questions[3], "requirements.credentials"),
+        question_item(questions[3], "requirements.credentials"),
+        question_item(questions[4], "requirements.must_have"),
         {
             "id": "candidate_bad",
             "question": "¿Tienes carnet B y puedes aportar papeles?",
@@ -557,6 +559,7 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
     assert question_text.count("licencia de conducir") == 1
     assert question_text.count("documentacion exacta") == 1
     assert question_text.count("evidencia concreta") == 1
+    assert question_text.count("reparaciones") == 1
     assert "tienes" not in question_text
     assert "puedes aportar" not in question_text
     assert flat["recruiter_questions"] == recruiter_questions
@@ -571,8 +574,20 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
     assert normalized["job_context"]["compensation"] == ["Salario según convenio"]
     assert "papeles en regla" not in all_plan_text(plan["blockers"])
     assert plan["readiness"]["code"] != "ready"
+    assert plan["readiness"]["code"] == "insufficient-for-precise-search"
     assert plan["readiness"]["severity"] == "warning"
     assert normalized["search_readiness"]["recruiter_decision_required"] is True
+    assert plan["professional_grade"] == "Oficial de primera"
+    assert not plan["seniority"]
+    criteria = plan["criteria_review"]
+    criterion_ids = [item["criterion_id"] for item in criteria]
+    question_ids = [item["question_id"] for item in plan["question_registry"]]
+    assert len(criteria) == 5
+    assert len(criterion_ids) == len(set(criterion_ids))
+    assert len(question_ids) == len(set(question_ids))
+    assert all(item["precision_status"] == "needs_clarification" for item in criteria)
+    assert all(item["review_status"] == "pending_recruiter_confirmation" for item in criteria)
+    assert all(item["clarification_question_id"] in question_ids for item in criteria)
     assert any(
         item["precision_status"] == "needs_clarification"
         and item["importance"] == "must_have"

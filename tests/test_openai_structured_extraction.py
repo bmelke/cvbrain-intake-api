@@ -408,7 +408,7 @@ def test_one_pass_precision_contract_accepts_valid_output_without_second_ai_call
     assert criterion["clarification_question"] == question
     assert question in result["recruiter_questions"]
     assert question in result["display_plan"]["questions"]
-    assert result["job_intelligence"]["search_readiness"]["status"] == "usable_with_warnings"
+    assert result["job_intelligence"]["search_readiness"]["status"] == "insufficient_for_precise_search"
 
 
 def test_mechanic_sparse_input_one_pass_precision_questions_without_fallback_plan():
@@ -421,6 +421,7 @@ def test_mechanic_sparse_input_one_pass_precision_questions_without_fallback_pla
     questions = [
         "¿Qué categoría, certificación o experiencia valida que el candidato sea oficial de primera?",
         "¿Cuántos años mínimos o qué evidencia concreta se considera suficiente para demostrar la experiencia?",
+        "¿Qué alcance concreto de reparaciones debe poder realizar?",
         "¿Qué categoría de licencia de conducir se requiere y es excluyente o solamente preferida?",
         "¿Qué documentación exacta debe tener el candidato en regla?",
     ]
@@ -432,16 +433,16 @@ def test_mechanic_sparse_input_one_pass_precision_questions_without_fallback_pla
         imprecise_requirement_item(
             "Con experiencia demostrable que haga todo tipo de reparaciones y con carnet de conducir",
             "must_have",
-            ["duration", "evidence", "license_category"],
-            questions[1],
+            ["duration", "evidence", "scope", "license_category"],
+            questions[2],
         ),
-        imprecise_requirement_item("Carnet de conducir", "must_have", ["license_category", "importance"], questions[2]),
-        imprecise_requirement_item("Papeles en regla", "must_have", ["legal_documentation"], questions[3]),
+        imprecise_requirement_item("Carnet de conducir", "must_have", ["license_category", "importance"], questions[3]),
+        imprecise_requirement_item("Papeles en regla", "must_have", ["legal_documentation"], questions[4]),
         requirement_item("Asalariado o autónomo", "must_have"),
         requirement_item("Salario según convenio", "must_have"),
     ]
     payload["requirements"]["credentials"] = [
-        imprecise_requirement_item("Carnet B", "must_have", ["license_category"], questions[2]),
+        imprecise_requirement_item("Carnet B", "must_have", ["license_category"], questions[3]),
     ]
     payload["requirements"]["blockers"] = ["No avanzar sin papeles en regla"]
     payload["search_strategy"]["search_terms"] = ["Mecánico de coches", "carnet B", "carnet de conducir"]
@@ -470,16 +471,26 @@ def test_mechanic_sparse_input_one_pass_precision_questions_without_fallback_pla
     assert plan["role_title"] != "Rol a confirmar"
     assert "mecanico" in fold(plan["role_title"])
     assert plan["readiness"]["code"] != "ready"
-    for expected in ("oficial de primera", "evidencia", "licencia", "documentacion"):
+    for expected in ("oficial de primera", "evidencia", "reparaciones", "licencia", "documentacion"):
         assert expected in question_text
     assert question_text.count("licencia") == 1
     assert question_text.count("documentacion") == 1
+    assert question_text.count("reparaciones") == 1
     assert "carnet b" not in fold(result)
     assert "puedes aportar" not in question_text
     assert "salario" not in fold(plan["must_have"] + plan["preferred"] + plan["nice_to_have"] + plan["tie_breakers"] + plan["search_concepts"])
     assert "asalariado" not in fold(plan["must_have"] + plan["preferred"] + plan["nice_to_have"] + plan["tie_breakers"] + plan["search_concepts"])
     assert "papeles en regla" not in fold(plan["blockers"])
-    assert any(item["precision_status"] == "needs_clarification" for item in plan["criteria_review"])
+    criteria = plan["criteria_review"]
+    criterion_ids = [item["criterion_id"] for item in criteria]
+    question_ids = [item["question_id"] for item in plan["question_registry"]]
+    assert len(criteria) == 5
+    assert len(criterion_ids) == len(set(criterion_ids))
+    assert len(question_ids) == len(set(question_ids))
+    assert all(item["precision_status"] == "needs_clarification" for item in criteria)
+    assert all(item["review_status"] == "pending_recruiter_confirmation" for item in criteria)
+    assert all(item["clarification_question_id"] in question_ids for item in criteria)
+    assert "oficial de primera" in fold(plan["professional_grade"])
     assert "Candidatos alineados a la búsqueda recibida" not in json.dumps(plan, ensure_ascii=False)
     assert "Lista para buscar" not in json.dumps(plan, ensure_ascii=False)
 

@@ -551,7 +551,9 @@ def test_full_ga_structured_output_is_normalized_before_schema_validation():
     assert "active directory" in fold(flat["should_have"])
     assert "herramientas de mesa de ayuda" in fold(flat["should_have"])
     assert normalized["requirements"]["should_have"][0]["hard_filter_approved"] is False
-    assert normalized["requirements"]["blockers"] == ["Sin experiencia no avanzar para este rol de soporte."]
+    assert [item.rstrip(".") for item in normalized["requirements"]["blockers"]] == [
+        "Sin experiencia no avanzar para este rol de soporte"
+    ]
 
 
 def test_soft_competencies_hard_filter_flags_are_removed_before_schema_validation():
