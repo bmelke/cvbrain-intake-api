@@ -172,6 +172,10 @@ def test_display_plan_cleans_engineering_manager_intake_for_recruiter_ui():
         "semantic_terms": ["diseño de motores", "coordinación de equipo", "gerencia"],
         "negative_terms": [],
     }
+    payload["company_clarification_questions"] = [
+        question_item("¿Qué credenciales exactas son requeridas?", "requirements.blockers"),
+        question_item("¿Qué significa MBS y cómo se valida?", "requirements.nice_to_have"),
+    ]
 
     _, flat, plan = normalized_flat_and_plan(payload, source_text=source)
 
@@ -252,6 +256,9 @@ def test_display_plan_sparse_responsable_calidad_input_is_ok_and_clean():
     ]
     payload["missing_information"] = [
         missing_item("work_modality", "¿Cuál es la ciudad/zona y la modalidad de trabajo?")
+    ]
+    payload["company_clarification_questions"] = [
+        question_item("¿Cuál es la ciudad/zona y la modalidad de trabajo?", "location_intelligence")
     ]
 
     _, flat, plan = normalized_flat_and_plan(
@@ -465,3 +472,110 @@ def test_optional_health_experience_can_ask_scope_without_becoming_must_have():
     assert flat["must_have"] == []
     assert "salud" in all_plan_text(flat["should_have"] + plan["preferred"])
     assert question in plan["questions"]
+
+
+def test_mechanic_display_plan_uses_canonical_registries_without_invented_specificity():
+    source = (
+        "Necesitamos mecanico de coches\n\n"
+        "oficial de primera, con experiencia demostrable que haga todo tipo de reparaciones y con carnet de conducir\n\n"
+        "asalariado o autonomo y papeles en regla\n\n"
+        "salario segun convenio"
+    )
+    questions = [
+        "¿Qué categoría, certificación o experiencia valida que el candidato sea oficial de primera?",
+        "¿Cuántos años mínimos o qué evidencia concreta se considera suficiente para demostrar la experiencia?",
+        "¿Qué categoría de licencia de conducir se requiere?",
+        "¿Qué documentación exacta debe tener el candidato en regla?",
+    ]
+    payload = base_job_intelligence("Mecánico de coches")
+    payload["requirements"]["must_have"] = [
+        imprecise_requirement_item("Oficial de primera", "must_have", ["evidence", "equivalence"], questions[0]),
+        imprecise_requirement_item("Experiencia demostrable", "must_have", ["duration", "evidence"], questions[1]),
+        imprecise_requirement_item(
+            "Con experiencia demostrable que haga todo tipo de reparaciones y con carnet de conducir",
+            "must_have",
+            ["duration", "evidence", "license_category"],
+            questions[1],
+        ),
+        imprecise_requirement_item("Papeles en regla", "must_have", ["legal_documentation"], questions[3]),
+        requirement_item("Asalariado o autónomo"),
+        requirement_item("Salario según convenio"),
+    ]
+    payload["requirements"]["credentials"] = [
+        imprecise_requirement_item(
+            "Carnet de conducir (categoría no especificada)",
+            "must_have",
+            ["license_category"],
+            questions[2],
+        ),
+        imprecise_requirement_item("Carnet B", "must_have", ["license_category"], questions[2]),
+    ]
+    payload["requirements"]["blockers"] = ["No avanzar sin papeles en regla"]
+    payload["search_strategy"]["search_terms"] = [
+        "Mecánico de coches",
+        "carnet B",
+        "carnet de conducir",
+        "salario según convenio",
+    ]
+    payload["search_strategy"]["semantic_terms"] = ["asalariado", "autónomo", "reparaciones generales"]
+    payload["company_clarification_questions"] = [
+        question_item(questions[0], "requirements.must_have"),
+        question_item(questions[1], "requirements.must_have"),
+        question_item(questions[2], "requirements.credentials"),
+        question_item(questions[2], "requirements.credentials"),
+        question_item(questions[3], "requirements.must_have"),
+        {
+            "id": "candidate_bad",
+            "question": "¿Tienes carnet B y puedes aportar papeles?",
+            "related_fields": ["candidate_screening_questions"],
+            "asked_to": "candidate",
+        },
+    ]
+    payload["candidate_screening_questions"] = [
+        {"question": "¿Puedes aportar papeles en regla?", "asked_to": "candidate"}
+    ]
+    payload["search_readiness"]["status"] = "ready"
+
+    normalized, flat, plan = normalized_flat_and_plan(payload, source_text=source)
+
+    all_text = all_plan_text([normalized, flat, plan])
+    criteria_text = all_plan_text(
+        flat["must_have"]
+        + flat["should_have"]
+        + flat["nice_to_have"]
+        + flat["credentials"]["required"]
+        + flat["credentials"]["preferred"]
+        + plan["tie_breakers"]
+        + plan["search_concepts"]
+    )
+    recruiter_questions = plan["questions"]
+    question_text = all_plan_text(recruiter_questions)
+
+    assert flat["ok"] is True
+    assert plan["role_title"] == "Mecánico de coches"
+    assert "carnet b" not in all_text
+    assert question_text.count("licencia de conducir") == 1
+    assert question_text.count("documentacion exacta") == 1
+    assert question_text.count("evidencia concreta") == 1
+    assert "tienes" not in question_text
+    assert "puedes aportar" not in question_text
+    assert flat["recruiter_questions"] == recruiter_questions
+    assert flat["candidate_screening_questions"] == ["¿Puedes aportar papeles en regla?"]
+    assert all_plan_text(flat["must_have"] + flat["credentials"]["required"]).count("carnet de conducir") == 1
+    assert "con experiencia demostrable que haga todo tipo de reparaciones y con carnet de conducir" not in criteria_text
+    assert "salario" not in criteria_text
+    assert "convenio" not in criteria_text
+    assert "asalariado" not in criteria_text
+    assert "autonomo" not in criteria_text
+    assert normalized["job_context"]["employment_terms"] == ["Asalariado o autónomo"]
+    assert normalized["job_context"]["compensation"] == ["Salario según convenio"]
+    assert "papeles en regla" not in all_plan_text(plan["blockers"])
+    assert plan["readiness"]["code"] != "ready"
+    assert plan["readiness"]["severity"] == "warning"
+    assert normalized["search_readiness"]["recruiter_decision_required"] is True
+    assert any(
+        item["precision_status"] == "needs_clarification"
+        and item["importance"] == "must_have"
+        and item["clarification_question"]
+        for item in plan["criteria_review"]
+    )

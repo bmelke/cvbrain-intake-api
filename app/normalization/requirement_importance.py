@@ -336,8 +336,13 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     output = ensure_precision_contract(output)
     requirements = dict(output["requirements"])
     requirements = _normalize_blockers_and_negations(requirements, source_text)
+    requirements, job_context = _extract_non_search_job_context(requirements)
     requirements = _dedupe_requirement_concepts(requirements)
+    requirements = _canonicalize_requirement_registry(requirements)
     output["requirements"] = requirements
+    if job_context:
+        output["job_context"] = _merge_job_context(output.get("job_context", {}), job_context)
+    output = _sanitize_search_strategy_specificity(output)
     output = _sanitize_public_output_contract(output)
     return ensure_precision_contract(output)
 
@@ -947,6 +952,69 @@ def _is_credential_text(text: str) -> bool:
     return bool(CREDENTIAL_PATTERN.search(text))
 
 
+def _is_driving_license_text(text: str) -> bool:
+    folded = _fold(_normalize_accents(str(text or "")))
+    return bool(
+        re.search(r"\b(?:licencia|libreta|carnet)\s+(?:de\s+)?conducir\b", folded)
+        or re.search(r"\b(?:licencia|libreta|carnet)\s+(?:categor[ií]a\s+)?(?![yeou]\b)[a-z0-9]\b", folded)
+    )
+
+
+def _driving_license_category(text: str) -> str:
+    folded = _fold(_normalize_accents(str(text or "")))
+    if re.search(r"(?:no\s+especificad[ao]|sin\s+especificar|categoria\s+no\s+especificada)", folded):
+        return ""
+    match = re.search(
+        r"\b(?:licencia|libreta|carnet)(?:\s+de\s+conducir)?\s+(?:categor[ií]a\s+)?(?![yeou]\b)([a-z0-9])\b",
+        folded,
+    )
+    return match.group(1).upper() if match else ""
+
+
+def _driver_license_needs_category(item: Mapping[str, Any]) -> bool:
+    dimensions = list(item.get("missing_dimensions", []) or [])
+    return "license_category" in dimensions and _is_driving_license_text(_source_and_text(item))
+
+
+def _generic_driving_license_text(text: str) -> str:
+    if not _is_driving_license_text(text):
+        return normalize_requirement_text(text) if text else ""
+    clean = _normalize_accents(str(text or ""))
+    if re.search(r"\blibreta\b", clean, re.I):
+        return "Libreta de conducir"
+    if re.search(r"\blicencia\b", clean, re.I):
+        return "Licencia de conducir"
+    return "Carnet de conducir"
+
+
+def _is_legal_documentation_text(text: str) -> bool:
+    folded = _fold(_normalize_accents(str(text or "")))
+    return bool(
+        re.search(r"\b(?:papeles|documentaci[oó]n|documentos?)\s+(?:en\s+)?regla\b", folded)
+        or re.search(r"\bdocumentaci[oó]n\s+legal\b", folded)
+    )
+
+
+def _non_search_context_kind(text: str) -> str:
+    folded = _fold(_normalize_accents(str(text or "")))
+    if re.search(r"\b(?:salario|sueldo|remuneracion|compensacion|jornal|segun\s+convenio|según\s+convenio|convenio)\b", folded):
+        return "compensation"
+    if re.search(
+        r"\b(?:asalariad[oa]s?|autonom[oa]s?|relacion\s+de\s+dependencia|relacion\s+laboral|"
+        r"tipo\s+de\s+contratacion|contratacion|freelance|monotributo)\b",
+        folded,
+    ):
+        return "employment_terms"
+    return ""
+
+
+def _is_invented_driving_license_category_term(text: str) -> bool:
+    folded = _fold(_normalize_accents(str(text or ""))).strip()
+    if not _is_driving_license_text(folded):
+        return False
+    return bool(_driving_license_category(folded))
+
+
 def _normalize_blockers_and_negations(requirements: Mapping[str, Any], source_text: str) -> Dict[str, Any]:
     output: Dict[str, Any] = dict(requirements)
     blockers = _normalize_blocker_list(output.get("blockers", []) or [])
@@ -997,7 +1065,9 @@ def _dedupe_requirement_concepts(requirements: Mapping[str, Any]) -> Dict[str, A
             if not cleaned:
                 continue
             key = _requirement_item_concept_key(cleaned)
-            if not key or key in blocker_keys:
+            if not key:
+                continue
+            if key in blocker_keys and not _is_legal_documentation_text(_source_and_text(cleaned)):
                 continue
             record = {"bucket": bucket, "item": cleaned}
             if key not in selected:
@@ -1045,6 +1115,217 @@ def _dedupe_requirement_concepts(requirements: Mapping[str, Any]) -> Dict[str, A
 
     output["credentials"] = _unique_credentials_by_strongest_concept(credentials)
     output["blockers"] = blockers
+    return output
+
+
+def _canonicalize_requirement_registry(requirements: Mapping[str, Any]) -> Dict[str, Any]:
+    output: Dict[str, Any] = dict(requirements)
+
+    requirements_without_legal_blocker, _ = _remove_legal_eligibility_from_blockers(output)
+    output.update(requirements_without_legal_blocker)
+
+    selected: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    for bucket in ("must_have", "should_have", "nice_to_have", "credentials"):
+        for item in output.get(bucket, []) or []:
+            if not isinstance(item, Mapping):
+                continue
+            canonical = _canonical_requirement_item(item, bucket)
+            if not canonical:
+                continue
+            key = _canonical_registry_key(canonical)
+            if not key:
+                continue
+            record = {"bucket": bucket, "item": canonical}
+            if key not in selected:
+                selected[key] = record
+                order.append(key)
+                continue
+            selected[key] = _merge_canonical_records(selected[key], record)
+
+    _remove_redundant_aggregate_duplicates(selected, order)
+    _remove_component_requirement_duplicates(selected, order)
+
+    bucketed: Dict[str, List[Dict[str, Any]]] = {
+        "must_have": [],
+        "should_have": [],
+        "nice_to_have": [],
+        "credentials": [],
+    }
+    for key in order:
+        record = selected.get(key)
+        if not record:
+            continue
+        bucket = str(record["bucket"])
+        item = _strip_internal_fields(record["item"])
+        if bucket not in bucketed:
+            bucket = _bucket_for_importance(str(item.get("importance", "")))
+        bucketed[bucket].append(item)
+
+    output["must_have"] = _unique_requirement_items_by_concept(bucketed["must_have"])
+    output["should_have"] = _unique_requirement_items_by_concept(bucketed["should_have"])
+    output["nice_to_have"] = _unique_requirement_items_by_concept(bucketed["nice_to_have"])
+    output["credentials"] = _unique_credentials_by_strongest_concept(bucketed["credentials"])
+    output["soft_competencies"] = _normalize_soft_competencies(output.get("soft_competencies", []))
+    return output
+
+
+def _canonical_requirement_item(item: Mapping[str, Any], bucket: str) -> Dict[str, Any]:
+    cleaned = _clean_positive_requirement_item(item)
+    if not cleaned:
+        return {}
+
+    if _driver_license_needs_category(cleaned):
+        cleaned["text"] = _generic_driving_license_text(str(cleaned.get("text", "")))
+        cleaned["source_text"] = _generic_driving_license_text(str(cleaned.get("source_text", ""))) or cleaned["text"]
+        dimensions = list(cleaned.get("missing_dimensions", []) or [])
+        if "license_category" not in dimensions:
+            dimensions.append("license_category")
+        cleaned["missing_dimensions"] = _unique(dimensions)
+        cleaned["precision_status"] = "needs_clarification"
+
+    if _is_legal_documentation_text(_source_and_text(cleaned)):
+        dimensions = list(cleaned.get("missing_dimensions", []) or [])
+        if "legal_documentation" not in dimensions and str(cleaned.get("precision_status")) == "needs_clarification":
+            dimensions.append("legal_documentation")
+        cleaned["missing_dimensions"] = _unique(dimensions)
+
+    importance = str(cleaned.get("importance") or "")
+    if bucket == "credentials" and not importance:
+        cleaned["importance"] = PREFERRED
+    elif not importance:
+        cleaned["importance"] = MUST_HAVE if bucket == "must_have" else PREFERRED if bucket == "should_have" else NICE_TO_HAVE
+    cleaned["hard_filter_candidate"] = str(cleaned.get("importance")) == MUST_HAVE
+    cleaned["hard_filter_approved"] = bool(cleaned.get("hard_filter_approved") is True and cleaned["hard_filter_candidate"])
+    return cleaned
+
+
+def _merge_canonical_records(existing: Mapping[str, Any], candidate: Mapping[str, Any]) -> Dict[str, Any]:
+    existing_item = dict(existing.get("item", {}) if isinstance(existing.get("item"), Mapping) else {})
+    candidate_item = dict(candidate.get("item", {}) if isinstance(candidate.get("item"), Mapping) else {})
+    if not existing_item:
+        return {"bucket": candidate.get("bucket", "should_have"), "item": candidate_item}
+    if not candidate_item:
+        return {"bucket": existing.get("bucket", "should_have"), "item": existing_item}
+
+    existing_rank = _importance_rank(str(existing_item.get("importance", "")))
+    candidate_rank = _importance_rank(str(candidate_item.get("importance", "")))
+    if candidate_rank < existing_rank:
+        primary = candidate_item
+        secondary = existing_item
+        bucket = str(candidate.get("bucket") or existing.get("bucket") or "should_have")
+    else:
+        primary = existing_item
+        secondary = candidate_item
+        bucket = str(existing.get("bucket") or candidate.get("bucket") or "should_have")
+
+    merged = dict(primary)
+    merged["missing_dimensions"] = _unique(
+        list(primary.get("missing_dimensions", []) or []) + list(secondary.get("missing_dimensions", []) or [])
+    )
+    if primary.get("precision_status") == "needs_clarification" or secondary.get("precision_status") == "needs_clarification":
+        merged["precision_status"] = "needs_clarification"
+        merged["clarification_question"] = (
+            primary.get("clarification_question") or secondary.get("clarification_question")
+        )
+    if not merged.get("clarification_question") and merged.get("precision_status") == "needs_clarification":
+        merged["clarification_question"] = secondary.get("clarification_question")
+    merged["hard_filter_candidate"] = str(merged.get("importance", "")) == MUST_HAVE
+    merged["hard_filter_approved"] = bool(merged.get("hard_filter_approved") is True and merged["hard_filter_candidate"])
+    return {"bucket": bucket, "item": merged}
+
+
+def _canonical_registry_key(item: Mapping[str, Any]) -> str:
+    text = _source_and_text(item)
+    if _is_driving_license_text(text):
+        category = _driving_license_category(text)
+        if category and "license_category" not in list(item.get("missing_dimensions", []) or []):
+            return f"credential:driving_license:{category}"
+        return "credential:driving_license"
+    if _is_legal_documentation_text(text):
+        return "legal_documentation"
+    return _requirement_item_concept_key(item)
+
+
+def _remove_legal_eligibility_from_blockers(requirements: Mapping[str, Any]) -> tuple[Dict[str, Any], set[str]]:
+    output = dict(requirements)
+    has_positive_legal = any(
+        isinstance(item, Mapping) and _is_legal_documentation_text(_source_and_text(item))
+        for bucket in ("must_have", "should_have", "nice_to_have", "credentials")
+        for item in output.get(bucket, []) or []
+    )
+    if not has_positive_legal:
+        return output, set()
+
+    blockers: List[str] = []
+    removed_keys: set[str] = set()
+    for blocker in output.get("blockers", []) or []:
+        if _is_legal_documentation_text(str(blocker)):
+            removed_keys.add("legal_documentation")
+            continue
+        blockers.append(str(blocker))
+    output["blockers"] = _normalize_blocker_list(blockers)
+    return output, removed_keys
+
+
+def _extract_non_search_job_context(requirements: Mapping[str, Any]) -> tuple[Dict[str, Any], Dict[str, List[str]]]:
+    output = dict(requirements)
+    context: Dict[str, List[str]] = {"employment_terms": [], "compensation": []}
+
+    for bucket in ("must_have", "should_have", "nice_to_have", "credentials", "soft_competencies"):
+        kept: List[Dict[str, Any]] = []
+        for item in output.get(bucket, []) or []:
+            if not isinstance(item, Mapping):
+                continue
+            kind = _non_search_context_kind(_source_and_text(item))
+            if kind:
+                context[kind].append(str(item.get("text") or item.get("source_text") or "").strip())
+                continue
+            kept.append(dict(item))
+        output[bucket] = kept
+
+    filtered_context = {key: _unique(value) for key, value in context.items() if _unique(value)}
+    return output, filtered_context
+
+
+def _merge_job_context(existing: Any, added: Mapping[str, List[str]]) -> Dict[str, List[str]]:
+    output: Dict[str, List[str]] = {}
+    if isinstance(existing, Mapping):
+        for key, value in existing.items():
+            if isinstance(value, list):
+                output[str(key)] = _unique(str(item) for item in value)
+    for key, value in added.items():
+        output[str(key)] = _unique(output.get(str(key), []) + list(value))
+    return output
+
+
+def _sanitize_search_strategy_specificity(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    output: Dict[str, Any] = dict(payload)
+    requirements = output.get("requirements", {})
+    if not isinstance(requirements, Mapping):
+        return output
+
+    missing_license_category = any(
+        isinstance(item, Mapping)
+        and "license_category" in list(item.get("missing_dimensions", []) or [])
+        and _is_driving_license_text(_source_and_text(item))
+        for bucket in ("must_have", "should_have", "nice_to_have", "credentials")
+        for item in requirements.get(bucket, []) or []
+    )
+    if not missing_license_category:
+        return output
+
+    search_strategy = dict(output.get("search_strategy", {}) or {})
+    for key in ("target_titles", "search_terms", "semantic_terms", "negative_terms"):
+        values = search_strategy.get(key)
+        if not isinstance(values, list):
+            continue
+        search_strategy[key] = [
+            str(value).strip()
+            for value in values
+            if str(value).strip() and not _is_invented_driving_license_category_term(str(value))
+        ]
+    output["search_strategy"] = search_strategy
     return output
 
 
@@ -1158,6 +1439,8 @@ def _clean_positive_requirement_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     source_text = str(item.get("source_text", "")).strip()
     if not text or _is_metadata_artifact_text(text) or _is_meta_policy_fragment(text):
         return {}
+    if _non_search_context_kind(f"{source_text} {text}"):
+        return {}
     if (
         _is_orphan_requirement_text(text)
         or _is_modifier_only_fragment(text)
@@ -1258,11 +1541,18 @@ def _requirement_item_concept_key(item: Mapping[str, Any]) -> str:
 def _requirement_concept_key(text: str) -> str:
     clean = _fold(_normalize_accents(str(text)))
     clean = re.sub(r"\blibretta\b", "libreta", clean)
+    clean = re.sub(r"\((?:categoria|categor[ií]a)\s+(?:no\s+especificada|sin\s+especificar)\)", " ", clean)
     clean = re.sub(r"[\u2018\u2019\u201c\u201d\"'`]", "", clean)
     clean = re.sub(r"[^a-z0-9áéíóúñü\s/+#.-]+", " ", clean)
     clean = re.sub(r"\s+", " ", clean).strip(" -:.,;/\t\r\n")
     if not clean:
         return ""
+
+    if _is_driving_license_text(clean):
+        category = _driving_license_category(clean)
+        return f"licencia conducir categoria {category}" if category else "licencia conducir"
+    if _is_legal_documentation_text(clean):
+        return "documentacion legal en regla"
 
     prefix_patterns = (
         r"^(?:es|son)\s+",

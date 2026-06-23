@@ -429,11 +429,28 @@ def test_mechanic_sparse_input_one_pass_precision_questions_without_fallback_pla
     payload["requirements"]["must_have"] = [
         imprecise_requirement_item("Oficial de primera", "must_have", ["evidence", "equivalence"], questions[0]),
         imprecise_requirement_item("Experiencia demostrable", "must_have", ["duration", "evidence"], questions[1]),
+        imprecise_requirement_item(
+            "Con experiencia demostrable que haga todo tipo de reparaciones y con carnet de conducir",
+            "must_have",
+            ["duration", "evidence", "license_category"],
+            questions[1],
+        ),
         imprecise_requirement_item("Carnet de conducir", "must_have", ["license_category", "importance"], questions[2]),
         imprecise_requirement_item("Papeles en regla", "must_have", ["legal_documentation"], questions[3]),
+        requirement_item("Asalariado o autónomo", "must_have"),
+        requirement_item("Salario según convenio", "must_have"),
     ]
+    payload["requirements"]["credentials"] = [
+        imprecise_requirement_item("Carnet B", "must_have", ["license_category"], questions[2]),
+    ]
+    payload["requirements"]["blockers"] = ["No avanzar sin papeles en regla"]
+    payload["search_strategy"]["search_terms"] = ["Mecánico de coches", "carnet B", "carnet de conducir"]
+    payload["search_strategy"]["semantic_terms"] = ["salario según convenio", "asalariado", "autónomo"]
     payload["search_readiness"]["status"] = "ready"
     payload["company_clarification_questions"] = []
+    payload["candidate_screening_questions"] = [
+        {"question": "¿Puedes aportar papeles en regla?", "asked_to": "candidate"}
+    ]
     fake_client = FakeOpenAIClient(response={"output_parsed": payload})
     extractor = OpenAIStructuredExtractor(
         api_key="test-key-not-used",
@@ -455,6 +472,14 @@ def test_mechanic_sparse_input_one_pass_precision_questions_without_fallback_pla
     assert plan["readiness"]["code"] != "ready"
     for expected in ("oficial de primera", "evidencia", "licencia", "documentacion"):
         assert expected in question_text
+    assert question_text.count("licencia") == 1
+    assert question_text.count("documentacion") == 1
+    assert "carnet b" not in fold(result)
+    assert "puedes aportar" not in question_text
+    assert "salario" not in fold(plan["must_have"] + plan["preferred"] + plan["nice_to_have"] + plan["tie_breakers"] + plan["search_concepts"])
+    assert "asalariado" not in fold(plan["must_have"] + plan["preferred"] + plan["nice_to_have"] + plan["tie_breakers"] + plan["search_concepts"])
+    assert "papeles en regla" not in fold(plan["blockers"])
+    assert any(item["precision_status"] == "needs_clarification" for item in plan["criteria_review"])
     assert "Candidatos alineados a la búsqueda recibida" not in json.dumps(plan, ensure_ascii=False)
     assert "Lista para buscar" not in json.dumps(plan, ensure_ascii=False)
 

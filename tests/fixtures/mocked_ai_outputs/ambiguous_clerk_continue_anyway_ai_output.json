@@ -154,8 +154,7 @@
     ],
     "recruiter_questions": [
       "What type of clerk role is this?",
-      "What location or candidate market should be used?",
-      "Are there any must-have experience or credential requirements?"
+      "What location or candidate market should be used?"
     ],
     "warnings": [
       "broad_role_title",

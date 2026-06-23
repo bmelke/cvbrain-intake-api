@@ -67,8 +67,9 @@ def derive_flat_compatibility(payload: Mapping[str, Any]) -> Dict[str, Any]:
         ),
         "recruiter_questions": _unique(
             _question_texts(validated.get("company_clarification_questions", []))
-            + _question_texts(validated.get("candidate_screening_questions", []))
-            + _missing_information_questions(validated.get("missing_information", []))
+        ),
+        "candidate_screening_questions": _unique(
+            _question_texts(validated.get("candidate_screening_questions", []))
         ),
         "warnings": warnings,
         "confidence": float(quality_control.get("confidence", 0.0)),
@@ -120,16 +121,6 @@ def _question_texts(items: Iterable[Any]) -> List[str]:
             text = str(item).strip()
         if text:
             output.append(text)
-    return output
-
-
-def _missing_information_questions(items: Iterable[Any]) -> List[str]:
-    output: List[str] = []
-    for item in items:
-        if isinstance(item, Mapping):
-            question = str(item.get("suggested_question", "")).strip()
-            if question:
-                output.append(question)
     return output
 
 

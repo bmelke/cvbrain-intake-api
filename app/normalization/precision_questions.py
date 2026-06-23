@@ -79,6 +79,9 @@ def ensure_precision_contract(payload: Mapping[str, Any], *, strict: bool = Fals
 
     existing_questions = list(output.get("company_clarification_questions", []) or [])
     output["company_clarification_questions"] = _dedupe_questions(existing_questions + precision_questions)
+    output["candidate_screening_questions"] = _dedupe_candidate_questions(
+        output.get("candidate_screening_questions", []) or []
+    )
     output["search_readiness"] = _readiness_with_precision(output.get("search_readiness", {}), needs_by_bucket)
     return output
 
@@ -155,6 +158,9 @@ def _question_from_item(item: Mapping[str, Any], bucket: str) -> Dict[str, Any]:
         "id": f"precision_{_slug(str(item.get('criterion_id') or question))}",
         "question": question,
         "related_fields": [f"requirements.{bucket}"],
+        "criterion_id": str(item.get("criterion_id") or ""),
+        "missing_dimensions": list(item.get("missing_dimensions", []) or []),
+        "concept_key": _concept_key(str(item.get("text") or item.get("source_text") or question)),
         "blocking_level": "advisory",
         "asked_to": "hiring_company",
     }
@@ -198,25 +204,68 @@ def _dedupe_questions(items: Iterable[Any]) -> List[Dict[str, Any]]:
             fields = item.get("related_fields") if isinstance(item.get("related_fields"), list) else []
             field = str(fields[0]) if fields else str(item.get("field") or "requirements")
             question_id = str(item.get("id") or f"precision_{_slug(question)}")
+            asked_to = str(item.get("asked_to") or "hiring_company").strip()
+            missing_dimensions = [
+                str(value)
+                for value in item.get("missing_dimensions", []) or []
+                if str(value).strip()
+            ]
+            criterion_id = str(item.get("criterion_id") or "").strip()
+            concept_key = str(item.get("concept_key") or _question_topic_key(question) or field).strip()
         else:
             question = _clean_text(item)
             field = "requirements"
             question_id = f"precision_{_slug(question)}"
+            asked_to = "hiring_company"
+            missing_dimensions = []
+            criterion_id = ""
+            concept_key = _question_topic_key(question)
+        if asked_to in {"candidate", "candidate_screening", "applicant"}:
+            continue
         if not question or _is_bad_question(question):
             continue
-        key = _question_key(question)
+        key = _question_key(
+            question,
+            audience=asked_to,
+            criterion_id=criterion_id,
+            missing_dimensions=missing_dimensions,
+            concept_key=concept_key,
+        )
         if key in seen:
             continue
         seen.add(key)
-        output.append(
-            {
-                "id": question_id[:80],
-                "question": question,
-                "related_fields": [field],
-                "blocking_level": "advisory",
-                "asked_to": "hiring_company",
-            }
-        )
+        normalized = {
+            "id": question_id[:80],
+            "question": question,
+            "related_fields": [field],
+            "blocking_level": "advisory",
+            "asked_to": "hiring_company",
+        }
+        if criterion_id:
+            normalized["criterion_id"] = criterion_id
+        if missing_dimensions:
+            normalized["missing_dimensions"] = _unique(missing_dimensions)
+        if concept_key:
+            normalized["concept_key"] = concept_key[:80]
+        output.append(normalized)
+    return output
+
+
+def _dedupe_candidate_questions(items: Iterable[Any]) -> List[Any]:
+    output: List[Any] = []
+    seen: set[str] = set()
+    for item in items:
+        if isinstance(item, Mapping):
+            question = _clean_text(item.get("question") or item.get("suggested_question") or "")
+        else:
+            question = _clean_text(item)
+        if not question:
+            continue
+        key = _question_key(question, audience="candidate", concept_key=_question_topic_key(question))
+        if key in seen:
+            continue
+        seen.add(key)
+        output.append(dict(item) if isinstance(item, Mapping) else question)
     return output
 
 
@@ -226,8 +275,10 @@ def _is_bad_question(question: str) -> bool:
         return True
     return bool(
         re.search(
-            r"\b(?:cumplis|cumples|pod[eé]s\s+ampliar|podrias\s+ampliar|podr[ií]as\s+ampliar|"
-            r"can\s+you\s+elaborate|search_readiness|low_confidence|ai_schema|ai_provider)\b",
+            r"\b(?:tenes|ten[eé]s|tienes|cumplis|cumples|pod[eé]s\s+(?:ampliar|aportar|contar|demostrar)|"
+            r"puedes\s+(?:aportar|contar|demostrar)|podrias\s+ampliar|podr[ií]as\s+ampliar|"
+            r"como\s+encajas|c[oó]mo\s+encajas|can\s+you\s+elaborate|search_readiness|"
+            r"low_confidence|ai_schema|ai_provider)\b",
             folded,
         )
     )
@@ -238,10 +289,53 @@ def _criterion_id(bucket: str, index: int, text: str) -> str:
     return f"{bucket}_{digest}"
 
 
-def _question_key(question: str) -> str:
+def _question_key(
+    question: str,
+    *,
+    audience: str = "hiring_company",
+    criterion_id: str = "",
+    missing_dimensions: Iterable[str] = (),
+    concept_key: str = "",
+) -> str:
     folded = _fold(question)
     folded = re.sub(r"\b(?:exacta|exacto|concreta|concreto|debe|deberia|debería|candidato|cv|validarse|validar)\b", " ", folded)
-    return re.sub(r"\s+", " ", folded).strip()
+    normalized_question = re.sub(r"\s+", " ", folded).strip()
+    dimensions = ",".join(sorted(str(value).strip() for value in missing_dimensions if str(value).strip()))
+    concept = concept_key or _question_topic_key(question) or normalized_question
+    if criterion_id and dimensions:
+        return f"{audience}|{criterion_id}|{dimensions}|{concept}"
+    if dimensions:
+        return f"{audience}|{dimensions}|{concept}"
+    return f"{audience}|{concept}|{normalized_question}"
+
+
+def _question_topic_key(question: str) -> str:
+    folded = _fold(question)
+    if re.search(r"\b(?:licencia|libreta|carnet|conducir|categoria|categor[ií]a)\b", folded):
+        return "credential:driving_license"
+    if re.search(r"\b(?:papeles|documentaci[oó]n|documentos?|legal|regla)\b", folded):
+        return "legal_documentation"
+    if re.search(r"\b(?:experiencia|a[nñ]os?|evidencia|demostrable)\b", folded):
+        return "experience:evidence"
+    if re.search(r"\b(?:oficial|categoria|categor[ií]a|equivalencia|equivalente)\b", folded):
+        return "level:equivalence"
+    if re.search(r"\b(?:sigla|acr[oó]nimo|significa|meaning)\b", folded):
+        return "undefined_acronym"
+    return ""
+
+
+def _concept_key(text: str) -> str:
+    folded = _fold(text)
+    if (
+        re.search(r"\b(?:licencia|libreta|carnet)\s+(?:de\s+)?conducir\b", folded)
+        or re.search(r"\b(?:licencia|libreta|carnet)\s+(?:categoria\s+)?(?![yeou]\b)[a-z0-9]\b", folded)
+    ):
+        return "credential:driving_license"
+    if re.search(r"\b(?:papeles|documentaci[oó]n|documentos?)\s+(?:en\s+)?regla\b", folded):
+        return "legal_documentation"
+    folded = re.sub(r"[^a-z0-9áéíóúñü\s]+", " ", folded)
+    folded = re.sub(r"\s+", " ", folded).strip()
+    return folded
 
 
 def _slug(value: str) -> str:

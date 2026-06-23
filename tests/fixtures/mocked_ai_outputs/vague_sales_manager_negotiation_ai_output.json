@@ -163,8 +163,7 @@
     ],
     "recruiter_questions": [
       "What sales market, product category, and must-have experience should be used?",
-      "What location or candidate market should be used?",
-      "Ask the candidate to describe a negotiation they led and how the outcome was achieved."
+      "What location or candidate market should be used?"
     ],
     "warnings": [
       "broad_role_title",

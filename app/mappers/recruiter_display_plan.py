@@ -98,6 +98,7 @@ def build_recruiter_display_plan(
         preferred=preferred,
         nice_to_have=nice_to_have,
     )
+    criteria_review = _criteria_review(job_intelligence)
 
     return {
         "role_title": role_title,
@@ -113,6 +114,7 @@ def build_recruiter_display_plan(
         "tie_breakers": tie_breakers,
         "questions": questions,
         "search_concepts": search_concepts,
+        "criteria_review": criteria_review,
         "readiness": _readiness(readiness, flat),
     }
 
@@ -289,13 +291,6 @@ def _display_questions(
     search_strategy: Mapping[str, Any],
 ) -> List[str]:
     questions = _texts(job_intelligence.get("company_clarification_questions"))
-    questions += _texts(job_intelligence.get("missing_information"))
-    if any("credencial" in _fold(blocker) for blocker in blockers):
-        questions.append("¿Qué credenciales exactas son requeridas?")
-
-    acronyms = _unknown_acronyms(_texts(search_strategy.get("search_terms")) + _texts(search_strategy.get("semantic_terms")))
-    for acronym in acronyms:
-        questions.append(f"¿Qué significa {acronym} y cómo se valida?")
 
     output: List[str] = []
     for item in _dedupe_display_items(questions):
@@ -340,7 +335,11 @@ def _question_topic(value: str) -> str:
 
 
 def _tie_breakers(preferred: List[str], nice_to_have: List[str], industries: List[str]) -> List[str]:
-    grounded = nice_to_have + preferred + industries
+    grounded = [
+        item
+        for item in nice_to_have + preferred + industries
+        if not _looks_non_search_context(item)
+    ]
     return _dedupe_display_items(grounded, limit=6)
 
 
@@ -366,6 +365,83 @@ def _search_concepts(
         if clean:
             output.append(clean)
     return _dedupe_display_items(output, limit=14)
+
+
+def _criteria_review(job_intelligence: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    requirements = _mapping(job_intelligence.get("requirements"))
+    questions = _question_lookup(job_intelligence.get("company_clarification_questions"))
+    output: List[Dict[str, Any]] = []
+    for bucket in ("must_have", "should_have", "nice_to_have", "credentials"):
+        for item in requirements.get(bucket, []) or []:
+            if not isinstance(item, Mapping):
+                continue
+            text = _clean_requirement_text(item.get("text", ""))
+            if not text or _looks_non_search_context(text):
+                continue
+            criterion_id = str(item.get("criterion_id") or "").strip()[:120]
+            question_ref, question = _question_for_criterion(item, questions)
+            output.append(
+                {
+                    "criterion_id": criterion_id,
+                    "text": text,
+                    "bucket": bucket,
+                    "importance": _structured_value(item.get("importance", "")),
+                    "precision_status": _structured_value(item.get("precision_status", "precise")) or "precise",
+                    "hard_filter_candidate": bool(item.get("hard_filter_candidate")),
+                    "hard_filter_approved": bool(item.get("hard_filter_approved")),
+                    "clarification_question_id": question_ref,
+                    "clarification_question": question,
+                }
+            )
+    return _dedupe_review_items(output)
+
+
+def _question_lookup(items: Any) -> Dict[str, Mapping[str, Any]]:
+    output: Dict[str, Mapping[str, Any]] = {}
+    if not isinstance(items, list):
+        return output
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        criterion_id = str(item.get("criterion_id") or "").strip()
+        if criterion_id and criterion_id not in output:
+            output[criterion_id] = item
+    return output
+
+
+def _question_for_criterion(
+    item: Mapping[str, Any],
+    questions: Mapping[str, Mapping[str, Any]],
+) -> Tuple[str, str]:
+    criterion_id = str(item.get("criterion_id") or "").strip()
+    question_item = questions.get(criterion_id) if criterion_id else None
+    if question_item:
+        return (
+            _clean_display_text(question_item.get("id", "")),
+            _clean_display_text(question_item.get("question", "")),
+        )
+    question = _clean_display_text(item.get("clarification_question", ""))
+    if question and "?" in question:
+        return "", question
+    return "", ""
+
+
+def _structured_value(value: Any) -> str:
+    clean = re.sub(r"[^a-z0-9_-]+", "", str(value or "").strip().casefold())
+    return clean[:80]
+
+
+def _dedupe_review_items(items: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    output: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in items:
+        text = str(item.get("text", "")).strip()
+        key = _concept_key(text)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        output.append(dict(item))
+    return output
 
 
 def _role_head_concept(role_title: str) -> str:
@@ -406,7 +482,7 @@ def _concepts_from_requirements(items: Iterable[str]) -> List[str]:
 
 def _clean_search_concept(value: Any) -> str:
     clean = _clean_display_text(value)
-    if not clean or _blocker_from_text(clean) or _looks_meta_or_process(clean):
+    if not clean or _blocker_from_text(clean) or _looks_meta_or_process(clean) or _looks_non_search_context(clean):
         return ""
     clean = re.sub(
         r"^(?:experiencia\s+(?:en|con)|experiencia\s+realizando|conocimiento(?:s)?\s+de|manejo\s+de|dominio\s+de)\s+",
@@ -422,6 +498,18 @@ def _clean_search_concept(value: Any) -> str:
     if len(words) > 7 or (len(words) > 5 and re.search(r"[.;:]", str(value))):
         return ""
     return clean
+
+
+def _looks_non_search_context(value: Any) -> bool:
+    folded = _fold(value)
+    return bool(
+        re.search(r"\b(?:salario|sueldo|remuneracion|compensacion|segun\s+convenio|convenio)\b", folded)
+        or re.search(
+            r"\b(?:asalariad[oa]s?|autonom[oa]s?|relacion\s+de\s+dependencia|tipo\s+de\s+contratacion|"
+            r"contratacion|freelance|monotributo)\b",
+            folded,
+        )
+    )
 
 
 def _readiness(readiness: Mapping[str, Any], flat: Mapping[str, Any]) -> Dict[str, str]:
