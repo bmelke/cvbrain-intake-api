@@ -20,6 +20,7 @@ from app.normalization.requirement_importance import (
     normalize_job_intelligence_requirements,
     resolve_requirements_from_text,
 )
+from app.normalization.precision_questions import ensure_precision_contract, validate_precision_contract
 from app.normalization.role_title import normalize_role_title_for_source, source_role_title_for_text
 from app.schemas.job_intelligence_v1_contract import (
     JobIntelligenceValidationError,
@@ -185,6 +186,28 @@ Recruiter display/search plan contract:
 - Missing placeholders such as sin especificar, no indicado, no informado, unspecified, source_text_span_missing, or span_missing are missing information/questions, not requirements or chips.
 - Search concepts must be short searchable concepts, titles, skills, tools, industries, or synonyms. Do not use full requirement sentences as search concepts.
 - Recruiter/company questions should clarify the search brief. Candidate interview/screening questions belong only in candidate_screening_questions, not company_clarification_questions.
+
+One-pass precision/search-actionability contract:
+- The original extraction call must understand the recruiter request, extract normalized Job Intelligence, classify criteria, evaluate precision, and generate recruiter clarification questions. Do not rely on a second semantic audit call.
+- Understandable human language is not automatically precise enough for CV search.
+- A criterion is precise only when there is enough information to know what evidence to search for in a CV, distinguish matching from non-matching candidates, understand whether it is mandatory/preferred/valuable/exclusionary, and avoid inventing thresholds, credentials, equivalences, scope, or legal conditions.
+- Every public candidate criterion in must_have, should_have, nice_to_have, credentials, and soft_competencies must include criterion_id, precision_status, missing_dimensions, and clarification_question.
+- precision_status must be precise or needs_clarification.
+- missing_dimensions may use only: duration, quantity, scope, level, evidence, identity, equivalence, importance, geography, modality, frequency, legal_documentation, credential, license_category, undefined_acronym.
+- When precision_status is needs_clarification, missing_dimensions must not be empty and clarification_question must be present.
+- When precision_status is precise, missing_dimensions must be empty and clarification_question must be null.
+- Clarification questions must address the recruiter/company, be written in the source language, reference a real source ambiguity, and never invent the missing answer.
+- Do not use generic questions such as Podés ampliar, Podrías ampliar, Can you elaborate, or Cumplís con.
+- Add every clarification_question from imprecise criteria to company_clarification_questions.
+- "experiencia demostrable" needs clarification for duration and evidence.
+- "papeles en regla" needs clarification for legal_documentation.
+- "oficial de primera" needs clarification for evidence and equivalence.
+- "MBS preferido" needs clarification for undefined_acronym.
+- "amplia experiencia en motores" needs clarification for duration and scope.
+- "mínimo 3 años de experiencia en gerencia" is precise and needs no duration question.
+- "licencia de conducir categoría C excluyente" is precise and needs no category or importance question.
+- "trabajo híbrido en Montevideo, dos días remotos por semana" is precise and needs no location or modality question.
+- Imprecision must not create a schema failure when the precision fields and questions are valid.
 
 Long input segmentation contract:
 - Sparse valid intake contract:
@@ -438,11 +461,13 @@ class OpenAIStructuredExtractor:
         request: ExtractorRequest,
     ) -> tuple[Dict[str, Any], Dict[str, Any]]:
         parsed_job_intelligence = self._extract_payload(response)
+        validate_precision_contract(parsed_job_intelligence)
         job_intelligence = normalize_job_intelligence_requirements(
             parsed_job_intelligence,
             source_text=request.source_text,
         )
         job_intelligence = normalize_role_title_for_source(job_intelligence, source_text=request.source_text)
+        job_intelligence = ensure_precision_contract(job_intelligence)
         validate_job_intelligence_v1(job_intelligence)
         return parsed_job_intelligence, job_intelligence
 
@@ -546,6 +571,7 @@ class OpenAIStructuredExtractor:
                 recovered_job_intelligence,
                 source_text=request.source_text,
             )
+            recovered_job_intelligence = ensure_precision_contract(recovered_job_intelligence)
             validate_job_intelligence_v1(recovered_job_intelligence)
             self._log_event(
                 "schema_stub_recovery_success",
@@ -1396,6 +1422,7 @@ def job_intelligence_v1_response_schema() -> Dict[str, Any]:
         "type": "object",
         "additionalProperties": False,
         "properties": {
+            "criterion_id": {"type": "string"},
             "text": {"type": "string"},
             "source_text": {"type": "string"},
             "importance": {
@@ -1405,14 +1432,43 @@ def job_intelligence_v1_response_schema() -> Dict[str, Any]:
             "explicit": {"type": "boolean"},
             "hard_filter_candidate": {"type": "boolean"},
             "hard_filter_approved": {"type": "boolean"},
+            "precision_status": {"type": "string", "enum": ["precise", "needs_clarification"]},
+            "missing_dimensions": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": [
+                        "duration",
+                        "quantity",
+                        "scope",
+                        "level",
+                        "evidence",
+                        "identity",
+                        "equivalence",
+                        "importance",
+                        "geography",
+                        "modality",
+                        "frequency",
+                        "legal_documentation",
+                        "credential",
+                        "license_category",
+                        "undefined_acronym",
+                    ],
+                },
+            },
+            "clarification_question": {"type": ["string", "null"]},
         },
         "required": [
+            "criterion_id",
             "text",
             "source_text",
             "importance",
             "explicit",
             "hard_filter_candidate",
             "hard_filter_approved",
+            "precision_status",
+            "missing_dimensions",
+            "clarification_question",
         ],
     }
 

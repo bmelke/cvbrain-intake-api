@@ -46,7 +46,11 @@
         "importance": "must_have",
         "evidence_expected": "interview",
         "hard_filter_candidate": false,
-        "hard_filter_approved": false
+        "hard_filter_approved": false,
+        "criterion_id": "soft_competencies_368cbdd7",
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": null
       }
     ]
   },

@@ -12,6 +12,8 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
+from app.normalization.precision_questions import ensure_precision_contract
+
 
 Importance = str
 
@@ -330,10 +332,14 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
     requirements["credentials"] = _unique_credentials_by_strongest_importance(buckets["credentials"])
     requirements["blockers"] = _normalize_blocker_list(blockers)
     requirements["soft_competencies"] = _normalize_soft_competencies(soft_competencies)
+    output["requirements"] = requirements
+    output = ensure_precision_contract(output)
+    requirements = dict(output["requirements"])
     requirements = _normalize_blockers_and_negations(requirements, source_text)
     requirements = _dedupe_requirement_concepts(requirements)
     output["requirements"] = requirements
-    return _sanitize_public_output_contract(output)
+    output = _sanitize_public_output_contract(output)
+    return ensure_precision_contract(output)
 
 
 def normalize_structured_requirement_item(item: Mapping[str, Any], default_importance: Importance) -> List[Dict[str, Any]]:

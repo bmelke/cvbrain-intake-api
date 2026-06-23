@@ -94,12 +94,34 @@ def fold(value):
 
 def requirement_item(text, importance):
     return {
+        "criterion_id": "criterion_" + fold(text).replace(" ", "_")[:40],
         "text": text,
         "source_text": text,
         "importance": importance,
         "explicit": True,
         "hard_filter_candidate": importance == "must_have",
         "hard_filter_approved": False,
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": None,
+    }
+
+
+def imprecise_requirement_item(text, importance, missing_dimensions, question):
+    item = requirement_item(text, importance)
+    item["precision_status"] = "needs_clarification"
+    item["missing_dimensions"] = missing_dimensions
+    item["clarification_question"] = question
+    return item
+
+
+def company_question(question, field="requirements.must_have"):
+    return {
+        "id": "precision_" + fold(question).replace(" ", "_")[:40],
+        "question": question,
+        "related_fields": [field],
+        "blocking_level": "advisory",
+        "asked_to": "hiring_company",
     }
 
 
@@ -358,6 +380,73 @@ def test_analyze_endpoint_ai_path_normalizes_dirty_parsed_payload_before_respons
     ]
 
 
+def test_one_pass_precision_contract_accepts_valid_output_without_second_ai_call():
+    question = "¿Cuántos años mínimos o qué evidencia concreta se considera suficiente para demostrar la experiencia?"
+    payload = role_title_payload("Mecánico de coches")
+    payload["requirements"]["must_have"] = [
+        imprecise_requirement_item("Experiencia demostrable", "must_have", ["duration", "evidence"], question)
+    ]
+    payload["company_clarification_questions"] = [company_question(question)]
+    payload["search_readiness"]["status"] = "ready"
+    fake_client = FakeOpenAIClient(response={"output_parsed": payload})
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Necesitamos mecánico de coches con experiencia demostrable."))
+
+    criterion = result["job_intelligence"]["requirements"]["must_have"][0]
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert len(fake_client.responses.calls) == 1
+    assert criterion["precision_status"] == "needs_clarification"
+    assert criterion["missing_dimensions"] == ["duration", "evidence"]
+    assert criterion["clarification_question"] == question
+    assert question in result["recruiter_questions"]
+    assert question in result["display_plan"]["questions"]
+    assert result["job_intelligence"]["search_readiness"]["status"] == "usable_with_warnings"
+
+
+def test_precision_contract_missing_question_uses_existing_schema_repair_path():
+    question = "¿Qué significa MBS en este contexto y cómo debe validarse en el CV?"
+    invalid_payload = role_title_payload("Ingeniero recibido")
+    invalid_payload["requirements"]["nice_to_have"] = [
+        imprecise_requirement_item("MBS preferido", "nice_to_have", ["undefined_acronym"], question)
+    ]
+    invalid_payload["company_clarification_questions"] = []
+    repaired_payload = role_title_payload("Ingeniero recibido")
+    repaired_payload["requirements"]["nice_to_have"] = [
+        imprecise_requirement_item("MBS preferido", "nice_to_have", ["undefined_acronym"], question)
+    ]
+    repaired_payload["company_clarification_questions"] = [company_question(question, "requirements.nice_to_have")]
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"output_parsed": invalid_payload},
+            {"output_parsed": repaired_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Ingeniero recibido. MBS preferido."))
+
+    repair_user_prompt = fake_client.responses.calls[1]["input"][1]["content"]
+    assert result["ok"] is True
+    assert result["ai_schema_repaired"] is True
+    assert result["fallback_used"] is False
+    assert len(fake_client.responses.calls) == 2
+    assert "precision_contract.requirements.nice_to_have[0].clarification_question not_in_company_questions" in repair_user_prompt
+    assert question in result["display_plan"]["questions"]
+
+
 def test_openai_structured_prompt_includes_global_language_contract_for_spanish_source():
     fake_client = FakeOpenAIClient(response={"output_parsed": role_title_payload("Arquitecto de Software")})
     extractor = OpenAIStructuredExtractor(
@@ -404,6 +493,13 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     assert "inútil presentarse" in system_prompt
     assert "Search concepts must be short searchable concepts" in system_prompt
     assert "Candidate interview/screening questions belong only in candidate_screening_questions" in system_prompt
+    assert "One-pass precision/search-actionability contract:" in system_prompt
+    assert "Understandable human language is not automatically precise enough for CV search." in system_prompt
+    assert "Every public candidate criterion in must_have, should_have, nice_to_have, credentials, and soft_competencies" in system_prompt
+    assert "precision_status must be precise or needs_clarification" in system_prompt
+    assert "missing_dimensions may use only" in system_prompt
+    assert "Add every clarification_question from imprecise criteria to company_clarification_questions." in system_prompt
+    assert "MBS preferido" in system_prompt
     assert "Sparse valid intake contract:" in system_prompt
     assert "Sparse recruiter text is still valid input" in system_prompt
     assert "Sparse input should lower confidence" in system_prompt
@@ -1081,6 +1177,10 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "CVBrain, not WordPress, owns the intelligence needed for recruiter-facing display plans." in repair_prompt
     assert "inútil presentarse" in repair_prompt
     assert "Search concepts must be short searchable concepts" in repair_prompt
+    assert "One-pass precision/search-actionability contract:" in repair_prompt
+    assert "Do not rely on a second semantic audit call." in repair_prompt
+    assert "precision_status" in repair_prompt
+    assert "clarification_question" in repair_prompt
     assert "Requirement list inheritance contract:" in repair_prompt
     assert "Libreta de conducir será valorable si debe recorrer servicios" in repair_prompt
     assert "Long input segmentation contract:" in repair_prompt

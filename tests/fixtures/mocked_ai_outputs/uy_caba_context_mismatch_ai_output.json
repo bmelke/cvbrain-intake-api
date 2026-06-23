@@ -40,7 +40,11 @@
         "importance": "preferred",
         "explicit": true,
         "hard_filter_candidate": false,
-        "hard_filter_approved": false
+        "hard_filter_approved": false,
+        "criterion_id": "should_have_2a13d05e",
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": null
       }
     ],
     "nice_to_have": [],

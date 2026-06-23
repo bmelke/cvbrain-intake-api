@@ -298,16 +298,10 @@ def _display_questions(
         questions.append(f"¿Qué significa {acronym} y cómo se valida?")
 
     output: List[str] = []
-    seen_topics: set[str] = set()
     for item in _dedupe_display_items(questions):
         clean = _clean_display_text(item)
         if not clean or "?" not in clean or _looks_candidate_interview_question(clean):
             continue
-        topic = _question_topic(clean)
-        if topic and topic in seen_topics:
-            continue
-        if topic:
-            seen_topics.add(topic)
         output.append(clean)
     return output[:8]
 

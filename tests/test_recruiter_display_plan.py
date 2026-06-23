@@ -35,13 +35,25 @@ def fold(value):
 
 def requirement_item(text, importance="must_have", source_text=None):
     return {
+        "criterion_id": "criterion_" + fold(text).replace(" ", "_")[:40],
         "text": text,
         "source_text": source_text or text,
         "importance": importance,
         "explicit": True,
         "hard_filter_candidate": importance == "must_have",
         "hard_filter_approved": False,
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": None,
     }
+
+
+def imprecise_requirement_item(text, importance, missing_dimensions, question, source_text=None):
+    item = requirement_item(text, importance, source_text=source_text)
+    item["precision_status"] = "needs_clarification"
+    item["missing_dimensions"] = missing_dimensions
+    item["clarification_question"] = question
+    return item
 
 
 def question_item(question, field="requirements"):
@@ -356,3 +368,92 @@ def test_openai_response_path_returns_display_plan_from_normalized_payload():
     assert "No avanzar" not in all_plan_text(plan["must_have"] + plan["preferred"] + plan["nice_to_have"])
     assert "No excluyente" not in all_plan_text(plan)
     assert "search_readiness_" not in all_plan_text(plan)
+
+
+def test_display_plan_questions_come_from_one_pass_precision_contract_and_are_deduped():
+    questions = [
+        "¿Qué categoría, certificación o experiencia valida que el candidato sea oficial de primera?",
+        "¿Cuántos años mínimos o qué evidencia concreta se considera suficiente para demostrar la experiencia?",
+        "¿Qué documentación exacta debe tener el candidato en regla?",
+        "¿Qué significa MBS en este contexto y cómo debe validarse en el CV?",
+        "¿Cuántos años y qué tipo de experiencia en motores se consideran suficientes?",
+    ]
+    payload = base_job_intelligence("Mecánico de coches")
+    payload["requirements"]["must_have"] = [
+        imprecise_requirement_item("Oficial de primera", "must_have", ["evidence", "equivalence"], questions[0]),
+        imprecise_requirement_item("Experiencia demostrable", "must_have", ["duration", "evidence"], questions[1]),
+        imprecise_requirement_item("Papeles en regla", "must_have", ["legal_documentation"], questions[2]),
+        imprecise_requirement_item("Amplia experiencia en motores", "must_have", ["duration", "scope"], questions[4]),
+    ]
+    payload["requirements"]["nice_to_have"] = [
+        imprecise_requirement_item("MBS preferido", "nice_to_have", ["undefined_acronym"], questions[3])
+    ]
+    payload["company_clarification_questions"] = [
+        question_item(questions[3], "requirements.nice_to_have"),
+        question_item(questions[3], "requirements.nice_to_have"),
+    ]
+
+    normalized, flat, plan = normalized_flat_and_plan(
+        payload,
+        source_text=(
+            "Necesitamos mecánico de coches oficial de primera, con experiencia demostrable, "
+            "carnet de conducir y papeles en regla. Amplia experiencia en motores de fuerza. MBS preferido."
+        ),
+    )
+
+    all_questions = plan["questions"]
+    assert all(question in all_questions for question in questions)
+    assert all_questions.count(questions[3]) == 1
+    assert flat["recruiter_questions"].count(questions[3]) == 1
+    assert normalized["search_readiness"]["status"] == "usable_with_warnings"
+    assert "cumplis" not in all_plan_text(all_questions)
+    assert "podes ampliar" not in all_plan_text(all_questions)
+    assert "search_readiness_" not in all_plan_text(plan)
+    for bucket in ("must_have", "nice_to_have"):
+        for item in normalized["requirements"][bucket]:
+            assert item["precision_status"] in {"precise", "needs_clarification"}
+
+
+def test_precise_criteria_do_not_generate_unnecessary_precision_questions():
+    payload = base_job_intelligence("Gerente")
+    payload["requirements"]["must_have"] = [
+        requirement_item("Mínimo 3 años de experiencia en gerencia"),
+    ]
+    payload["requirements"]["credentials"] = [
+        requirement_item("Licencia de conducir categoría C excluyente"),
+    ]
+    payload["location_intelligence"]["raw"] = "Trabajo híbrido en Montevideo, dos días remotos por semana"
+    payload["location_intelligence"]["normalized"] = "Montevideo"
+    payload["location_intelligence"]["hybrid_allowed"] = True
+    payload["location_intelligence"]["remote_allowed"] = True
+
+    _, _, plan = normalized_flat_and_plan(
+        payload,
+        source_text=(
+            "Experiencia mínima de 3 años en gerencia. Licencia de conducir categoría C excluyente. "
+            "Trabajo híbrido en Montevideo, dos días remotos por semana."
+        ),
+    )
+
+    questions = all_plan_text(plan["questions"])
+    assert "anos" not in questions
+    assert "años" not in questions
+    assert "categoria" not in questions
+    assert "modalidad" not in questions
+
+
+def test_optional_health_experience_can_ask_scope_without_becoming_must_have():
+    question = "¿Qué contexto del sector salud es más relevante para validar esa experiencia?"
+    payload = base_job_intelligence("Ejecutivo Comercial")
+    payload["requirements"]["should_have"] = [
+        imprecise_requirement_item("Deseable experiencia en salud", "preferred", ["scope"], question)
+    ]
+
+    _, flat, plan = normalized_flat_and_plan(
+        payload,
+        source_text="Deseable experiencia en salud.",
+    )
+
+    assert flat["must_have"] == []
+    assert "salud" in all_plan_text(flat["should_have"] + plan["preferred"])
+    assert question in plan["questions"]

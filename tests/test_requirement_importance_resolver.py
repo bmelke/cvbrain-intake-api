@@ -141,12 +141,16 @@ def minimal_job_intelligence(requirements):
 
 def requirement_item(text, importance):
     return {
+        "criterion_id": "criterion_" + fold(text).replace(" ", "_")[:40],
         "text": text,
         "source_text": text,
         "importance": importance,
         "explicit": True,
         "hard_filter_candidate": importance == "must_have",
         "hard_filter_approved": False,
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": None,
     }
 
 

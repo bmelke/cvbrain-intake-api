@@ -53,6 +53,25 @@ DECISION_OPTIONS = {
     "cancel",
 }
 
+PRECISION_STATUSES = {"precise", "needs_clarification"}
+MISSING_DIMENSIONS = {
+    "duration",
+    "quantity",
+    "scope",
+    "level",
+    "evidence",
+    "identity",
+    "equivalence",
+    "importance",
+    "geography",
+    "modality",
+    "frequency",
+    "legal_documentation",
+    "credential",
+    "license_category",
+    "undefined_acronym",
+}
+
 FORBIDDEN_CANDIDATE_KEYS = {
     "candidate_results",
     "candidate_ids",
@@ -200,6 +219,8 @@ def _validate_requirements(requirements: Mapping[str, Any], errors: List[str]) -
         if group_name in {"should_have", "nice_to_have", "soft_competencies"} and approved:
             errors.append(f"requirements.{group_name} cannot be hard_filter_approved")
 
+        _validate_precision_fields(group_name, item, errors)
+
 
 def _iter_requirement_items(requirements: Mapping[str, Any]) -> Iterable[tuple[str, Any]]:
     for group_name in ("must_have", "should_have", "nice_to_have", "credentials", "soft_competencies"):
@@ -207,6 +228,35 @@ def _iter_requirement_items(requirements: Mapping[str, Any]) -> Iterable[tuple[s
         if isinstance(items, list):
             for item in items:
                 yield group_name, item
+
+
+def _validate_precision_fields(group_name: str, item: Mapping[str, Any], errors: List[str]) -> None:
+    path = f"requirements.{group_name}"
+    if not str(item.get("criterion_id", "")).strip():
+        errors.append(f"{path}.criterion_id is required")
+
+    status = item.get("precision_status")
+    if status not in PRECISION_STATUSES:
+        errors.append(f"{path}.precision_status is invalid")
+
+    dimensions = item.get("missing_dimensions")
+    if not isinstance(dimensions, list):
+        errors.append(f"{path}.missing_dimensions must be a list")
+        dimensions = []
+    elif any(dimension not in MISSING_DIMENSIONS for dimension in dimensions):
+        errors.append(f"{path}.missing_dimensions contains an invalid value")
+
+    question = item.get("clarification_question")
+    if status == "needs_clarification":
+        if not dimensions:
+            errors.append(f"{path}.missing_dimensions is required for imprecise criteria")
+        if not isinstance(question, str) or not question.strip():
+            errors.append(f"{path}.clarification_question is required for imprecise criteria")
+    elif status == "precise":
+        if dimensions:
+            errors.append(f"{path}.missing_dimensions must be empty for precise criteria")
+        if question not in (None, ""):
+            errors.append(f"{path}.clarification_question must be null for precise criteria")
 
 
 def _validate_search_strategy(search_strategy: Mapping[str, Any], errors: List[str]) -> None:

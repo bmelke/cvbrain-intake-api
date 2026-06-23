@@ -40,7 +40,11 @@
         "importance": "must_have",
         "explicit": true,
         "hard_filter_candidate": true,
-        "hard_filter_approved": false
+        "hard_filter_approved": false,
+        "criterion_id": "must_have_09234f00",
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": null
       },
       {
         "text": "Experience in dispositivos médicos",
@@ -48,7 +52,11 @@
         "importance": "must_have",
         "explicit": true,
         "hard_filter_candidate": true,
-        "hard_filter_approved": false
+        "hard_filter_approved": false,
+        "criterion_id": "must_have_79766b8b",
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": null
       }
     ],
     "should_have": [
@@ -58,7 +66,11 @@
         "importance": "preferred",
         "explicit": true,
         "hard_filter_candidate": false,
-        "hard_filter_approved": false
+        "hard_filter_approved": false,
+        "criterion_id": "should_have_2a13d05e",
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": null
       }
     ],
     "nice_to_have": [],

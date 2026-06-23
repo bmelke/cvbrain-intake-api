@@ -15,12 +15,16 @@ def fold(value):
 
 def requirement_item(text, importance="must_have", source_text=None):
     return {
+        "criterion_id": "criterion_" + fold(text).replace(" ", "_")[:40],
         "text": text,
         "source_text": source_text or text,
         "importance": importance,
         "explicit": True,
         "hard_filter_candidate": importance == "must_have",
         "hard_filter_approved": False,
+        "precision_status": "precise",
+        "missing_dimensions": [],
+        "clarification_question": None,
     }
 
 
