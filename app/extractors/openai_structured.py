@@ -24,6 +24,8 @@ from app.normalization.precision_questions import ensure_precision_contract, val
 from app.normalization.role_title import normalize_role_title_for_source, source_role_title_for_text
 from app.schemas.job_intelligence_v1_contract import (
     JobIntelligenceValidationError,
+    job_intelligence_v1_response_schema as _typed_job_intelligence_v1_response_schema,
+    recover_job_intelligence_draft_shape,
     validate_job_intelligence_v1,
 )
 
@@ -74,7 +76,9 @@ def provider_timeout_for_source_chars(
 
 SYSTEM_INSTRUCTIONS = """You are CVBrain Job Intake extraction.
 
-Return only CVBrain Job Intelligence v1 structured output.
+Return only the canonical CVBrain JobIntelligenceDraft structured output.
+Do not return flat_compatibility, display_plan, duplicated top-level requirement arrays,
+or any derived API projection; CVBrain derives those after validation.
 
 Rules:
 - Extract only from source text and provided context.
@@ -117,7 +121,9 @@ matches the CVBrain Job Intelligence v1 schema. Do not add commentary, markdown,
 or extra keys. Preserve the original source facts. Do not invent missing facts.
 Do not include candidate data or candidate PII.
 Do not return a public API envelope such as ok=false, warnings, engine, or
-fallback_used. Return the Job Intelligence schema object itself.
+fallback_used. Return the canonical JobIntelligenceDraft schema object itself.
+Do not return flat_compatibility, display_plan, duplicated top-level requirement arrays,
+or any derived API projection; CVBrain derives those after validation.
 If the invalid output was an empty error stub but the source text is normal
 recruiter prose, rebuild a valid Job Intelligence schema from the source text.
 Sparse but valid recruiter prose must produce the best valid schema, not an
@@ -311,7 +317,8 @@ class OpenAIStructuredExtractor:
         self.timeout_seconds = timeout_seconds
         self.max_input_chars = max_input_chars
         self.max_output_tokens = max_output_tokens
-        self.strict_schema_enabled = strict_schema_enabled
+        self.strict_schema_enabled = True
+        self.configured_strict_schema_enabled = strict_schema_enabled
         self.fallback_enabled = fallback_enabled
         self.extractor_mode = extractor_mode
         self.client = client
@@ -461,6 +468,7 @@ class OpenAIStructuredExtractor:
         request: ExtractorRequest,
     ) -> tuple[Dict[str, Any], Dict[str, Any]]:
         parsed_job_intelligence = self._extract_payload(response)
+        parsed_job_intelligence = recover_job_intelligence_draft_shape(parsed_job_intelligence)
         validate_precision_contract(parsed_job_intelligence)
         job_intelligence = normalize_job_intelligence_requirements(
             parsed_job_intelligence,
@@ -496,6 +504,9 @@ class OpenAIStructuredExtractor:
                 sanitized_exception_message=_sanitize_text(str(current_error)),
                 validation_error_fields=_validation_error_fields(str(current_error)),
                 sanitized_raw_output_sha256=_sha256_hex(_sanitize_text(invalid_output, limit=20000)),
+                openai_response_id=_get_response_value(current_response, "id"),
+                openai_request_id=_get_response_value(current_response, "request_id"),
+                validation_errors=_validation_errors(str(current_error)),
             )
 
             repair_response: Optional[Any] = None
@@ -549,6 +560,9 @@ class OpenAIStructuredExtractor:
                 parse_path=_response_parse_path(repair_response),
                 repair_attempt=attempt,
                 parsed_json_keys=sorted(repair_job_intelligence.keys()),
+                openai_response_id=_get_response_value(repair_response, "id"),
+                openai_request_id=_get_response_value(repair_response, "request_id"),
+                repair_outcome="success",
             )
             return repair_response, repair_parsed_payload, repair_job_intelligence
 
@@ -720,6 +734,8 @@ class OpenAIStructuredExtractor:
                 parse_path="output_parsed",
                 raw_output_text_found=False,
                 parsed_json_keys=sorted(payload.keys()),
+                openai_response_id=_get_response_value(response, "id"),
+                openai_request_id=_get_response_value(response, "request_id"),
             )
             return payload
 
@@ -731,6 +747,8 @@ class OpenAIStructuredExtractor:
                 parse_path="output_text",
                 raw_output_text_found=True,
                 parsed_json_keys=sorted(payload.keys()),
+                openai_response_id=_get_response_value(response, "id"),
+                openai_request_id=_get_response_value(response, "request_id"),
             )
             return payload
 
@@ -742,6 +760,8 @@ class OpenAIStructuredExtractor:
                 parse_path="output_array.output_text",
                 raw_output_text_found=True,
                 parsed_json_keys=sorted(payload.keys()),
+                openai_response_id=_get_response_value(response, "id"),
+                openai_request_id=_get_response_value(response, "request_id"),
             )
             return payload
 
@@ -777,6 +797,7 @@ class OpenAIStructuredExtractor:
             "model": self.model,
             "api_shape": OPENAI_API_SHAPE,
             "strict_schema_enabled": self.strict_schema_enabled,
+            "configured_strict_schema_enabled": self.configured_strict_schema_enabled,
             "fallback_enabled": self.fallback_enabled,
         }
         safe_metadata.update(_safe_log_metadata(metadata))
@@ -826,6 +847,7 @@ class OpenAIStructuredExtractor:
             "model": self.model,
             "extractor_mode": self.extractor_mode,
             "strict_schema_enabled": self.strict_schema_enabled,
+            "configured_strict_schema_enabled": self.configured_strict_schema_enabled,
             "fallback_enabled": self.fallback_enabled,
             "openai_response_id": _sanitize_text(str(_get_response_value(response, "id") or "")),
             "openai_request_id": _sanitize_text(str(_get_response_value(response, "request_id") or "")),
@@ -1411,290 +1433,9 @@ def _fold_text(value: str) -> str:
 
 
 def job_intelligence_v1_response_schema() -> Dict[str, Any]:
-    """OpenAI Structured Outputs-compatible JSON schema.
+    """OpenAI Structured Outputs schema derived from JobIntelligenceDraft."""
 
-    This schema avoids free-form `{}` items and `additionalProperties: true`,
-    which are common causes of provider-side schema failures. Fields that are
-    optional in product semantics are represented as nullable required fields.
-    """
-
-    requirement_item = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "criterion_id": {"type": "string"},
-            "text": {"type": "string"},
-            "source_text": {"type": "string"},
-            "importance": {
-                "type": "string",
-                "enum": ["must_have", "strongly_preferred", "preferred", "nice_to_have", "low_importance"],
-            },
-            "explicit": {"type": "boolean"},
-            "hard_filter_candidate": {"type": "boolean"},
-            "hard_filter_approved": {"type": "boolean"},
-            "precision_status": {"type": "string", "enum": ["precise", "needs_clarification"]},
-            "missing_dimensions": {
-                "type": "array",
-                "items": {
-                    "type": "string",
-                    "enum": [
-                        "duration",
-                        "quantity",
-                        "scope",
-                        "level",
-                        "evidence",
-                        "identity",
-                        "equivalence",
-                        "importance",
-                        "geography",
-                        "modality",
-                        "frequency",
-                        "legal_documentation",
-                        "credential",
-                        "license_category",
-                        "undefined_acronym",
-                    ],
-                },
-            },
-            "clarification_question": {"type": ["string", "null"]},
-        },
-        "required": [
-            "criterion_id",
-            "text",
-            "source_text",
-            "importance",
-            "explicit",
-            "hard_filter_candidate",
-            "hard_filter_approved",
-            "precision_status",
-            "missing_dimensions",
-            "clarification_question",
-        ],
-    }
-
-    missing_information_item = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "id": {"type": "string"},
-            "field": {"type": "string"},
-            "description": {"type": "string"},
-            "suggested_question": {"type": "string"},
-            "can_continue_without_answer": {"type": "boolean"},
-        },
-        "required": ["id", "field", "description", "suggested_question", "can_continue_without_answer"],
-    }
-
-    company_question_item = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "id": {"type": "string"},
-            "question": {"type": "string"},
-            "related_fields": {"type": "array", "items": {"type": "string"}},
-            "blocking_level": {"type": "string", "enum": ["advisory", "blocking"]},
-            "asked_to": {"type": "string", "enum": ["hiring_company"]},
-        },
-        "required": ["id", "question", "related_fields", "blocking_level", "asked_to"],
-    }
-
-    candidate_screening_item = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "id": {"type": "string"},
-            "question": {"type": "string"},
-            "related_competency": {"type": "string"},
-            "evidence_expected": {"type": "string", "enum": ["resume", "interview", "screening", "reference"]},
-            "hard_filter_candidate": {"type": "boolean"},
-            "hard_filter_approved": {"type": "boolean"},
-        },
-        "required": [
-            "id",
-            "question",
-            "related_competency",
-            "evidence_expected",
-            "hard_filter_candidate",
-            "hard_filter_approved",
-        ],
-    }
-
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "schema_version": {"type": "string", "enum": ["cvbrain_job_intelligence_v1"]},
-            "job_profile": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "job_title": {"type": "string"},
-                    "normalized_role_title": {"type": "string"},
-                    "role_family": {"type": "string"},
-                    "seniority": {"type": "string"},
-                    "summary": {"type": "string"},
-                    "primary_industries": {"type": "array", "items": {"type": "string"}},
-                    "work_modality": {"type": ["string", "null"], "enum": ["onsite", "hybrid", "remote", None]},
-                },
-                "required": [
-                    "job_title",
-                    "normalized_role_title",
-                    "role_family",
-                    "seniority",
-                    "summary",
-                    "primary_industries",
-                    "work_modality",
-                ],
-            },
-            "location_intelligence": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "raw": {"type": "string"},
-                    "normalized": {"type": "string"},
-                    "country_code": {"type": "string"},
-                    "remote_allowed": {"type": ["boolean", "null"]},
-                    "hybrid_allowed": {"type": ["boolean", "null"]},
-                    "onsite_required": {"type": ["boolean", "null"]},
-                    "country_context_mismatch": {"type": "boolean"},
-                    "hard_filter_candidate": {"type": "boolean"},
-                    "hard_filter_approved": {"type": "boolean"},
-                    "warnings": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": [
-                    "raw",
-                    "normalized",
-                    "country_code",
-                    "remote_allowed",
-                    "hybrid_allowed",
-                    "onsite_required",
-                    "country_context_mismatch",
-                    "hard_filter_candidate",
-                    "hard_filter_approved",
-                    "warnings",
-                ],
-            },
-            "requirements": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "must_have": {"type": "array", "items": requirement_item},
-                    "should_have": {"type": "array", "items": requirement_item},
-                    "nice_to_have": {"type": "array", "items": requirement_item},
-                    "credentials": {"type": "array", "items": requirement_item},
-                    "blockers": {"type": "array", "items": {"type": "string"}},
-                    "experience": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "minimum_years": {"type": ["integer", "null"]},
-                            "seniority": {"type": "string"},
-                        },
-                        "required": ["minimum_years", "seniority"],
-                    },
-                    "soft_competencies": {"type": "array", "items": requirement_item},
-                },
-                "required": [
-                    "must_have",
-                    "should_have",
-                    "nice_to_have",
-                    "credentials",
-                    "blockers",
-                    "experience",
-                    "soft_competencies",
-                ],
-            },
-            "search_strategy": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "target_titles": {"type": "array", "items": {"type": "string"}},
-                    "search_terms": {"type": "array", "items": {"type": "string"}},
-                    "semantic_terms": {"type": "array", "items": {"type": "string"}},
-                    "negative_terms": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["target_titles", "search_terms", "semantic_terms", "negative_terms"],
-            },
-            "missing_information": {"type": "array", "items": missing_information_item},
-            "company_clarification_questions": {"type": "array", "items": company_question_item},
-            "candidate_screening_questions": {"type": "array", "items": candidate_screening_item},
-            "search_readiness": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "status": {
-                        "type": "string",
-                        "enum": [
-                            "ready",
-                            "usable_with_warnings",
-                            "exploratory",
-                            "insufficient_for_precise_search",
-                            "blocked_for_safety_or_technical_reason",
-                        ],
-                    },
-                    "proceed_allowed": {"type": "boolean"},
-                    "recommended_action": {
-                        "type": "string",
-                        "enum": [
-                            "continue_anyway",
-                            "answer_clarifying_questions",
-                            "ask_company",
-                            "use_manual_search",
-                            "cancel",
-                        ],
-                    },
-                    "recruiter_decision_required": {"type": "boolean"},
-                    "continued_with_missing_information": {"type": "boolean"},
-                    "recruiter_override_reason": {"type": ["string", "null"]},
-                    "decision_options": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "continue_anyway",
-                                "answer_clarifying_questions",
-                                "ask_company",
-                                "use_manual_search",
-                                "cancel",
-                            ],
-                        },
-                    },
-                },
-                "required": [
-                    "status",
-                    "proceed_allowed",
-                    "recommended_action",
-                    "recruiter_decision_required",
-                    "continued_with_missing_information",
-                    "recruiter_override_reason",
-                    "decision_options",
-                ],
-            },
-            "quality_control": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "warnings": {"type": "array", "items": {"type": "string"}},
-                    "confidence": {"type": "number"},
-                    "contains_candidate_data": {"type": "boolean"},
-                    "contains_candidate_pii": {"type": "boolean"},
-                },
-                "required": ["warnings", "confidence", "contains_candidate_data", "contains_candidate_pii"],
-            },
-        },
-        "required": [
-            "schema_version",
-            "job_profile",
-            "location_intelligence",
-            "requirements",
-            "search_strategy",
-            "missing_information",
-            "company_clarification_questions",
-            "candidate_screening_questions",
-            "search_readiness",
-            "quality_control",
-        ],
-    }
+    return _typed_job_intelligence_v1_response_schema()
 
 
 def _schema_validation_failed_error() -> ExtractorError:

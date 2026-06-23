@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import sys
@@ -12,6 +13,10 @@ from app.extractors.openai_structured import (
     OpenAIStructuredExtractor,
     job_intelligence_v1_response_schema,
     provider_timeout_for_source_chars,
+)
+from app.schemas.job_intelligence_v1_contract import (
+    JobIntelligenceDraft,
+    job_intelligence_v1_response_schema as contract_job_intelligence_v1_response_schema,
 )
 from app.normalization.role_title import source_role_title_for_text
 from app.main import app
@@ -209,6 +214,30 @@ def role_title_payload(ai_title):
     payload["requirements"]["nice_to_have"] = []
     payload["requirements"]["credentials"] = []
     payload["requirements"]["blockers"] = []
+    return payload
+
+
+def experience_payload(experience_value_marker="valid"):
+    payload = role_title_payload("Soporte IT")
+    payload["requirements"]["must_have"] = [
+        imprecise_requirement_item(
+            "Experiencia demostrable en tickets",
+            "must_have",
+            ["duration", "evidence"],
+            "¿Cuántos años mínimos o qué evidencia concreta se considera suficiente para demostrar la experiencia en tickets?",
+        )
+    ]
+    payload["search_strategy"]["search_terms"] = ["Soporte IT", "tickets"]
+    if experience_value_marker == "missing":
+        payload["requirements"].pop("experience", None)
+    elif experience_value_marker == "null":
+        payload["requirements"]["experience"] = None
+    elif experience_value_marker == "string":
+        payload["requirements"]["experience"] = "experiencia demostrable en tickets"
+    elif experience_value_marker == "list":
+        payload["requirements"]["experience"] = ["experiencia demostrable en tickets"]
+    else:
+        payload["requirements"]["experience"] = {"minimum_years": None, "seniority": None}
     return payload
 
 
@@ -545,6 +574,8 @@ def test_openai_structured_prompt_includes_global_language_contract_for_spanish_
     system_prompt = fake_client.responses.calls[0]["input"][0]["content"]
     assert result["role_title"] == "Arquitecto de Software"
     assert "Language contract:" in system_prompt
+    assert "Return only the canonical CVBrain JobIntelligenceDraft structured output." in system_prompt
+    assert "Do not return flat_compatibility, display_plan" in system_prompt
     assert "Source text language detected as: Spanish" in system_prompt
     assert "All user-facing output fields must be in the same language as source_text." in system_prompt
     assert "If source_text is Spanish, write those user-facing fields in Spanish." in system_prompt
@@ -1094,6 +1125,117 @@ def test_openai_schema_avoids_free_form_strict_schema_traps():
     walk(schema)
 
 
+def test_provider_schema_is_generated_from_typed_job_intelligence_draft():
+    provider_schema = job_intelligence_v1_response_schema()
+    contract_schema = contract_job_intelligence_v1_response_schema()
+    model_schema = JobIntelligenceDraft.model_json_schema()
+
+    assert provider_schema == contract_schema
+    assert set(provider_schema["required"]) == set(model_schema["properties"].keys())
+    assert provider_schema["additionalProperties"] is False
+    experience_schema = provider_schema["$defs"]["ExperienceDraft"]
+    assert experience_schema["additionalProperties"] is False
+    assert experience_schema["required"] == ["minimum_years", "seniority"]
+    assert experience_schema["properties"]["minimum_years"]["type"] == ["number", "null"]
+    assert experience_schema["properties"]["seniority"]["type"] == ["string", "null"]
+
+
+def test_openai_structured_outputs_are_always_strict_even_if_legacy_flag_is_false():
+    fake_client = FakeOpenAIClient(response={"output_parsed": role_title_payload("Soporte IT")})
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        strict_schema_enabled=False,
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Empresa busca Soporte IT."))
+
+    call = fake_client.responses.calls[0]
+    assert result["ok"] is True
+    assert call["text"]["format"]["strict"] is True
+    assert extractor.strict_schema_enabled is True
+    assert extractor.configured_strict_schema_enabled is False
+
+
+def test_requirements_experience_valid_object_uses_one_ai_call_and_display_plan():
+    payload = experience_payload("valid")
+    fake_client = FakeOpenAIClient(response={"output_parsed": payload})
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Empresa busca Soporte IT con experiencia demostrable en tickets."))
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert len(fake_client.responses.calls) == 1
+    assert result["experience"] == {"minimum_years": None, "seniority": ""}
+    assert result["job_intelligence"]["requirements"]["experience"] == {"minimum_years": None, "seniority": None}
+    assert result["display_plan"]["role_title"] == "Soporte IT"
+
+
+@pytest.mark.parametrize("marker", ["missing", "null"])
+def test_requirements_experience_missing_or_null_gets_safe_default_without_repair(marker):
+    payload = experience_payload(marker)
+    fake_client = FakeOpenAIClient(response={"output_parsed": payload})
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Empresa busca Soporte IT con experiencia demostrable en tickets."))
+
+    assert result["ok"] is True
+    assert result["fallback_used"] is False
+    assert len(fake_client.responses.calls) == 1
+    assert result["job_intelligence"]["requirements"]["experience"] == {"minimum_years": None, "seniority": None}
+    assert result["experience"]["minimum_years"] is None
+    assert result["display_plan"]["role_title"] == "Soporte IT"
+
+
+@pytest.mark.parametrize(
+    ("marker", "received_type"),
+    [("string", "string"), ("list", "array")],
+)
+def test_requirements_experience_wrong_type_invokes_schema_repair_without_discarding_content(marker, received_type):
+    invalid_payload = experience_payload(marker)
+    repaired_payload = copy.deepcopy(experience_payload("valid"))
+    fake_client = FakeOpenAIClient(
+        responses=[
+            {"id": "resp_initial_invalid_experience", "output_parsed": invalid_payload},
+            {"id": "resp_repaired_experience", "output_parsed": repaired_payload},
+        ]
+    )
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request("Empresa busca Soporte IT con experiencia demostrable en tickets."))
+
+    repair_prompt = fake_client.responses.calls[1]["input"][1]["content"]
+    assert result["ok"] is True
+    assert result["fallback_used"] is False
+    assert result["ai_schema_repaired"] is True
+    assert len(fake_client.responses.calls) == 2
+    assert f"requirements.experience expected object, received {received_type}" in repair_prompt
+    assert fake_client.responses.calls[1]["text"]["format"]["strict"] is True
+    assert fake_client.responses.calls[1]["text"]["format"]["schema"] == job_intelligence_v1_response_schema()
+    assert result["experience"]["minimum_years"] is None
+    assert "Experiencia demostrable en tickets" in result["must_have"]
+    assert "Experiencia demostrable en tickets" in json.dumps(result["job_intelligence"], ensure_ascii=False)
+
+
 def test_ai_invalid_json_falls_back_when_enabled():
     fake_client = FakeOpenAIClient(response={"output_text": "{not valid json"})
     extractor = OpenAIStructuredExtractor(
@@ -1250,6 +1392,8 @@ def test_ai_schema_repair_prompt_preserves_source_language_contract_and_spanish_
     assert "Case contract:" in repair_prompt
     assert "For output, incoming source case wins." in repair_prompt
     assert "Do not return a public API envelope" in repair_prompt
+    assert "Return the canonical JobIntelligenceDraft schema object itself." in repair_prompt
+    assert "Do not return flat_compatibility, display_plan" in repair_prompt
     assert "Agente Comercial" in repair_prompt
     assert "Director/a de Secundaria" in repair_prompt
     assert "Never respond with ok=false for normal recruiter prose" in repair_prompt
