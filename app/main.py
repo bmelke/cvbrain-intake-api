@@ -336,6 +336,7 @@ def analyze(
         result["ok"] = False
         result["warnings"].append("empty_source_text")
         result["confidence"] = 0.0
+        result.pop("display_plan", None)
         return result
 
     request = ExtractorRequest(

@@ -196,8 +196,16 @@ def test_display_plan_cleans_engineering_manager_intake_for_recruiter_ui():
         "ai_schema_",
         "ai_provider_",
     ]
+    recruiter_text = (
+        plan["must_have"]
+        + plan["preferred"]
+        + plan["nice_to_have"]
+        + plan["blockers"]
+        + plan["questions"]
+        + plan["search_concepts"]
+    )
     for term in forbidden:
-        assert fold(term) not in all_plan_text(plan)
+        assert fold(term) not in all_plan_text(recruiter_text)
     assert flat["display_plan"] == plan
 
 

@@ -73,6 +73,7 @@ def test_ai_mode_without_key_returns_clean_error_when_fallback_disabled():
     assert result["fallback_used"] is False
     assert "ai_missing_api_key" in result["warnings"]
     assert result["search_terms"] == []
+    assert "display_plan" not in result
 
 
 def test_ai_stub_failure_falls_back_and_adds_warning_when_key_exists():

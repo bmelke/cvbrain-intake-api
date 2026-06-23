@@ -189,6 +189,7 @@ def test_empty_text_returns_clean_error(monkeypatch):
     assert data["ok"] is False
     assert "empty_source_text" in data["warnings"]
     assert data["confidence"] == 0.0
+    assert "display_plan" not in data
 
 
 @pytest.mark.parametrize(

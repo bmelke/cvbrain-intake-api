@@ -5,7 +5,6 @@ from typing import Any, Dict, Mapping, Optional
 
 from app.extractors.base import ExtractorError, ExtractorRequest
 from app.extractors.deterministic import DeterministicExtractor
-from app.mappers.recruiter_display_plan import build_recruiter_display_plan
 
 
 SERVICE_VERSION = "0.1.0"
@@ -148,5 +147,4 @@ class ExtractorRouter:
             "engine": "openai",
             "fallback_used": False,
         }
-        response["display_plan"] = build_recruiter_display_plan(flat=response)
         return response

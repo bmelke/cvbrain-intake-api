@@ -386,7 +386,7 @@ def test_one_pass_precision_contract_accepts_valid_output_without_second_ai_call
     payload["requirements"]["must_have"] = [
         imprecise_requirement_item("Experiencia demostrable", "must_have", ["duration", "evidence"], question)
     ]
-    payload["company_clarification_questions"] = [company_question(question)]
+    payload["company_clarification_questions"] = []
     payload["search_readiness"]["status"] = "ready"
     fake_client = FakeOpenAIClient(response={"output_parsed": payload})
     extractor = OpenAIStructuredExtractor(
@@ -411,18 +411,67 @@ def test_one_pass_precision_contract_accepts_valid_output_without_second_ai_call
     assert result["job_intelligence"]["search_readiness"]["status"] == "usable_with_warnings"
 
 
+def test_mechanic_sparse_input_one_pass_precision_questions_without_fallback_plan():
+    source_text = (
+        "Necesitamos mecanico de coches\n\n"
+        "oficial de primera, con experiencia demostrable que haga todo tipo de reparaciones y con carnet de conducir\n\n"
+        "asalariado o autonomo y papeles en regla\n\n"
+        "salario segun convenio"
+    )
+    questions = [
+        "¿Qué categoría, certificación o experiencia valida que el candidato sea oficial de primera?",
+        "¿Cuántos años mínimos o qué evidencia concreta se considera suficiente para demostrar la experiencia?",
+        "¿Qué categoría de licencia de conducir se requiere y es excluyente o solamente preferida?",
+        "¿Qué documentación exacta debe tener el candidato en regla?",
+    ]
+    payload = role_title_payload("Mecánico de coches")
+    payload["job_profile"]["summary"] = "Mecánico de coches para reparaciones generales."
+    payload["requirements"]["must_have"] = [
+        imprecise_requirement_item("Oficial de primera", "must_have", ["evidence", "equivalence"], questions[0]),
+        imprecise_requirement_item("Experiencia demostrable", "must_have", ["duration", "evidence"], questions[1]),
+        imprecise_requirement_item("Carnet de conducir", "must_have", ["license_category", "importance"], questions[2]),
+        imprecise_requirement_item("Papeles en regla", "must_have", ["legal_documentation"], questions[3]),
+    ]
+    payload["search_readiness"]["status"] = "ready"
+    payload["company_clarification_questions"] = []
+    fake_client = FakeOpenAIClient(response={"output_parsed": payload})
+    extractor = OpenAIStructuredExtractor(
+        api_key="test-key-not-used",
+        model="test-model-not-used",
+        fallback_enabled=False,
+        client=fake_client,
+    )
+
+    result = extractor.extract(request(source_text))
+    plan = result["display_plan"]
+    question_text = fold(plan["questions"])
+
+    assert result["ok"] is True
+    assert result["engine"] == "openai"
+    assert result["fallback_used"] is False
+    assert len(fake_client.responses.calls) == 1
+    assert plan["role_title"] != "Rol a confirmar"
+    assert "mecanico" in fold(plan["role_title"])
+    assert plan["readiness"]["code"] != "ready"
+    for expected in ("oficial de primera", "evidencia", "licencia", "documentacion"):
+        assert expected in question_text
+    assert "Candidatos alineados a la búsqueda recibida" not in json.dumps(plan, ensure_ascii=False)
+    assert "Lista para buscar" not in json.dumps(plan, ensure_ascii=False)
+
+
 def test_precision_contract_missing_question_uses_existing_schema_repair_path():
     question = "¿Qué significa MBS en este contexto y cómo debe validarse en el CV?"
     invalid_payload = role_title_payload("Ingeniero recibido")
     invalid_payload["requirements"]["nice_to_have"] = [
         imprecise_requirement_item("MBS preferido", "nice_to_have", ["undefined_acronym"], question)
     ]
+    invalid_payload["requirements"]["nice_to_have"][0]["clarification_question"] = None
     invalid_payload["company_clarification_questions"] = []
     repaired_payload = role_title_payload("Ingeniero recibido")
     repaired_payload["requirements"]["nice_to_have"] = [
         imprecise_requirement_item("MBS preferido", "nice_to_have", ["undefined_acronym"], question)
     ]
-    repaired_payload["company_clarification_questions"] = [company_question(question, "requirements.nice_to_have")]
+    repaired_payload["company_clarification_questions"] = []
     fake_client = FakeOpenAIClient(
         responses=[
             {"output_parsed": invalid_payload},
@@ -443,7 +492,7 @@ def test_precision_contract_missing_question_uses_existing_schema_repair_path():
     assert result["ai_schema_repaired"] is True
     assert result["fallback_used"] is False
     assert len(fake_client.responses.calls) == 2
-    assert "precision_contract.requirements.nice_to_have[0].clarification_question not_in_company_questions" in repair_user_prompt
+    assert "precision_contract.requirements.nice_to_have[0].clarification_question missing" in repair_user_prompt
     assert question in result["display_plan"]["questions"]
 
 

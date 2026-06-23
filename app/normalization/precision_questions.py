@@ -89,8 +89,6 @@ def _precision_contract_errors(payload: Mapping[str, Any]) -> List[str]:
     if not isinstance(requirements, Mapping):
         return ["precision_contract.requirements missing"]
 
-    existing_questions = _question_texts(payload.get("company_clarification_questions", []))
-
     for bucket in STRUCTURED_REQUIREMENT_BUCKETS:
         items = requirements.get(bucket, [])
         if not isinstance(items, list):
@@ -120,8 +118,6 @@ def _precision_contract_errors(payload: Mapping[str, Any]) -> List[str]:
                     errors.append(f"{path}.clarification_question missing")
                 elif _is_bad_question(question):
                     errors.append(f"{path}.clarification_question not_recruiter_facing")
-                elif _question_key(question) not in existing_questions:
-                    errors.append(f"{path}.clarification_question not_in_company_questions")
                 if not str(item.get("source_text") or item.get("text") or "").strip():
                     errors.append(f"{path}.source_text missing_for_ambiguity")
             elif status == "precise":
@@ -222,16 +218,6 @@ def _dedupe_questions(items: Iterable[Any]) -> List[Dict[str, Any]]:
             }
         )
     return output
-
-
-def _question_texts(items: Any) -> set[str]:
-    if not isinstance(items, list):
-        return set()
-    return {
-        _question_key(item.get("question", ""))
-        for item in items
-        if isinstance(item, Mapping) and str(item.get("question", "")).strip()
-    }
 
 
 def _is_bad_question(question: str) -> bool:

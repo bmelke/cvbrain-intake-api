@@ -425,13 +425,13 @@ def _clean_search_concept(value: Any) -> str:
 
 
 def _readiness(readiness: Mapping[str, Any], flat: Mapping[str, Any]) -> Dict[str, str]:
-    code = _clean_display_text(readiness.get("status"))
+    code = str(readiness.get("status") or "").strip()
     if not code:
         code = "usable_with_warnings" if _texts(flat.get("warnings")) else "ready"
     if code not in READY_LABELS:
         code = "usable_with_warnings"
     label, severity = READY_LABELS[code]
-    return {"code": code, "label": label, "severity": severity}
+    return {"code": code.replace("_", "-"), "label": label, "severity": severity}
 
 
 def _blocker_from_text(value: Any) -> str:
