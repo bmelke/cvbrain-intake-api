@@ -421,7 +421,7 @@ def test_structured_requirements_are_rebucketed_before_flat_mapping():
     )
 
     normalized = normalize_job_intelligence_requirements(payload)
-    flat = derive_flat_compatibility(payload)
+    flat = derive_flat_compatibility(normalized)
 
     assert "formacion tecnica en informatica o certificacion equivalente" in fold(
         normalized["requirements"]["must_have"]
@@ -523,7 +523,7 @@ def test_full_ga_structured_output_is_normalized_before_schema_validation():
     payload["location_intelligence"]["hybrid_allowed"] = True
 
     normalized = normalize_job_intelligence_requirements(payload)
-    flat = derive_flat_compatibility(payload)
+    flat = derive_flat_compatibility(normalized)
 
     must = fold(flat["must_have"])
     credentials_required = fold(flat["credentials"]["required"])

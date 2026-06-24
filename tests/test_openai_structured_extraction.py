@@ -500,9 +500,9 @@ def test_mechanic_sparse_input_one_pass_precision_questions_without_fallback_pla
     assert plan["role_title"] != "Rol a confirmar"
     assert "mecanico" in fold(plan["role_title"])
     assert plan["readiness"]["code"] != "ready"
-    for expected in ("oficial de primera", "evidencia", "reparaciones", "licencia", "documentacion"):
+    for expected in ("oficial de primera", "evidencia", "reparaciones", "carnet", "documentacion"):
         assert expected in question_text
-    assert question_text.count("licencia") == 1
+    assert question_text.count("carnet de conducir") == 1
     assert question_text.count("documentacion") == 1
     assert question_text.count("reparaciones") == 1
     assert "carnet b" not in fold(result)
@@ -1232,8 +1232,8 @@ def test_requirements_experience_wrong_type_invokes_schema_repair_without_discar
     assert fake_client.responses.calls[1]["text"]["format"]["strict"] is True
     assert fake_client.responses.calls[1]["text"]["format"]["schema"] == job_intelligence_v1_response_schema()
     assert result["experience"]["minimum_years"] is None
-    assert "Experiencia demostrable en tickets" in result["must_have"]
-    assert "Experiencia demostrable en tickets" in json.dumps(result["job_intelligence"], ensure_ascii=False)
+    assert "Experiencia demostrable como soporte it" in result["must_have"]
+    assert "Experiencia demostrable como soporte it" in json.dumps(result["job_intelligence"], ensure_ascii=False)
 
 
 def test_ai_invalid_json_falls_back_when_enabled():

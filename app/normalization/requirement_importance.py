@@ -310,9 +310,10 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
                 blockers.append(source_item.blocker)
                 if _is_blocker_only_clause(source_item.source_text):
                     continue
-            buckets[target].append(source_mapping)
             if source_item.is_credential:
                 buckets["credentials"].append(dict(source_mapping))
+                continue
+            buckets[target].append(source_mapping)
 
     must_have = _unique_requirement_items(buckets["must_have"])
     should_have = _unique_requirement_items(buckets["should_have"])
@@ -327,19 +328,28 @@ def normalize_job_intelligence_requirements(payload: Mapping[str, Any], source_t
         if _fold(str(item.get("text", ""))) not in must_keys | should_keys
     ]
 
+    credentials = _unique_credentials_by_strongest_importance(buckets["credentials"])
+    public_concept_keys = {
+        _requirement_item_concept_key(item)
+        for item in [*must_have, *should_have, *nice_to_have]
+        if _requirement_item_concept_key(item)
+    }
+    credentials = [
+        item
+        for item in credentials
+        if _requirement_item_concept_key(item) not in public_concept_keys
+    ]
+
     requirements["must_have"] = must_have
     requirements["should_have"] = should_have
     requirements["nice_to_have"] = nice_to_have
-    requirements["credentials"] = _unique_credentials_by_strongest_importance(buckets["credentials"])
+    requirements["credentials"] = credentials
     requirements["blockers"] = _normalize_blocker_list(blockers)
     requirements["soft_competencies"] = _normalize_soft_competencies(soft_competencies)
     output["requirements"] = requirements
     output = ensure_precision_contract(output)
     requirements = dict(output["requirements"])
     requirements = _normalize_blockers_and_negations(requirements, source_text)
-    output["requirements"] = requirements
-    output = canonicalize_job_intelligence(output, source_text=source_text)
-    requirements = dict(output["requirements"])
     requirements = _dedupe_requirement_concepts(requirements)
     output["requirements"] = requirements
     output = canonicalize_job_intelligence(output, source_text=source_text)
@@ -1119,7 +1129,7 @@ def _remove_redundant_aggregate_duplicates(
             and other_key in selected
             and _component_key_inside(other_key, key)
         ]
-        if len(component_keys) >= 2:
+        if len(component_keys) >= 2 and _components_cover_missing_dimensions(item, component_keys, selected):
             del selected[key]
 
 
@@ -1131,9 +1141,41 @@ def _more_complete_duplicate_key(
     for other_key in order:
         if other_key == key or other_key not in selected:
             continue
-        if _component_key_inside(key, other_key):
+        if _component_key_inside(key, other_key) and _item_dimensions_are_covered(
+            selected.get(key, {}).get("item", {}),
+            selected.get(other_key, {}).get("item", {}),
+        ):
             return other_key
     return ""
+
+
+def _components_cover_missing_dimensions(
+    item: Mapping[str, Any],
+    component_keys: Iterable[str],
+    selected: Mapping[str, Dict[str, Any]],
+) -> bool:
+    item_dimensions = _item_missing_dimensions(item)
+    if not item_dimensions:
+        return True
+    component_dimensions: set[str] = set()
+    for component_key in component_keys:
+        component_item = selected.get(component_key, {}).get("item", {})
+        if isinstance(component_item, Mapping):
+            component_dimensions.update(_item_missing_dimensions(component_item))
+    return item_dimensions.issubset(component_dimensions)
+
+
+def _item_dimensions_are_covered(component: Any, aggregate: Any) -> bool:
+    if not isinstance(component, Mapping) or not isinstance(aggregate, Mapping):
+        return True
+    component_dimensions = _item_missing_dimensions(component)
+    if not component_dimensions:
+        return True
+    return component_dimensions.issubset(_item_missing_dimensions(aggregate))
+
+
+def _item_missing_dimensions(item: Mapping[str, Any]) -> set[str]:
+    return {str(value) for value in item.get("missing_dimensions", []) or [] if str(value).strip()}
 
 
 def _component_key_inside(component_key: str, aggregate_key: str) -> bool:

@@ -15,12 +15,13 @@ from typing import Any, Callable, Dict, Mapping, Optional
 
 from app.extractors.base import ExtractorError, ExtractorRequest
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
+from app.normalization.canonical_job_intelligence import CanonicalJobIntelligenceError
 from app.normalization.requirement_importance import (
     blocker_text_for_clause,
     normalize_job_intelligence_requirements,
     resolve_requirements_from_text,
 )
-from app.normalization.precision_questions import ensure_precision_contract, validate_precision_contract
+from app.normalization.precision_questions import validate_precision_contract
 from app.normalization.role_title import normalize_role_title_for_source, source_role_title_for_text
 from app.schemas.job_intelligence_v1_contract import (
     JobIntelligenceValidationError,
@@ -470,12 +471,23 @@ class OpenAIStructuredExtractor:
         parsed_job_intelligence = self._extract_payload(response)
         parsed_job_intelligence = recover_job_intelligence_draft_shape(parsed_job_intelligence)
         validate_precision_contract(parsed_job_intelligence)
-        job_intelligence = normalize_job_intelligence_requirements(
-            parsed_job_intelligence,
-            source_text=request.source_text,
-        )
+        try:
+            job_intelligence = normalize_job_intelligence_requirements(
+                parsed_job_intelligence,
+                source_text=request.source_text,
+            )
+        except CanonicalJobIntelligenceError as error:
+            self._log_exception(
+                "canonicalization_failed",
+                error,
+                request_payload=request.ai_payload(),
+            )
+            raise ExtractorError(
+                "canonicalization_failed",
+                "CVBrain canonicalization failed internal integrity validation.",
+                warnings=["canonicalization_failed"],
+            ) from error
         job_intelligence = normalize_role_title_for_source(job_intelligence, source_text=request.source_text)
-        job_intelligence = ensure_precision_contract(job_intelligence)
         validate_job_intelligence_v1(job_intelligence)
         return parsed_job_intelligence, job_intelligence
 
@@ -573,19 +585,18 @@ class OpenAIStructuredExtractor:
             error=current_error,
         ):
             recovered_job_intelligence = _schema_stub_recovery_job_intelligence(request)
-            recovered_job_intelligence = normalize_job_intelligence_requirements(
-                recovered_job_intelligence,
-                source_text=request.source_text,
-            )
             recovered_job_intelligence = _restore_schema_stub_credentials(
                 recovered_job_intelligence,
                 request.source_text,
+            )
+            recovered_job_intelligence = normalize_job_intelligence_requirements(
+                recovered_job_intelligence,
+                source_text=request.source_text,
             )
             recovered_job_intelligence = normalize_role_title_for_source(
                 recovered_job_intelligence,
                 source_text=request.source_text,
             )
-            recovered_job_intelligence = ensure_precision_contract(recovered_job_intelligence)
             validate_job_intelligence_v1(recovered_job_intelligence)
             self._log_event(
                 "schema_stub_recovery_success",

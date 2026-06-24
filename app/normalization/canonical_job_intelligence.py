@@ -13,12 +13,13 @@ import re
 import unicodedata
 from typing import Any, Dict, Iterable, List, Mapping, Tuple
 
-from app.normalization.precision_questions import ensure_precision_contract
-
-
 REVIEW_PENDING = "pending_recruiter_confirmation"
 SEARCH_PRECISION = "search_precision"
 JOB_CONFIGURATION = "job_configuration"
+
+
+class CanonicalJobIntelligenceError(ValueError):
+    """Raised when canonical Job Intelligence cannot be safely projected."""
 
 
 def canonicalize_job_intelligence(payload: Mapping[str, Any], *, source_text: str = "") -> Dict[str, Any]:
@@ -35,6 +36,7 @@ def canonicalize_job_intelligence(payload: Mapping[str, Any], *, source_text: st
     output["company_clarification_questions"] = _canonical_question_registry(output)
     _link_criteria_to_questions(output)
     output["search_readiness"] = _canonical_readiness(output.get("search_readiness", {}), output["requirements"])
+    validate_canonical_job_intelligence(output)
     return output
 
 
@@ -98,9 +100,11 @@ def _atomic_criteria_for_item(item: Mapping[str, Any], bucket: str, payload: Map
     base = dict(item)
     text = _clean_text(base.get("text") or base.get("source_text"))
     source = _clean_text(base.get("source_text") or text)
-    combined = f"{source} {text}".strip()
+    combined = _combined_source_and_text(source, text)
     if not text or _non_search_context_kind(combined):
         return []
+    if base.get("canonical_kind") or base.get("canonical_key"):
+        return [_canonical_existing_item(base, bucket)]
 
     atoms: List[Dict[str, Any]] = []
     role = _role_noun(payload)
@@ -113,8 +117,8 @@ def _atomic_criteria_for_item(item: Mapping[str, Any], bucket: str, payload: Map
                 base,
                 text=professional_grade,
                 source_text=professional_grade,
-                missing_dimensions=["equivalence", "level", "evidence"],
-                clarification_question=_best_question(base, ("oficial", "categoria", "categoría", "equivalencia", "evidencia")),
+                missing_dimensions=["equivalence", "evidence"],
+                clarification_question=_question_for_atomic_kind(base, "professional_grade", professional_grade),
                 canonical_kind="professional_grade",
             )
         )
@@ -127,7 +131,7 @@ def _atomic_criteria_for_item(item: Mapping[str, Any], bucket: str, payload: Map
                 text=experience_text,
                 source_text=_source_fragment(combined, "experiencia demostrable") or experience_text,
                 missing_dimensions=["duration", "evidence"],
-                clarification_question=_best_question(base, ("años", "anos", "evidencia", "experiencia")),
+                clarification_question=_question_for_atomic_kind(base, "experience", experience_text),
                 canonical_kind="experience",
             )
         )
@@ -140,7 +144,7 @@ def _atomic_criteria_for_item(item: Mapping[str, Any], bucket: str, payload: Map
                 text=repair_scope,
                 source_text=_source_fragment(combined, "todo tipo") or repair_scope,
                 missing_dimensions=["scope"],
-                clarification_question=_best_question(base, ("tipo", "alcance", "scope", "reparaciones")),
+                clarification_question=_question_for_atomic_kind(base, "technical_scope", repair_scope),
                 canonical_kind="technical_scope",
             )
         )
@@ -155,7 +159,7 @@ def _atomic_criteria_for_item(item: Mapping[str, Any], bucket: str, payload: Map
                 text=_generic_driving_license_text(combined),
                 source_text=_generic_driving_license_text(combined),
                 missing_dimensions=["license_category"],
-                clarification_question=_best_question(base, ("licencia", "libreta", "carnet", "categoria", "categoría")),
+                clarification_question=_question_for_atomic_kind(base, "driving_license", _generic_driving_license_text(combined)),
                 canonical_kind="driving_license",
             )
         )
@@ -167,12 +171,12 @@ def _atomic_criteria_for_item(item: Mapping[str, Any], bucket: str, payload: Map
                 text="Papeles en regla" if "papeles" in _fold(combined) else "Documentación en regla",
                 source_text=text,
                 missing_dimensions=["legal_documentation"],
-                clarification_question=_best_question(base, ("documentacion", "documentación", "papeles", "legal")),
+                clarification_question=_question_for_atomic_kind(base, "legal_documentation", "Papeles en regla"),
                 canonical_kind="legal_documentation",
             )
         )
 
-    if len(atoms) >= 2 and _dimensions_cover(base, atoms):
+    if atoms and _dimensions_cover(base, atoms):
         return atoms
     if atoms and _is_redundant_component(base, atoms):
         return atoms
@@ -206,6 +210,56 @@ def _atom(
     item["clarification_question"] = clarification_question or _clean_text(base.get("clarification_question"))
     item["hard_filter_approved"] = False
     return item
+
+
+def _combined_source_and_text(source: str, text: str) -> str:
+    source = _clean_text(source)
+    text = _clean_text(text)
+    if not source:
+        return text
+    if not text:
+        return source
+    source_fold = _fold(source)
+    text_fold = _fold(text)
+    if text_fold and text_fold in source_fold:
+        return source
+    if source_fold and source_fold in text_fold:
+        return text
+    return f"{source} {text}".strip()
+
+
+def _canonical_existing_item(item: Mapping[str, Any], bucket: str) -> Dict[str, Any]:
+    output = dict(item)
+    kind = str(output.get("canonical_kind") or _kind_from_canonical_key(output.get("canonical_key")) or "")
+    text = _clean_text(output.get("text") or output.get("source_text"))
+    if kind == "technical_scope":
+        text = _todo_tipo_scope(text) or text
+    elif kind == "professional_grade":
+        text = _professional_grade(text) or text
+    elif kind == "driving_license":
+        text = _generic_driving_license_text(text)
+    elif kind == "legal_documentation" and _is_legal_documentation_text(text):
+        text = "Papeles en regla" if "papeles" in _fold(text) else "Documentación en regla"
+    output["text"] = text
+    output["source_text"] = _clean_text(output.get("source_text") or text)
+    output["importance"] = str(output.get("importance") or _importance_from_bucket(bucket))
+    output["missing_dimensions"] = _unique(str(value) for value in output.get("missing_dimensions", []) or [])
+    if output.get("precision_status") == "needs_clarification":
+        if kind and not _clean_text(output.get("clarification_question")):
+            output["clarification_question"] = _default_question_for_kind(kind, text)
+        output.setdefault("review_status", REVIEW_PENDING)
+    else:
+        output["precision_status"] = "precise"
+        output["missing_dimensions"] = []
+        output["clarification_question"] = None
+    if kind:
+        output["canonical_kind"] = kind
+    return output
+
+
+def _kind_from_canonical_key(value: Any) -> str:
+    text = str(value or "")
+    return text.split(":", 1)[0] if ":" in text else ""
 
 
 def _merge_records(existing: Mapping[str, Any], candidate: Mapping[str, Any]) -> Dict[str, Any]:
@@ -254,6 +308,12 @@ def _canonical_question_registry(payload: Mapping[str, Any]) -> List[Dict[str, A
         }
         _store_question_record(records, order, key, record)
 
+    criteria_question_concepts = {
+        _criterion_question_concept(item)
+        for _, item in _iter_criteria(_mapping(payload.get("requirements")))
+        if item.get("precision_status") == "needs_clarification"
+    }
+
     existing_items = list(payload.get("company_clarification_questions", []) or [])
     for item in existing_items:
         if not isinstance(item, Mapping):
@@ -270,6 +330,11 @@ def _canonical_question_registry(payload: Mapping[str, Any]) -> List[Dict[str, A
         dimensions = _unique(str(value) for value in item.get("missing_dimensions", []) or [])
         refs = _unique(str(value) for value in item.get("criterion_refs", []) or [])
         concept = str(item.get("concept_key") or _question_concept(question)).strip()
+        if concept.startswith("requirements"):
+            concept = _question_concept(question)
+        text_concept = _question_concept(question)
+        if category == SEARCH_PRECISION and not refs and (concept in criteria_question_concepts or text_concept in criteria_question_concepts):
+            continue
         key = _question_key("hiring_company", category, concept, dimensions, question)
         record = _question_record(item, key, question, category, dimensions, refs)
         _store_question_record(records, order, key, record)
@@ -300,6 +365,91 @@ def _link_criteria_to_questions(payload: Dict[str, Any]) -> None:
             item["clarification_question"] = None
             item["clarification_question_id"] = ""
             item.pop("review_status", None)
+
+
+def validate_canonical_job_intelligence(payload: Mapping[str, Any]) -> None:
+    requirements = _mapping(payload.get("requirements"))
+    errors: List[str] = []
+    criterion_ids: Dict[str, str] = {}
+    semantic_keys: Dict[str, str] = {}
+    technical_scope_count = 0
+    questions = {
+        str(question.get("question_id") or question.get("id") or ""): question
+        for question in payload.get("company_clarification_questions", []) or []
+        if isinstance(question, Mapping)
+    }
+
+    for bucket, item in _iter_criteria(requirements):
+        criterion_id = str(item.get("criterion_id") or "").strip()
+        text = _clean_text(item.get("text"))
+        key = str(item.get("canonical_key") or _criterion_key(item))
+        if not criterion_id:
+            errors.append(f"requirements.{bucket}.criterion_id missing")
+        elif criterion_id in criterion_ids and criterion_ids[criterion_id] != text:
+            errors.append(f"criterion_id duplicated with different text: {criterion_id}")
+        else:
+            criterion_ids[criterion_id] = text
+        if key in semantic_keys and semantic_keys[key] != criterion_id:
+            errors.append(f"semantic criterion key duplicated: {key}")
+        else:
+            semantic_keys[key] = criterion_id
+        if _has_repeated_self_concatenation(text):
+            errors.append(f"criterion text appears self-concatenated: {criterion_id or key}")
+        if item.get("canonical_kind") == "technical_scope":
+            technical_scope_count += 1
+        if item.get("precision_status") == "needs_clarification":
+            dimensions = list(item.get("missing_dimensions", []) or [])
+            question_id = str(item.get("clarification_question_id") or "").strip()
+            if not dimensions:
+                errors.append(f"requirements.{bucket}.missing_dimensions missing: {criterion_id}")
+            if not question_id:
+                errors.append(f"requirements.{bucket}.clarification_question_id missing: {criterion_id}")
+            elif question_id not in questions:
+                errors.append(f"requirements.{bucket}.clarification_question_id dangling: {criterion_id}")
+            else:
+                question = questions[question_id]
+                if _question_audience(question) != "hiring_company":
+                    errors.append(f"question audience invalid: {question_id}")
+                refs = [str(ref) for ref in question.get("criterion_refs", []) or []]
+                if criterion_id and criterion_id not in refs:
+                    errors.append(f"question missing criterion ref: {question_id}")
+                question_concept = _question_concept(str(question.get("question", "")))
+                item_concept = _criterion_question_concept(item)
+                if question_concept and item_concept and question_concept != item_concept:
+                    errors.append(f"question concept mismatch: {criterion_id}")
+    if technical_scope_count > 1:
+        errors.append("multiple equivalent technical-scope criteria")
+
+    question_ids: set[str] = set()
+    for question in payload.get("company_clarification_questions", []) or []:
+        if not isinstance(question, Mapping):
+            continue
+        question_id = str(question.get("question_id") or question.get("id") or "").strip()
+        if not question_id:
+            errors.append("question_id missing")
+        elif question_id in question_ids:
+            errors.append(f"question_id duplicated: {question_id}")
+        question_ids.add(question_id)
+        if _question_audience(question) != "hiring_company":
+            errors.append(f"question audience invalid: {question_id}")
+
+    if errors:
+        raise CanonicalJobIntelligenceError("; ".join(_unique(errors)))
+
+
+def _has_repeated_self_concatenation(text: str) -> bool:
+    folded = _fold(text)
+    if not folded:
+        return False
+    suspicious = [
+        "realizar todo tipo de reparaciones",
+        "experiencia demostrable",
+        "oficial de primera",
+        "carnet de conducir",
+        "papeles en regla",
+    ]
+    return any(folded.count(fragment) > 1 for fragment in suspicious)
+
 
 
 def _canonical_readiness(readiness: Any, requirements: Mapping[str, Any]) -> Dict[str, Any]:
@@ -465,14 +615,14 @@ def _question_key(audience: str, category: str, concept: str, dimensions: Iterab
 
 def _question_concept(question: str) -> str:
     folded = _fold(question)
-    if re.search(r"\b(?:licencia|libreta|carnet|conducir|categoria|categor[ií]a)\b", folded):
-        return "credential:driving_license"
     if re.search(r"\b(?:papeles|documentaci[oó]n|documentos?|legal|regla)\b", folded):
         return "legal_documentation"
     if re.search(r"\b(?:reparaciones|alcance|scope|tipo)\b", folded):
         return "technical_scope"
-    if re.search(r"\b(?:oficial|equivalencia|categoria|categor[ií]a)\b", folded):
+    if re.search(r"\b(?:oficial|equivalencia|nivel\s+['\"]?oficial)\b", folded):
         return "professional_grade"
+    if re.search(r"\b(?:licencia|libreta|carnet|conducir|categor[ií]a\s+de\s+(?:licencia|libreta|carnet))\b", folded):
+        return "credential:driving_license"
     if re.search(r"\b(?:experiencia|a[nñ]os?|evidencia|demostrable)\b", folded):
         return "experience"
     return _slug(question)
@@ -500,12 +650,24 @@ def _stronger_blocking_level(left: Any, right: Any) -> str:
     return left_value if rank.get(left_value, 2) <= rank.get(right_value, 2) else right_value
 
 
+def _technical_scope_key(value: Any) -> str:
+    scope = _todo_tipo_scope(str(value or "")) or _clean_text(value)
+    folded = _concept_text(scope)
+    if "reparaciones" in folded or "reparacion" in folded:
+        return "reparaciones"
+    return folded or _slug(scope)
+
+
 def _criterion_key(item: Mapping[str, Any]) -> str:
     kind = str(item.get("canonical_kind") or "")
     text = f"{item.get('source_text', '')} {item.get('text', '')}"
     if kind:
         if kind == "driving_license":
             return "credential:driving_license"
+        if kind == "legal_documentation":
+            return "legal_documentation"
+        if kind == "technical_scope":
+            return f"technical_scope:{_technical_scope_key(item.get('text') or item.get('source_text'))}"
         return f"{kind}:{_concept_text(item.get('text'))}"
     if _is_driving_license_text(text):
         category = _driving_license_category(text)
@@ -557,6 +719,8 @@ def _bucket_for_item(item: Mapping[str, Any], bucket: str) -> str:
         item["hard_filter_candidate"] = False
         item["hard_filter_approved"] = False
         return "soft_competencies"
+    if item.get("canonical_kind"):
+        return _bucket_for_importance(str(item.get("importance") or _importance_from_bucket(bucket)))
     if bucket == "credentials":
         return "credentials"
     return _bucket_for_importance(str(item.get("importance") or _importance_from_bucket(bucket)))
@@ -619,6 +783,53 @@ def _merge_dimensions(base: Mapping[str, Any], candidates: Iterable[str]) -> Lis
     return _unique(list(base.get("missing_dimensions", []) or []) + list(candidates))
 
 
+def _question_for_atomic_kind(base: Mapping[str, Any], kind: str, text: str) -> str:
+    question = _clean_text(base.get("clarification_question"))
+    if (
+        question
+        and _question_concept(question) == _concept_for_kind(kind)
+        and not _should_prefer_default_question(kind, question)
+    ):
+        return question
+    return _default_question_for_kind(kind, text)
+
+
+def _should_prefer_default_question(kind: str, question: str) -> bool:
+    folded = _fold(question)
+    if kind == "driving_license":
+        return "carnet de conducir" not in folded
+    return False
+
+
+def _default_question_for_kind(kind: str, text: str) -> str:
+    if kind == "professional_grade":
+        grade = _clean_text(text).lower() or "oficial de primera"
+        return f"¿Qué categoría, equivalencia o evidencia acredita el nivel '{grade}'?"
+    if kind == "experience":
+        return "¿Cuántos años o qué evidencia se considera experiencia demostrable?"
+    if kind == "technical_scope":
+        return "¿Qué tipos de reparaciones debe dominar el candidato?"
+    if kind == "driving_license":
+        return "¿Qué categoría de carnet de conducir se exige?"
+    if kind == "legal_documentation":
+        return "¿Qué documentación concreta significa 'papeles en regla'?"
+    return ""
+
+
+def _concept_for_kind(kind: str) -> str:
+    if kind == "driving_license":
+        return "credential:driving_license"
+    return kind
+
+
+def _criterion_question_concept(item: Mapping[str, Any]) -> str:
+    kind = str(item.get("canonical_kind") or "")
+    if kind:
+        return _concept_for_kind(kind)
+    question = _clean_text(item.get("clarification_question"))
+    return _question_concept(question) or _criterion_key(item)
+
+
 def _best_question(base: Mapping[str, Any], tokens: Iterable[str]) -> str:
     question = _clean_text(base.get("clarification_question"))
     if not question:
@@ -654,7 +865,14 @@ def _todo_tipo_scope(value: str) -> str:
     match = re.search(r"\btodo\s+tipo\s+de\s+([^.,;\n]+)", clean, re.I)
     if not match:
         return ""
-    concept = re.sub(r"\s+y\s+con\s+.*$", "", match.group(1), flags=re.I).strip(" -:.,;")
+    concept = match.group(1)
+    concept = re.sub(r"\s+y\s+con\s+.*$", "", concept, flags=re.I)
+    concept = re.sub(
+        r"\s+(?:con\s+experiencia|experiencia\s+demostrable|con\s+(?:carnet|licencia|libreta)|papeles|asalariad[oa]|autonom[oa]|salario)\b.*$",
+        "",
+        concept,
+        flags=re.I,
+    ).strip(" -:.,;")
     if not concept:
         return ""
     return f"Realizar todo tipo de {concept}"

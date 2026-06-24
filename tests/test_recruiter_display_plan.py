@@ -1,3 +1,4 @@
+import copy
 import json
 import unicodedata
 
@@ -5,6 +6,7 @@ from app.extractors import ExtractorRequest
 from app.extractors.openai_structured import OpenAIStructuredExtractor
 from app.mappers.job_intelligence_to_flat import derive_flat_compatibility
 from app.mappers.recruiter_display_plan import build_recruiter_display_plan
+from app.normalization.canonical_job_intelligence import canonicalize_job_intelligence
 from app.normalization.requirement_importance import normalize_job_intelligence_requirements
 from app.normalization.role_title import normalize_role_title_for_source
 
@@ -537,8 +539,15 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
         {"question": "¿Puedes aportar papeles en regla?", "asked_to": "candidate"}
     ]
     payload["search_readiness"]["status"] = "ready"
+    original_payload = copy.deepcopy(payload)
 
+    canonical_once = canonicalize_job_intelligence(payload, source_text=source)
+    canonical_twice = canonicalize_job_intelligence(canonical_once, source_text=source)
     normalized, flat, plan = normalized_flat_and_plan(payload, source_text=source)
+
+    assert payload == original_payload
+    assert canonical_twice == canonical_once
+    assert canonicalize_job_intelligence(normalized, source_text=source) == normalized
 
     all_text = all_plan_text([normalized, flat, plan])
     criteria_text = all_plan_text(
@@ -556,10 +565,13 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
     assert flat["ok"] is True
     assert plan["role_title"] == "Mecánico de coches"
     assert "carnet b" not in all_text
-    assert question_text.count("licencia de conducir") == 1
-    assert question_text.count("documentacion exacta") == 1
-    assert question_text.count("evidencia concreta") == 1
+    assert len(recruiter_questions) == 5
+    assert question_text.count("carnet de conducir") == 1
+    assert question_text.count("documentacion") == 1
+    assert question_text.count("cuantos anos") == 1
+    assert question_text.count("evidencia") == 1
     assert question_text.count("reparaciones") == 1
+    assert question_text.count("oficial de primera") == 1
     assert "tienes" not in question_text
     assert "puedes aportar" not in question_text
     assert flat["recruiter_questions"] == recruiter_questions
@@ -582,15 +594,46 @@ def test_mechanic_display_plan_uses_canonical_registries_without_invented_specif
     criteria = plan["criteria_review"]
     criterion_ids = [item["criterion_id"] for item in criteria]
     question_ids = [item["question_id"] for item in plan["question_registry"]]
+    canonical_items = [
+        item
+        for bucket in ("must_have", "should_have", "nice_to_have", "credentials")
+        for item in normalized["requirements"].get(bucket, [])
+    ]
+    by_kind = {item["canonical_kind"]: item for item in canonical_items}
     assert len(criteria) == 5
+    assert len(canonical_items) == 5
+    assert set(by_kind) == {
+        "professional_grade",
+        "experience",
+        "technical_scope",
+        "driving_license",
+        "legal_documentation",
+    }
+    assert by_kind["professional_grade"]["text"] == "Oficial de primera"
+    assert by_kind["professional_grade"]["missing_dimensions"] == ["equivalence", "evidence"]
+    assert by_kind["experience"]["text"] == "Experiencia demostrable como mecánico"
+    assert by_kind["experience"]["missing_dimensions"] == ["duration", "evidence"]
+    assert by_kind["technical_scope"]["text"] == "Realizar todo tipo de reparaciones"
+    assert by_kind["technical_scope"]["missing_dimensions"] == ["scope"]
+    assert by_kind["driving_license"]["text"] == "Carnet de conducir"
+    assert by_kind["driving_license"]["missing_dimensions"] == ["license_category"]
+    assert by_kind["legal_documentation"]["text"] == "Papeles en regla"
+    assert by_kind["legal_documentation"]["missing_dimensions"] == ["legal_documentation"]
+    assert len([item for item in canonical_items if item.get("canonical_kind") == "technical_scope"]) == 1
     assert len(criterion_ids) == len(set(criterion_ids))
     assert len(question_ids) == len(set(question_ids))
     assert all(item["precision_status"] == "needs_clarification" for item in criteria)
     assert all(item["review_status"] == "pending_recruiter_confirmation" for item in criteria)
     assert all(item["clarification_question_id"] in question_ids for item in criteria)
-    assert any(
-        item["precision_status"] == "needs_clarification"
-        and item["importance"] == "must_have"
-        and item["clarification_question"]
-        for item in plan["criteria_review"]
-    )
+    questions_by_id = {item["question_id"]: item for item in plan["question_registry"]}
+    for item in criteria:
+        linked = questions_by_id[item["clarification_question_id"]]
+        assert item["criterion_id"] in linked["criterion_refs"]
+    questions_by_ref = {ref: item["question"] for item in plan["question_registry"] for ref in item["criterion_refs"]}
+    assert "oficial de primera" in all_plan_text(questions_by_ref[by_kind["professional_grade"]["criterion_id"]])
+    assert "experiencia demostrable" in all_plan_text(questions_by_ref[by_kind["experience"]["criterion_id"]])
+    assert "reparaciones" in all_plan_text(questions_by_ref[by_kind["technical_scope"]["criterion_id"]])
+    assert "carnet de conducir" in all_plan_text(questions_by_ref[by_kind["driving_license"]["criterion_id"]])
+    legal_question = all_plan_text(questions_by_ref[by_kind["legal_documentation"]["criterion_id"]])
+    assert "documentacion" in legal_question
+    assert "regla" in legal_question
