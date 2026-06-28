@@ -47,6 +47,14 @@ class V2RepairExhaustedError(IntakeV2Error):
     """Raised when the single allowed semantic repair does not produce a valid draft."""
 
 
+class V2InternalIntegrityError(IntakeV2Error):
+    """Raised when V2 internal reference integrity fails."""
+
+    def __init__(self, message: str = "Intake v2 internal integrity failed.", *, integrity: object = None) -> None:
+        super().__init__(message)
+        self.integrity = integrity
+
+
 class V2ShapeRecoveryError(IntakeV2ContractError):
     """Raised when structural recovery must defer to AI repair."""
 
