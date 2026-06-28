@@ -47,3 +47,19 @@ def build_extraction_prompt(source_language: str) -> str:
         + V2_PUBLIC_OUTPUT_CONTRACT.strip()
         + "\n"
     )
+
+
+def build_repair_prompt(source_language: str) -> str:
+    return (
+        "You are CVBrain Job Intake contract repair.\n\n"
+        "Return only a corrected JobIntelligenceDraftV2 structured output.\n"
+        "Use the original recruiter source and market context as the only semantic source.\n"
+        "Use the provided validation failure paths and invalid provider output only to fix shape, "
+        "schema, references, and contract consistency.\n"
+        "Do not invent facts, deterministic fallbacks, display_plan, flat compatibility output, "
+        "canonical IDs, projections, or search execution output.\n\n"
+        + language_contract_for_source_language(source_language).strip()
+        + "\n\n"
+        + V2_PUBLIC_OUTPUT_CONTRACT.strip()
+        + "\n"
+    )

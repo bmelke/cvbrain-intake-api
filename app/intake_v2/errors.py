@@ -13,3 +13,54 @@ class IntakeV2Error(Exception):
 
 class IntakeV2ContractError(IntakeV2Error):
     """Raised when a draft does not satisfy the v2 typed contract."""
+
+
+class V2ConfigurationError(IntakeV2Error):
+    """Raised when the V2 provider is not configured."""
+
+
+class V2ProviderTimeoutError(IntakeV2Error):
+    """Raised when a retryable provider timeout is exhausted."""
+
+
+class V2ProviderTransientError(IntakeV2Error):
+    """Raised when retryable provider failures are exhausted."""
+
+
+class V2ProviderTerminalError(IntakeV2Error):
+    """Raised for non-retryable provider failures."""
+
+
+class V2ResponseParseError(IntakeV2Error):
+    """Raised when a completed provider response cannot be parsed."""
+
+
+class V2DraftSchemaError(IntakeV2ContractError):
+    """Raised when a draft fails the strict typed schema."""
+
+
+class V2DraftContractError(IntakeV2ContractError):
+    """Raised when a draft passes schema but fails V2 provider contract rules."""
+
+
+class V2RepairExhaustedError(IntakeV2Error):
+    """Raised when the single allowed semantic repair does not produce a valid draft."""
+
+
+class V2ShapeRecoveryError(IntakeV2ContractError):
+    """Raised when structural recovery must defer to AI repair."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: str = "",
+        repair_required: bool = True,
+        malformed_value: object = None,
+        raw_value_sha256: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.path = path
+        self.repair_required = repair_required
+        self.malformed_value = malformed_value
+        self.raw_value_sha256 = raw_value_sha256
