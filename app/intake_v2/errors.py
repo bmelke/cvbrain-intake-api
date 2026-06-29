@@ -55,6 +55,21 @@ class V2InternalIntegrityError(IntakeV2Error):
         self.integrity = integrity
 
 
+class V2ServiceRequestError(IntakeV2Error):
+    """Raised when a V2 service request fails mechanical request validation."""
+
+    def __init__(
+        self,
+        message: str = "Intake v2 service request is invalid.",
+        *,
+        code: str = "invalid_request",
+        category: str = "request_validation",
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.category = category
+
+
 class V2ShapeRecoveryError(IntakeV2ContractError):
     """Raised when structural recovery must defer to AI repair."""
 
