@@ -70,6 +70,25 @@ class V2ServiceRequestError(IntakeV2Error):
         self.category = category
 
 
+class V2DisplayPlanProjectionError(IntakeV2Error):
+    """Raised when a V2 service result cannot be projected for rendering."""
+
+    def __init__(
+        self,
+        message: str = "Intake v2 display_plan projection failed.",
+        *,
+        code: str = "invalid_display_plan_input",
+        category: str = "display_plan_projection",
+        paths: list[str] | None = None,
+        counts: dict[str, int] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.category = category
+        self.paths = list(paths or [])
+        self.counts = dict(counts or {})
+
+
 class V2ShapeRecoveryError(IntakeV2ContractError):
     """Raised when structural recovery must defer to AI repair."""
 
