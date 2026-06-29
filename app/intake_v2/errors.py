@@ -108,6 +108,36 @@ class V2PublicResponseError(IntakeV2Error):
         self.counts = dict(counts or {})
 
 
+class V2PipelineRequestError(IntakeV2Error):
+    """Raised when the non-HTTP V2 public pipeline request is invalid."""
+
+    def __init__(
+        self,
+        message: str = "Intake v2 public pipeline request is invalid.",
+        *,
+        code: str = "invalid_pipeline_request",
+        category: str = "request_validation",
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.category = category
+
+
+class V2PipelineError(IntakeV2Error):
+    """Raised when V2 public pipeline coordination fails safely."""
+
+    def __init__(
+        self,
+        message: str = "Intake v2 public pipeline failed.",
+        *,
+        code: str = "pipeline_failed",
+        category: str = "pipeline",
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.category = category
+
+
 class V2ShapeRecoveryError(IntakeV2ContractError):
     """Raised when structural recovery must defer to AI repair."""
 
