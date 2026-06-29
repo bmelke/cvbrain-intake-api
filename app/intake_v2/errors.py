@@ -89,6 +89,25 @@ class V2DisplayPlanProjectionError(IntakeV2Error):
         self.counts = dict(counts or {})
 
 
+class V2PublicResponseError(IntakeV2Error):
+    """Raised when a V2 service/display result cannot be wrapped publicly."""
+
+    def __init__(
+        self,
+        message: str = "Intake v2 public response construction failed.",
+        *,
+        code: str = "invalid_public_response_input",
+        category: str = "public_response",
+        paths: list[str] | None = None,
+        counts: dict[str, int] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.category = category
+        self.paths = list(paths or [])
+        self.counts = dict(counts or {})
+
+
 class V2ShapeRecoveryError(IntakeV2ContractError):
     """Raised when structural recovery must defer to AI repair."""
 
