@@ -7,6 +7,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 from app.extractors import ExtractorRequest, ExtractorRouter
+from app.intake_v2.api import create_intake_v2_router
 from app.mappers.recruiter_display_plan import build_recruiter_display_plan
 from app.normalization.requirement_importance import resolve_requirements_from_text
 
@@ -16,6 +17,13 @@ SERVICE_NAME = "cvbrain-intake-api"
 PRODUCT_NAME = "CVBrain"
 
 app = FastAPI(title="CVBrain Intake API", version=SERVICE_VERSION)
+
+
+def get_intake_v2_provider() -> Any:
+    return None
+
+
+app.include_router(create_intake_v2_router(provider_dependency=get_intake_v2_provider))
 
 
 class JobIntakeRequest(BaseModel):

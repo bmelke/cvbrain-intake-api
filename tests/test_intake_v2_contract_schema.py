@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import copy
 import json
 import subprocess
@@ -246,7 +247,6 @@ def test_display_plan_and_flat_duplicate_arrays_are_absent_from_provider_schema(
 
 def test_v1_models_and_runtime_files_remain_unchanged():
     v1_paths = [
-        "app/main.py",
         "app/extractors/openai_structured.py",
         "app/extractors/router.py",
         "app/extractors/deterministic.py",
@@ -266,3 +266,68 @@ def test_v1_models_and_runtime_files_remain_unchanged():
     )
 
     assert result.stdout.strip() == ""
+    assert_app_main_v2_registration_delta_is_allowlisted()
+
+
+def assert_app_main_v2_registration_delta_is_allowlisted() -> None:
+    app_main_path = ROOT / "app" / "main.py"
+    source = app_main_path.read_text()
+    tree = ast.parse(source)
+
+    assert "from app.intake_v2.api import create_intake_v2_router" in source
+    assert "def get_intake_v2_provider() -> Any:" in source
+    assert "create_intake_v2_router(provider_dependency=get_intake_v2_provider)" in source
+
+    v2_related_lines = {
+        line.strip()
+        for line in source.splitlines()
+        if "intake_v2" in line or "create_intake_v2_router" in line
+    }
+    assert v2_related_lines == {
+        "from app.intake_v2.api import create_intake_v2_router",
+        "def get_intake_v2_provider() -> Any:",
+        "app.include_router(create_intake_v2_router(provider_dependency=get_intake_v2_provider))",
+    }
+
+    forbidden_imports = {
+        "app.intake_v2.provider_config",
+        "app.intake_v2.provider_factory",
+        "app.intake_v2.provider",
+        "openai",
+        "dotenv",
+    }
+    imported_modules = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    imported_modules.update(
+        alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names
+    )
+    assert not (forbidden_imports & imported_modules)
+
+    provider_hook = next(
+        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "get_intake_v2_provider"
+    )
+    assert len(provider_hook.body) == 1
+    return_statement = provider_hook.body[0]
+    assert isinstance(return_statement, ast.Return)
+    assert isinstance(return_statement.value, ast.Constant)
+    assert return_statement.value.value is None
+
+    diff = subprocess.run(
+        ["git", "diff", "--unified=0", "--", "app/main.py"],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.splitlines()
+    removed_lines = [line for line in diff if line.startswith("-") and not line.startswith("---")]
+    added_lines = [line[1:] for line in diff if line.startswith("+") and not line.startswith("+++")]
+    assert removed_lines == []
+    assert [line for line in added_lines if line] == [
+        "from app.intake_v2.api import create_intake_v2_router",
+        "def get_intake_v2_provider() -> Any:",
+        "    return None",
+        "app.include_router(create_intake_v2_router(provider_dependency=get_intake_v2_provider))",
+    ]
