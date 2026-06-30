@@ -278,23 +278,19 @@ def assert_app_main_v2_registration_delta_is_allowlisted() -> None:
     assert "def get_intake_v2_provider() -> Any:" in source
     assert "create_intake_v2_router(provider_dependency=get_intake_v2_provider)" in source
 
-    v2_related_lines = {
-        line.strip()
-        for line in source.splitlines()
-        if "intake_v2" in line or "create_intake_v2_router" in line
-    }
-    assert v2_related_lines == {
-        "from app.intake_v2.api import create_intake_v2_router",
-        "def get_intake_v2_provider() -> Any:",
-        "app.include_router(create_intake_v2_router(provider_dependency=get_intake_v2_provider))",
-    }
-
     forbidden_imports = {
-        "app.intake_v2.provider_config",
         "app.intake_v2.provider_factory",
         "app.intake_v2.provider",
         "openai",
         "dotenv",
+    }
+    allowed_intake_v2_imports = {
+        "app.intake_v2.api",
+        "app.intake_v2.provider_config",
+    }
+    allowed_provider_config_names = {
+        "OpenAIProviderConfigV2",
+        "build_openai_provider_v2",
     }
     imported_modules = {
         node.module
@@ -305,29 +301,76 @@ def assert_app_main_v2_registration_delta_is_allowlisted() -> None:
         alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names
     )
     assert not (forbidden_imports & imported_modules)
+    assert {
+        module for module in imported_modules if module == "app.intake_v2" or module.startswith("app.intake_v2.")
+    } <= allowed_intake_v2_imports
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "app.intake_v2.provider_config":
+            assert {alias.name for alias in node.names} <= allowed_provider_config_names
 
     provider_hook = next(
         node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "get_intake_v2_provider"
     )
-    assert len(provider_hook.body) == 1
-    return_statement = provider_hook.body[0]
-    assert isinstance(return_statement, ast.Return)
-    assert isinstance(return_statement.value, ast.Constant)
-    assert return_statement.value.value is None
+    assert not provider_hook.args.args
+    assert not provider_hook.args.kwonlyargs
+    assert provider_hook.args.vararg is None
+    assert provider_hook.args.kwarg is None
 
-    diff = subprocess.run(
-        ["git", "diff", "--unified=0", "--", "app/main.py"],
-        cwd=ROOT,
-        check=True,
-        text=True,
-        capture_output=True,
-    ).stdout.splitlines()
-    removed_lines = [line for line in diff if line.startswith("-") and not line.startswith("---")]
-    added_lines = [line[1:] for line in diff if line.startswith("+") and not line.startswith("+++")]
-    assert removed_lines == []
-    assert [line for line in added_lines if line] == [
-        "from app.intake_v2.api import create_intake_v2_router",
-        "def get_intake_v2_provider() -> Any:",
-        "    return None",
-        "app.include_router(create_intake_v2_router(provider_dependency=get_intake_v2_provider))",
-    ]
+    provider_hook_source = ast.get_source_segment(source, provider_hook)
+    assert provider_hook_source is not None
+    provider_hook_lower = provider_hook_source.lower()
+    for forbidden_term in (
+        "source_text",
+        "source_language",
+        "detect_language",
+        "canonical",
+        "mapper",
+        "normalizer",
+        "normalize",
+        "fallback",
+        "wordpress",
+        "ui_sections",
+        "v1_compatibility",
+    ):
+        assert forbidden_term not in provider_hook_lower
+
+    endpoint_paths = {
+        node.decorator_list[0].args[0].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+        and node.decorator_list
+        and isinstance(node.decorator_list[0], ast.Call)
+        and node.decorator_list[0].args
+        and isinstance(node.decorator_list[0].args[0], ast.Constant)
+    }
+    assert "/intake/v2/analyze" not in endpoint_paths
+
+    for top_level_node in tree.body:
+        if isinstance(top_level_node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.ClassDef)):
+            continue
+        for child in ast.walk(top_level_node):
+            if not isinstance(child, ast.Call):
+                continue
+            function_name = _call_name(child.func)
+            assert function_name not in {
+                "OpenAIProviderConfigV2",
+                "build_openai_provider_v2",
+                "os.getenv",
+                "os.environ.get",
+            }
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            assert _call_name(node.func) != "OpenAIProviderV2"
+
+
+def _call_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _call_name(node.value)
+        if parent:
+            return f"{parent}.{node.attr}"
+        return node.attr
+    return ""

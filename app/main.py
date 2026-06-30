@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.extractors import ExtractorRequest, ExtractorRouter
 from app.intake_v2.api import create_intake_v2_router
+from app.intake_v2.provider_config import OpenAIProviderConfigV2, build_openai_provider_v2
 from app.mappers.recruiter_display_plan import build_recruiter_display_plan
 from app.normalization.requirement_importance import resolve_requirements_from_text
 
@@ -15,12 +16,23 @@ from app.normalization.requirement_importance import resolve_requirements_from_t
 SERVICE_VERSION = "0.1.0"
 SERVICE_NAME = "cvbrain-intake-api"
 PRODUCT_NAME = "CVBrain"
+V2_PROVIDER_API_KEY_ENV = "CVBRAIN_INTAKE_V2_OPENAI_API_KEY"
+V2_PROVIDER_MODEL_ENV = "CVBRAIN_INTAKE_V2_OPENAI_MODEL"
 
 app = FastAPI(title="CVBrain Intake API", version=SERVICE_VERSION)
 
 
 def get_intake_v2_provider() -> Any:
-    return None
+    api_key = os.getenv(V2_PROVIDER_API_KEY_ENV, "").strip()
+    model = os.getenv(V2_PROVIDER_MODEL_ENV, "").strip()
+    if not api_key or not model:
+        return None
+
+    try:
+        config = OpenAIProviderConfigV2(api_key=api_key, model=model)
+        return build_openai_provider_v2(config)
+    except Exception:
+        return None
 
 
 app.include_router(create_intake_v2_router(provider_dependency=get_intake_v2_provider))

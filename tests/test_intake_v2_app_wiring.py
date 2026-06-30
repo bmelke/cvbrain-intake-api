@@ -5,7 +5,6 @@ import copy
 import importlib
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -62,11 +61,14 @@ FORBIDDEN_RESPONSE_KEYS = {
     "wordpress",
 }
 FORBIDDEN_MAIN_V2_IMPORTS = {
-    "app.intake_v2.provider_config",
     "app.intake_v2.provider_factory",
     "app.intake_v2.provider",
     "openai",
     "dotenv",
+}
+ALLOWED_PROVIDER_CONFIG_IMPORTS = {
+    "OpenAIProviderConfigV2",
+    "build_openai_provider_v2",
 }
 ALLOWED_LOG_KEYS = {
     "event",
@@ -416,13 +418,26 @@ def test_app_level_v2_invalid_request_returns_safe_400_without_pipeline_or_provi
 
 
 def test_app_level_v2_route_without_override_fails_safely_without_live_config(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(
-        os,
-        "getenv",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("V2 app wiring must not read env vars")),
-    )
+    monkeypatch.delenv("CVBRAIN_INTAKE_V2_OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("CVBRAIN_INTAKE_V2_OPENAI_MODEL", raising=False)
     main = app_main_module()
     clear_dependency_overrides(main.app)
+    if hasattr(main, "OpenAIProviderConfigV2"):
+        monkeypatch.setattr(
+            main,
+            "OpenAIProviderConfigV2",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("missing V2 config must not construct provider config")
+            ),
+        )
+    if hasattr(main, "build_openai_provider_v2"):
+        monkeypatch.setattr(
+            main,
+            "build_openai_provider_v2",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("missing V2 config must not build provider")
+            ),
+        )
     client = TestClient(main.app)
 
     response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
@@ -523,10 +538,15 @@ def test_app_main_v2_wiring_imports_no_live_provider_config_openai_or_env_runtim
         for imported in imports
         if any(imported == forbidden or imported.startswith(forbidden + ".") for forbidden in FORBIDDEN_MAIN_V2_IMPORTS)
     )
-    source = APP_MAIN_PATH.read_text(encoding="utf-8").lower()
+    source_text = APP_MAIN_PATH.read_text(encoding="utf-8")
+    source = source_text.lower()
+    tree = ast.parse(source_text)
 
     assert "app.intake_v2.api" in imports
     assert offenders == []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "app.intake_v2.provider_config":
+            assert {alias.name for alias in node.names} <= ALLOWED_PROVIDER_CONFIG_IMPORTS
     assert "create_intake_v2_router" in source
     assert "get_intake_v2_provider" in source
     assert "intake_v2" in source
