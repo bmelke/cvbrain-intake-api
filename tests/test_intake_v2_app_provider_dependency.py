@@ -322,6 +322,14 @@ def assert_public_failure(value: Mapping[str, Any]) -> None:
     assert_sensitive_sentinels_absent(value)
 
 
+def assert_safe_unavailable(value: Mapping[str, Any]) -> None:
+    assert value.get("status") == "unavailable"
+    assert "display_plan" not in value
+    assert all_keys(value).isdisjoint(FORBIDDEN_RESPONSE_KEYS)
+    assert_sensitive_sentinels_absent(value)
+    assert_semantic_sentinels_absent(value)
+
+
 def assert_pipeline_called_once_with_exact_inputs(pipeline: RecordingPipeline, provider: FakeProvider) -> None:
     assert len(pipeline.calls) == 1
     call = pipeline.calls[0]
@@ -390,6 +398,14 @@ def test_missing_v2_provider_config_returns_safe_unavailable_response_without_li
 
     main = app_main_module()
     clear_dependency_overrides(main.app)
+    endpoint = registered_intake_v2_endpoint(main.app)
+    monkeypatch.setitem(
+        endpoint.__globals__,
+        "run_public_intake_v2",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("missing V2 config must return unavailable before pipeline")
+        ),
+    )
     client = TestClient(main.app)
 
     with provider_runtime_call_recorder() as provider_calls:
@@ -399,10 +415,9 @@ def test_missing_v2_provider_config_returns_safe_unavailable_response_without_li
             headers=auth_headers(),
         )
 
-    assert response.status_code in {500, 503}
+    assert response.status_code == 503
     body = response.json()
-    assert_public_failure(body)
-    assert body["error"]["category"] in {"configuration", "pipeline", "provider"}
+    assert_safe_unavailable(body)
     assert_sensitive_sentinels_absent(caplog.text)
     assert_semantic_sentinels_absent(body)
     assert provider_calls == []
@@ -502,14 +517,22 @@ def test_invalid_v2_config_failure_does_not_leak_secret_sentinels(
 
     main = app_main_module()
     clear_dependency_overrides(main.app)
+    endpoint = registered_intake_v2_endpoint(main.app)
+    monkeypatch.setitem(
+        endpoint.__globals__,
+        "run_public_intake_v2",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("invalid V2 config must return unavailable before pipeline")
+        ),
+    )
     response = TestClient(main.app).post(
         ENDPOINT_PATH,
         json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
         headers=auth_headers(),
     )
 
-    assert response.status_code in {500, 503}
-    assert_public_failure(response.json())
+    assert response.status_code == 503
+    assert_safe_unavailable(response.json())
     assert_sensitive_sentinels_absent(response.json())
     assert_sensitive_sentinels_absent(caplog.text)
 

@@ -59,6 +59,8 @@ def create_intake_v2_router(*, provider_dependency: Callable[[], Any]) -> APIRou
             return _request_too_large_response()
 
         provider = _resolve_provider_dependency(request, provider_dependency)
+        if provider is None:
+            return _safe_readiness_response(status_code=503, status="unavailable")
 
         try:
             response = run_public_intake_v2(
@@ -70,6 +72,21 @@ def create_intake_v2_router(*, provider_dependency: Callable[[], Any]) -> APIRou
             return _safe_failure_response(status_code=500, code="pipeline_failed", category="pipeline")
 
         return JSONResponse(content=response, status_code=200)
+
+    @router.get("/intake/v2/status")
+    def status_intake_v2(
+        request: Request,
+        x_cvbrain_v2_api_key: str | None = Header(default=None, alias=V2_ACCESS_KEY_HEADER),
+    ) -> JSONResponse:
+        auth_failure = _v2_auth_failure_response(x_cvbrain_v2_api_key)
+        if auth_failure is not None:
+            return auth_failure
+
+        provider = _resolve_provider_dependency(request, provider_dependency)
+        if provider is None:
+            return _safe_readiness_response(status_code=503, status="unavailable")
+
+        return _safe_readiness_response(status_code=200, status="ready")
 
     return router
 
@@ -114,6 +131,10 @@ def _present_text(value: Any) -> bool:
 
 def _request_too_large_response() -> JSONResponse:
     return _safe_failure_response(status_code=413, code="request_too_large", category="request_validation")
+
+
+def _safe_readiness_response(*, status_code: int, status: str) -> JSONResponse:
+    return JSONResponse(content={"status": status}, status_code=status_code)
 
 
 def _safe_failure_response(*, status_code: int, code: str, category: str) -> JSONResponse:

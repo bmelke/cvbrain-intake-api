@@ -328,6 +328,14 @@ def assert_public_failure(value: Mapping[str, Any]) -> None:
     assert_no_forbidden_keys(value)
 
 
+def assert_safe_unavailable(value: Mapping[str, Any]) -> None:
+    assert value.get("status") == "unavailable"
+    assert "display_plan" not in value
+    assert_sensitive_sentinels_absent(value)
+    assert_semantic_sentinels_absent(value)
+    assert_no_forbidden_keys(value)
+
+
 def assert_pipeline_called_once_with_exact_inputs(
     pipeline: RecordingPipeline,
     provider: FakeInjectedProvider,
@@ -452,6 +460,14 @@ def test_app_level_v2_route_without_override_fails_safely_without_live_config(mo
                 AssertionError("missing V2 config must not build provider")
             ),
         )
+    endpoint = registered_intake_v2_endpoint(main.app)
+    monkeypatch.setitem(
+        endpoint.__globals__,
+        "run_public_intake_v2",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("missing V2 config must return unavailable before pipeline")
+        ),
+    )
     client = TestClient(main.app)
 
     response = client.post(
@@ -460,10 +476,9 @@ def test_app_level_v2_route_without_override_fails_safely_without_live_config(mo
         headers=auth_headers(),
     )
 
-    assert response.status_code in {500, 503}
+    assert response.status_code == 503
     body = response.json()
-    assert_public_failure(body)
-    assert body["error"]["category"] in {"provider", "configuration", "pipeline"}
+    assert_safe_unavailable(body)
     assert_sensitive_sentinels_absent(body)
     assert_semantic_sentinels_absent(body)
 
