@@ -17,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 APP_MAIN_MODULE = "app.main"
 APP_MAIN_PATH = ROOT / "app" / "main.py"
 ENDPOINT_PATH = "/intake/v2/analyze"
+V2_AUTH_ENV = "CVBRAIN_INTAKE_V2_API_KEY"
+V2_AUTH_HEADER = "X-CVBrain-V2-API-Key"
+V2_AUTH_SECRET = "SERVER_SECRET_SENTINEL"
 SOURCE_TEXT = (
     "SOURCE_TEXT_SENTINEL papeles en regla, oficial de primera, licencia profesional, "
     "bloqueante, nice to have, required."
@@ -28,6 +31,7 @@ SENSITIVE_SENTINELS = (
     "PROMPT_BODY_SENTINEL",
     "RAW_OUTPUT_SENTINEL",
     "SECRET_TOKEN_SENTINEL",
+    "SERVER_SECRET_SENTINEL",
     "API_KEY_SENTINEL",
     "BEARER_SENTINEL",
 )
@@ -133,12 +137,17 @@ def client_with_fake_v2_provider(
     provider_dependency = required_attr(main, "get_intake_v2_provider")
     provider = provider or FakeInjectedProvider()
     pipeline = pipeline or RecordingPipeline()
+    monkeypatch.setenv(V2_AUTH_ENV, V2_AUTH_SECRET)
     endpoint = registered_intake_v2_endpoint(app)
     if "run_public_intake_v2" not in endpoint.__globals__:
         pytest.fail("registered V2 app route must call run_public_intake_v2")
     monkeypatch.setitem(endpoint.__globals__, "run_public_intake_v2", pipeline)
     app.dependency_overrides[provider_dependency] = lambda: provider
     return TestClient(app), pipeline, provider, app
+
+
+def auth_headers() -> dict[str, str]:
+    return {V2_AUTH_HEADER: V2_AUTH_SECRET}
 
 
 def public_success_response(*, phrase: str = "papeles en regla") -> dict[str, Any]:
@@ -377,7 +386,11 @@ def test_app_level_v2_route_uses_fake_provider_override_and_returns_public_succe
 ):
     client, pipeline, provider, app = client_with_fake_v2_provider(monkeypatch)
     try:
-        response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+        response = client.post(
+            ENDPOINT_PATH,
+            json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+            headers=auth_headers(),
+        )
     finally:
         clear_dependency_overrides(app)
 
@@ -403,7 +416,7 @@ def test_app_level_v2_invalid_request_returns_safe_400_without_pipeline_or_provi
 
     try:
         for payload in invalid_payloads:
-            response = client.post(ENDPOINT_PATH, json=payload)
+            response = client.post(ENDPOINT_PATH, json=payload, headers=auth_headers())
             assert response.status_code == 400
             body = response.json()
             assert_public_failure(body)
@@ -418,6 +431,7 @@ def test_app_level_v2_invalid_request_returns_safe_400_without_pipeline_or_provi
 
 
 def test_app_level_v2_route_without_override_fails_safely_without_live_config(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv(V2_AUTH_ENV, V2_AUTH_SECRET)
     monkeypatch.delenv("CVBRAIN_INTAKE_V2_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("CVBRAIN_INTAKE_V2_OPENAI_MODEL", raising=False)
     main = app_main_module()
@@ -440,7 +454,11 @@ def test_app_level_v2_route_without_override_fails_safely_without_live_config(mo
         )
     client = TestClient(main.app)
 
-    response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+    response = client.post(
+        ENDPOINT_PATH,
+        json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
+    )
 
     assert response.status_code in {500, 503}
     body = response.json()
@@ -455,7 +473,11 @@ def test_app_level_v2_public_failure_envelope_is_preserved(monkeypatch: pytest.M
     pipeline = RecordingPipeline(result=expected)
     client, pipeline, provider, app = client_with_fake_v2_provider(monkeypatch, pipeline=pipeline)
     try:
-        response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+        response = client.post(
+            ENDPOINT_PATH,
+            json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+            headers=auth_headers(),
+        )
     finally:
         clear_dependency_overrides(app)
 
@@ -480,6 +502,7 @@ def test_app_level_v2_phrase_changes_do_not_change_route_status_or_metadata_shap
                 "source_text": "papeles en regla oficial de primera licencia profesional bloqueante nice to have required",
                 "source_language": SOURCE_LANGUAGE,
             },
+            headers=auth_headers(),
         )
     finally:
         clear_dependency_overrides(first_app)
@@ -494,6 +517,7 @@ def test_app_level_v2_phrase_changes_do_not_change_route_status_or_metadata_shap
         second = second_client.post(
             ENDPOINT_PATH,
             json={"source_text": "changed AI-owned phrase with required", "source_language": SOURCE_LANGUAGE},
+            headers=auth_headers(),
         )
     finally:
         clear_dependency_overrides(second_app)
@@ -518,7 +542,11 @@ def test_app_level_v2_response_adds_no_wordpress_ui_v1_or_legacy_shape(
 ):
     client, _pipeline, _provider, app = client_with_fake_v2_provider(monkeypatch)
     try:
-        response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+        response = client.post(
+            ENDPOINT_PATH,
+            json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+            headers=auth_headers(),
+        )
     finally:
         clear_dependency_overrides(app)
 
@@ -559,7 +587,11 @@ def test_app_level_v2_logs_are_absent_or_metadata_allowlisted(
     client, _pipeline, _provider, app = client_with_fake_v2_provider(monkeypatch)
     try:
         with caplog.at_level(logging.INFO, logger="cvbrain.intake_v2.app"):
-            response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+            response = client.post(
+                ENDPOINT_PATH,
+                json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+                headers=auth_headers(),
+            )
     finally:
         clear_dependency_overrides(app)
 

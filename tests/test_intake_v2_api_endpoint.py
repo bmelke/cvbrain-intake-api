@@ -20,6 +20,9 @@ API_MODULE = "app.intake_v2.api"
 API_PATH = ROOT / "app" / "intake_v2" / "api.py"
 PACKAGE_INIT = ROOT / "app" / "intake_v2" / "__init__.py"
 ENDPOINT_PATH = "/intake/v2/analyze"
+V2_AUTH_ENV = "CVBRAIN_INTAKE_V2_API_KEY"
+V2_AUTH_HEADER = "X-CVBrain-V2-API-Key"
+V2_AUTH_SECRET = "SERVER_SECRET_SENTINEL"
 SOURCE_TEXT = (
     "SOURCE_TEXT_SENTINEL papeles en regla, oficial de primera, licencia profesional, "
     "bloqueante, nice to have, required."
@@ -121,10 +124,8 @@ FORBIDDEN_API_IMPORTS = {
     "app.intake_v2.shape_recovery",
     "dotenv",
     "openai",
-    "os",
     "requests",
     "httpx",
-    "secrets",
 }
 FORBIDDEN_PACKAGE_EXPORTS = {
     "analyze_intake_v2",
@@ -193,12 +194,17 @@ def create_test_client(
     module = api_module()
     provider = provider or FakeInjectedProvider()
     pipeline = pipeline or RecordingPipeline()
+    monkeypatch.setenv(V2_AUTH_ENV, V2_AUTH_SECRET)
     monkeypatch.setattr(module, "run_public_intake_v2", pipeline, raising=False)
 
     create_router = required_attr(module, "create_intake_v2_router")
     app = FastAPI()
     app.include_router(create_router(provider_dependency=lambda: provider))
     return TestClient(app), pipeline, provider
+
+
+def auth_headers() -> dict[str, str]:
+    return {V2_AUTH_HEADER: V2_AUTH_SECRET}
 
 
 def public_success_response(*, phrase: str = "papeles en regla") -> dict[str, Any]:
@@ -471,12 +477,10 @@ def test_api_module_imports_no_provider_config_env_ui_wordpress_or_v1_runtime():
     source_offenders = sorted(
         token
         for token in (
-            "api_key",
             "authorization",
             "bearer",
             "dotenv",
             "environ",
-            "getenv",
             "provider_config",
             "secret",
             "source_language_inferred",
@@ -492,7 +496,11 @@ def test_create_router_exposes_endpoint_without_app_main_registration(monkeypatc
     before_main = sys.modules.get("app.main")
     client, pipeline, provider = create_test_client(monkeypatch)
 
-    response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+    response = client.post(
+        ENDPOINT_PATH,
+        json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
+    )
 
     assert response.status_code == 200
     assert response.json() == public_success_response()
@@ -516,7 +524,7 @@ def test_endpoint_requires_source_text_and_source_language_safely(monkeypatch: p
     ]
 
     for payload in invalid_payloads:
-        response = client.post(ENDPOINT_PATH, json=payload)
+        response = client.post(ENDPOINT_PATH, json=payload, headers=auth_headers())
         assert response.status_code == 400
         body = response.json()
         assert_public_failure(body)
@@ -532,7 +540,11 @@ def test_valid_request_calls_public_pipeline_once_with_exact_inputs_and_injected
 ):
     client, pipeline, provider = create_test_client(monkeypatch)
 
-    response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+    response = client.post(
+        ENDPOINT_PATH,
+        json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
+    )
 
     assert response.status_code == 200
     assert response.json() == public_success_response()
@@ -545,7 +557,11 @@ def test_endpoint_returns_public_success_envelope_unchanged(monkeypatch: pytest.
     pipeline = RecordingPipeline(result=expected)
     client, pipeline, _provider = create_test_client(monkeypatch, pipeline=pipeline)
 
-    response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+    response = client.post(
+        ENDPOINT_PATH,
+        json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
+    )
 
     assert response.status_code == 200
     assert response.json() == expected
@@ -559,7 +575,11 @@ def test_pipeline_public_failure_envelope_returns_unchanged_without_display_or_u
     pipeline = RecordingPipeline(result=expected)
     client, pipeline, provider = create_test_client(monkeypatch, pipeline=pipeline)
 
-    response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+    response = client.post(
+        ENDPOINT_PATH,
+        json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
+    )
 
     assert response.status_code == 200
     assert response.json() == expected
@@ -571,7 +591,11 @@ def test_pipeline_exception_returns_safe_http_failure_without_sensitive_content(
     pipeline = RecordingPipeline(error=HostilePipelineError())
     client, pipeline, provider = create_test_client(monkeypatch, pipeline=pipeline)
 
-    response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+    response = client.post(
+        ENDPOINT_PATH,
+        json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
+    )
 
     assert response.status_code == 500
     body = response.json()
@@ -592,6 +616,7 @@ def test_domain_phrase_changes_do_not_change_endpoint_behavior_or_metadata_shape
             "source_text": "papeles en regla oficial de primera licencia profesional bloqueante nice to have required",
             "source_language": SOURCE_LANGUAGE,
         },
+        headers=auth_headers(),
     )
     monkeypatch.undo()
 
@@ -600,6 +625,7 @@ def test_domain_phrase_changes_do_not_change_endpoint_behavior_or_metadata_shape
     second = second_client.post(
         ENDPOINT_PATH,
         json={"source_text": "changed AI-owned phrase with required", "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
     )
 
     assert first.status_code == second.status_code == 200
@@ -620,7 +646,11 @@ def test_domain_phrase_changes_do_not_change_endpoint_behavior_or_metadata_shape
 def test_endpoint_response_does_not_add_wordpress_ui_v1_or_legacy_fields(monkeypatch: pytest.MonkeyPatch):
     client, _pipeline, _provider = create_test_client(monkeypatch)
 
-    response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+    response = client.post(
+        ENDPOINT_PATH,
+        json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
+    )
 
     body = response.json()
     assert_no_forbidden_keys(body)
@@ -653,7 +683,11 @@ def test_endpoint_logs_are_absent_or_metadata_allowlisted(
     client, _pipeline, _provider = create_test_client(monkeypatch, pipeline=pipeline)
 
     with caplog.at_level(logging.INFO, logger="cvbrain.intake_v2.api"):
-        response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+        response = client.post(
+            ENDPOINT_PATH,
+            json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+            headers=auth_headers(),
+        )
 
     assert response.status_code == 500
     assert_sensitive_sentinels_absent(caplog.text)

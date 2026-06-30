@@ -20,6 +20,9 @@ APP_MAIN_MODULE = "app.main"
 APP_MAIN_PATH = ROOT / "app" / "main.py"
 PROVIDER_CONFIG_MODULE = "app.intake_v2.provider_config"
 ENDPOINT_PATH = "/intake/v2/analyze"
+V2_AUTH_ENV = "CVBRAIN_INTAKE_V2_API_KEY"
+V2_AUTH_HEADER = "X-CVBrain-V2-API-Key"
+V2_AUTH_SECRET = "SERVER_SECRET_SENTINEL"
 V2_API_KEY_ENV = "CVBRAIN_INTAKE_V2_OPENAI_API_KEY"
 V2_MODEL_ENV = "CVBRAIN_INTAKE_V2_OPENAI_MODEL"
 FORBIDDEN_IMPORT_ENV_FRAGMENTS = ("CVBRAIN_INTAKE_V2", "OPENAI_API_KEY", "API_KEY", "SECRET", "TOKEN", "BEARER")
@@ -36,6 +39,7 @@ SENSITIVE_SENTINELS = (
     "PROMPT_BODY_SENTINEL",
     "RAW_OUTPUT_SENTINEL",
     "SECRET_TOKEN_SENTINEL",
+    "SERVER_SECRET_SENTINEL",
     "API_KEY_SENTINEL",
     "BEARER_SENTINEL",
     "AUTH_HEADER_SENTINEL",
@@ -195,6 +199,10 @@ def registered_intake_v2_endpoint(app: Any) -> Any:
 
 def clear_dependency_overrides(app: Any) -> None:
     app.dependency_overrides.clear()
+
+
+def auth_headers() -> dict[str, str]:
+    return {V2_AUTH_HEADER: V2_AUTH_SECRET}
 
 
 def public_success_response() -> dict[str, Any]:
@@ -375,6 +383,7 @@ def test_missing_v2_provider_config_returns_safe_unavailable_response_without_li
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ):
+    monkeypatch.setenv(V2_AUTH_ENV, V2_AUTH_SECRET)
     monkeypatch.delenv(V2_API_KEY_ENV, raising=False)
     monkeypatch.delenv(V2_MODEL_ENV, raising=False)
     caplog.set_level(logging.INFO)
@@ -384,7 +393,11 @@ def test_missing_v2_provider_config_returns_safe_unavailable_response_without_li
     client = TestClient(main.app)
 
     with provider_runtime_call_recorder() as provider_calls:
-        response = client.post(ENDPOINT_PATH, json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE})
+        response = client.post(
+            ENDPOINT_PATH,
+            json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+            headers=auth_headers(),
+        )
 
     assert response.status_code in {500, 503}
     body = response.json()
@@ -439,8 +452,11 @@ def test_dependency_override_bypasses_v2_config_and_still_uses_fake_provider(
     pipeline = RecordingPipeline()
     provider = FakeProvider()
     endpoint = registered_intake_v2_endpoint(app)
+    monkeypatch.setenv(V2_AUTH_ENV, V2_AUTH_SECRET)
 
     def forbidden_getenv(name: str, *_args: Any, **_kwargs: Any) -> str:
+        if name == V2_AUTH_ENV:
+            return V2_AUTH_SECRET
         raise AssertionError(f"dependency override must bypass env var {name}")
 
     def forbidden_builder(*_args: Any, **_kwargs: Any) -> Any:
@@ -454,6 +470,7 @@ def test_dependency_override_bypasses_v2_config_and_still_uses_fake_provider(
         response = TestClient(app).post(
             ENDPOINT_PATH,
             json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+            headers=auth_headers(),
         )
     finally:
         clear_dependency_overrides(app)
@@ -478,6 +495,7 @@ def test_invalid_v2_config_failure_does_not_leak_secret_sentinels(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ):
+    monkeypatch.setenv(V2_AUTH_ENV, V2_AUTH_SECRET)
     monkeypatch.setenv(V2_API_KEY_ENV, API_KEY)
     monkeypatch.setenv(V2_MODEL_ENV, "   ")
     caplog.set_level(logging.INFO)
@@ -487,6 +505,7 @@ def test_invalid_v2_config_failure_does_not_leak_secret_sentinels(
     response = TestClient(main.app).post(
         ENDPOINT_PATH,
         json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
     )
 
     assert response.status_code in {500, 503}
@@ -499,6 +518,7 @@ def test_app_provider_dependency_logs_are_absent_or_metadata_allowlisted(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ):
+    monkeypatch.setenv(V2_AUTH_ENV, V2_AUTH_SECRET)
     monkeypatch.delenv(V2_API_KEY_ENV, raising=False)
     monkeypatch.delenv(V2_MODEL_ENV, raising=False)
     caplog.set_level(logging.INFO, logger="cvbrain.intake_v2.app")
@@ -508,6 +528,7 @@ def test_app_provider_dependency_logs_are_absent_or_metadata_allowlisted(
     response = TestClient(main.app).post(
         ENDPOINT_PATH,
         json={"source_text": SOURCE_TEXT, "source_language": SOURCE_LANGUAGE},
+        headers=auth_headers(),
     )
 
     assert response.status_code in {500, 503}
