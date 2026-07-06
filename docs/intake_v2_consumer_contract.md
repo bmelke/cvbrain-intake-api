@@ -61,6 +61,17 @@ Top-level success fields include:
 
 Consumers should render safe response and display fields from `display_plan` and `metadata`. Consumers must not reinterpret semantic output from `display_plan`, must not remap it into local semantic categories, and must not derive new meaning from CVBrain-owned text.
 
+`display_plan` is the recruiter-facing Search Brief contract. Consumers render these CVBrain-owned sections separately:
+
+- `comparison_basis`: what CVBrain will use to compare CVs.
+- `must_have_criteria`: explicit hard requirements preserved by CVBrain.
+- `nice_to_have_criteria`: preferred or appreciated items preserved by CVBrain.
+- `questions_for_recruiter`: recruiter/company questions kept separate from criteria.
+- `missing_information_or_blockers`: missing information or blocker signals.
+- `recommended_next_steps`: safe next-step guidance from CVBrain-owned readiness data.
+
+Consumers must render criteria and questions separately. Consumers must not infer must-have or nice-to-have criteria from `questions_for_recruiter`, must not generate missing criteria themselves, and must not move questions into criteria. CVBrain owns semantic interpretation.
+
 ## Safe Error And Unavailable Handling
 
 Consumers must handle these statuses safely:

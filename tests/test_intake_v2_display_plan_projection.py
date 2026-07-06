@@ -40,14 +40,12 @@ RAW_LOCAL_REFS = (
     "candidate_q_alpha",
 )
 EXPECTED_SECTION_CODES = [
-    "job_profile",
-    "location_and_modality",
-    "criteria",
-    "company_questions",
-    "candidate_screening_questions",
-    "search_strategy",
-    "search_readiness",
-    "quality_control",
+    "comparison_basis",
+    "must_have_criteria",
+    "nice_to_have_criteria",
+    "questions_for_recruiter",
+    "missing_information_or_blockers",
+    "recommended_next_steps",
 ]
 ALLOWED_TOP_LEVEL_KEYS = {"display_plan"}
 ALLOWED_DISPLAY_PLAN_KEYS = {"schema_version", "version", "sections", "request_id"}
@@ -480,6 +478,61 @@ def test_display_plan_sections_are_structural_and_renderable():
     assert_renderable_sections(plan)
 
 
+def section_by_code(plan: Mapping[str, Any], code: str) -> Mapping[str, Any]:
+    for section in sections_from(plan):
+        if section.get("code") == code:
+            return section
+    raise AssertionError(f"missing display_plan section: {code}")
+
+
+def test_display_plan_exposes_stable_search_brief_sections_without_ui_inference():
+    plan = display_plan_from(service_success_result())
+
+    assert section_codes(plan) == EXPECTED_SECTION_CODES
+    assert section_by_code(plan, "comparison_basis")["label"] == "What CVBrain will use to compare CVs"
+    assert section_by_code(plan, "must_have_criteria")["label"] == "Must-have criteria"
+    assert section_by_code(plan, "nice_to_have_criteria")["label"] == "Nice-to-have criteria"
+    assert section_by_code(plan, "questions_for_recruiter")["label"] == "Questions for the recruiter"
+    assert section_by_code(plan, "missing_information_or_blockers")["label"] == "Missing information / blockers"
+    assert section_by_code(plan, "recommended_next_steps")["label"] == "Recommended next steps"
+
+
+def test_display_plan_preserves_criteria_and_questions_in_separate_stable_sections():
+    hard_req = "HARD_REQ_SENTINEL"
+    preferred_req = "PREF_REQ_SENTINEL"
+    recruiter_question = "QUESTION_SENTINEL"
+    draft = valid_draft(phrase=hard_req)
+    draft["criteria"][0]["text"] = hard_req
+    draft["criteria"][0]["source_evidence"] = hard_req
+    draft["criteria"][0]["importance"] = "must_have"
+    draft["criteria"][0]["clarification_question_ref"] = "company_q_alpha"
+    draft["criteria"][1]["text"] = preferred_req
+    draft["criteria"][1]["source_evidence"] = preferred_req
+    draft["criteria"][1]["importance"] = "nice_to_have"
+    draft["criteria"][1]["clarification_question_ref"] = "company_q_beta"
+    draft["company_questions"][0]["question"] = recruiter_question
+    result = {
+        **service_success_result(),
+        **internalize_draft_v2(draft),
+    }
+
+    plan = display_plan_from(result)
+    must_have_text = safe_json(section_by_code(plan, "must_have_criteria"))
+    nice_to_have_text = safe_json(section_by_code(plan, "nice_to_have_criteria"))
+    question_text = safe_json(section_by_code(plan, "questions_for_recruiter"))
+    full_plan = safe_json(plan)
+
+    assert hard_req in must_have_text
+    assert preferred_req in nice_to_have_text
+    assert recruiter_question in question_text
+    assert hard_req in full_plan
+    assert preferred_req in full_plan
+    assert recruiter_question not in must_have_text
+    assert recruiter_question not in nice_to_have_text
+    assert "provider_payload" not in full_plan
+    assert "raw_output" not in full_plan
+
+
 def test_display_plan_preserves_ai_owned_text_exactly():
     plan = display_plan_from(service_success_result())
     rendered = safe_json(plan)
@@ -525,14 +578,24 @@ def test_display_plan_excludes_unsafe_inputs_debug_fields_and_v1_projection():
 def test_display_plan_uses_safe_item_ids_without_draft_local_refs_or_semantic_text_ids():
     plan = display_plan_from(service_success_result())
     rendered = safe_json(plan)
-    rendered_id_refs = safe_json(id_ref_like_values(plan))
+    dynamic_id_refs = safe_json(
+        [
+            value
+            for value in id_ref_like_values(plan)
+            if not (
+                isinstance(value, str)
+                and value.startswith("dp_section_")
+                and any(code in value for code in EXPECTED_SECTION_CODES)
+            )
+        ]
+    )
 
     for local_ref in RAW_LOCAL_REFS:
         assert local_ref not in rendered
     for phrase in SEMANTIC_SENTINELS:
-        assert phrase not in rendered_id_refs
-        assert f"id_{phrase}" not in rendered_id_refs
-        assert phrase.replace(" ", "_") not in rendered_id_refs
+        assert phrase not in dynamic_id_refs
+        assert f"id_{phrase}" not in dynamic_id_refs
+        assert phrase.replace(" ", "_") not in dynamic_id_refs
     for section in sections_from(plan):
         for item in section["items"]:
             item_id = str(item["id"])

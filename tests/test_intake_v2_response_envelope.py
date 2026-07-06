@@ -522,6 +522,31 @@ def test_public_response_preserves_display_plan_exactly_without_semantic_rewrite
     assert "Papeles En Regla" not in rendered
 
 
+def test_public_response_preserves_stable_search_brief_sections():
+    service_result = service_success_result()
+    display_result = display_plan_result(service_result)
+
+    response = build_public_response_v2(service_result, display_plan=display_result)
+    sections = response["display_plan"]["sections"]
+
+    assert [section["code"] for section in sections] == [
+        "comparison_basis",
+        "must_have_criteria",
+        "nice_to_have_criteria",
+        "questions_for_recruiter",
+        "missing_information_or_blockers",
+        "recommended_next_steps",
+    ]
+    assert {section["label"] for section in sections} >= {
+        "What CVBrain will use to compare CVs",
+        "Must-have criteria",
+        "Nice-to-have criteria",
+        "Questions for the recruiter",
+        "Missing information / blockers",
+        "Recommended next steps",
+    }
+
+
 def test_phrase_changes_do_not_change_response_envelope_metadata_or_shape_except_copied_values():
     first_service = service_success_result(phrase="papeles en regla")
     second_service = service_success_result(phrase="changed AI-owned phrase")

@@ -12,26 +12,21 @@ from app.intake_v2.errors import V2DisplayPlanProjectionError
 DISPLAY_PLAN_SCHEMA_VERSION = "cvbrain_intake_v2_display_plan"
 
 SECTION_DEFINITIONS = [
-    ("job_profile", "Job profile"),
-    ("location_and_modality", "Location and modality"),
-    ("criteria", "Criteria"),
-    ("company_questions", "Company questions"),
-    ("candidate_screening_questions", "Candidate screening questions"),
-    ("search_strategy", "Search strategy"),
-    ("search_readiness", "Search readiness"),
-    ("quality_control", "Quality control"),
+    ("comparison_basis", "What CVBrain will use to compare CVs"),
+    ("must_have_criteria", "Must-have criteria"),
+    ("nice_to_have_criteria", "Nice-to-have criteria"),
+    ("questions_for_recruiter", "Questions for the recruiter"),
+    ("missing_information_or_blockers", "Missing information / blockers"),
+    ("recommended_next_steps", "Recommended next steps"),
 ]
 
-JOB_PROFILE_FIELDS = [
+COMPARISON_BASIS_FIELDS = [
     ("role_title", "Role title"),
     ("role_family", "Role family"),
     ("professional_grade", "Professional grade"),
     ("seniority", "Seniority"),
     ("summary", "Summary"),
     ("industries", "Industries"),
-]
-
-LOCATION_FIELDS = [
     ("raw_location", "Raw location"),
     ("normalized_location", "Normalized location"),
     ("country_code", "Country code"),
@@ -41,9 +36,6 @@ LOCATION_FIELDS = [
     ("remote_allowed", "Remote allowed"),
     ("hybrid_allowed", "Hybrid allowed"),
     ("onsite_required", "Onsite required"),
-]
-
-SEARCH_STRATEGY_FIELDS = [
     ("target_titles", "Target titles"),
     ("search_terms", "Search terms"),
     ("semantic_terms", "Semantic terms"),
@@ -121,23 +113,54 @@ def _sections(document: Mapping[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _items_for_section(section_order: int, code: str, document: Mapping[str, Any]) -> List[Dict[str, Any]]:
-    if code == "job_profile":
-        return _mapping_field_items(section_order, _mapping_section(document, code), JOB_PROFILE_FIELDS)
-    if code == "location_and_modality":
-        return _mapping_field_items(section_order, _mapping_section(document, code), LOCATION_FIELDS)
-    if code == "criteria":
-        return _criteria_items(section_order, _list_section(document, code))
-    if code == "company_questions":
-        return _question_items(section_order, "company_question", _list_section(document, code))
-    if code == "candidate_screening_questions":
-        return _question_items(section_order, "candidate_question", _list_section(document, code))
-    if code == "search_strategy":
-        return _mapping_field_items(section_order, _mapping_section(document, code), SEARCH_STRATEGY_FIELDS)
-    if code == "search_readiness":
-        return _mapping_field_items(section_order, _mapping_section(document, code), READINESS_FIELDS)
-    if code == "quality_control":
-        return _mapping_field_items(section_order, _mapping_section(document, code), QUALITY_CONTROL_FIELDS)
+    if code == "comparison_basis":
+        return _comparison_basis_items(section_order, document)
+    if code == "must_have_criteria":
+        return _criteria_items(section_order, _criteria_by_importance(document, {"must_have"}))
+    if code == "nice_to_have_criteria":
+        return _criteria_items(section_order, _criteria_by_importance(document, {"should_have", "nice_to_have"}))
+    if code == "questions_for_recruiter":
+        return _question_items(section_order, "company_question", _list_section(document, "company_questions"))
+    if code == "missing_information_or_blockers":
+        return _missing_information_or_blocker_items(section_order, document)
+    if code == "recommended_next_steps":
+        return _mapping_field_items(section_order, _mapping_section(document, "search_readiness"), READINESS_FIELDS)
     return []
+
+
+def _comparison_basis_items(section_order: int, document: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    source = {
+        **dict(_mapping_section(document, "job_profile")),
+        **dict(_mapping_section(document, "location_and_modality")),
+        **dict(_mapping_section(document, "search_strategy")),
+    }
+    return _mapping_field_items(section_order, source, COMPARISON_BASIS_FIELDS)
+
+
+def _criteria_by_importance(document: Mapping[str, Any], allowed: set[str]) -> list[Any]:
+    return [
+        criterion
+        for criterion in _list_section(document, "criteria")
+        if isinstance(criterion, Mapping) and criterion.get("importance") in allowed
+    ]
+
+
+def _missing_information_or_blocker_items(section_order: int, document: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    items = _criteria_items(section_order, _criteria_by_importance(document, {"blocker"}))
+    offset = len(items)
+    warnings = _mapping_section(document, "quality_control").get("warnings")
+    if warnings:
+        items.append(
+            _display_item(
+                section_order=section_order,
+                order=offset,
+                code="warnings",
+                kind="field",
+                label="Warnings",
+                copied_value=warnings,
+            )
+        )
+    return items
 
 
 def _mapping_field_items(

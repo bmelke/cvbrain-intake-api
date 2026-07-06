@@ -125,6 +125,12 @@ def test_v2_prompt_keeps_explicit_criteria_separate_from_clarifying_questions():
 
     for prompt in (extraction_prompt, repair_prompt):
         assert "Explicit criteria and recruiter questions contract:" in prompt
+        assert "populate explicit hard requirements under must-have criteria" in prompt
+        assert "populate explicit preferred or appreciated items under nice-to-have criteria" in prompt
+        assert "keep clarifying questions separate from criteria" in prompt
+        assert "never use questions as a substitute for criteria" in prompt
+        assert "preserve explicit criteria even when clarification is needed" in prompt
+        assert "surface ambiguity as a question in addition to preserved criteria" in prompt
         assert "Clarifying questions must not replace, suppress, delete, or downgrade explicit criteria" in prompt
         assert "If evidence, validation, scope, or precision is unclear, keep the explicit criterion" in prompt
         assert "ask a separate recruiter/company clarification question" in prompt
@@ -132,6 +138,7 @@ def test_v2_prompt_keeps_explicit_criteria_separate_from_clarifying_questions():
         assert "Do not remove explicit requirements" in prompt
         assert "Do not downgrade a must-have to a question only" in prompt
         assert "Do not invent missing requirements" in prompt
+        assert "Do not delete explicit requirements" in prompt
         assert "no less than" in prompt
         assert "fundamental" in prompt
         assert "essential" in prompt

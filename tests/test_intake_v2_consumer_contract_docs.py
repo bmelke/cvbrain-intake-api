@@ -114,6 +114,21 @@ def test_consumer_contract_documents_public_response_envelope_without_reinterpre
     assert V2_RESPONSE_SCHEMA_VERSION in text
     assert_terms_near(text, "display_plan", "render", "safe")
     assert_terms_near(text, "display_plan", "must not", "reinterpret", "semantic")
+    assert_terms_near(text, "display_plan", "recruiter-facing", "Search Brief", "contract")
+    for section in (
+        "comparison_basis",
+        "must_have_criteria",
+        "nice_to_have_criteria",
+        "questions_for_recruiter",
+        "missing_information_or_blockers",
+        "recommended_next_steps",
+    ):
+        assert section in text
+    assert_terms_near(text, "must_have_criteria", "explicit", "hard", "requirements")
+    assert_terms_near(text, "nice_to_have_criteria", "preferred", "appreciated", "items")
+    assert_terms_near(text, "questions_for_recruiter", "separate", "criteria")
+    assert_terms_near(text, "questions_for_recruiter", "must not", "infer", "must-have", "nice-to-have")
+    assert_terms_near(text, "questions_for_recruiter", "must not", "generate", "missing criteria")
 
 
 def test_consumer_contract_documents_safe_error_and_unavailable_handling():

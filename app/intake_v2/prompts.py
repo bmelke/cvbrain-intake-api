@@ -45,11 +45,18 @@ V2_AI_LANGUAGE_AND_CORRECTION_CONTRACT = """AI-owned language and light correcti
 """
 
 V2_EXPLICIT_CRITERIA_QUESTIONS_CONTRACT = """Explicit criteria and recruiter questions contract:
+- In the AI-owned criteria list, populate explicit hard requirements under must-have criteria by setting criteria[].importance to must_have.
+- In the AI-owned criteria list, populate explicit preferred or appreciated items under nice-to-have criteria by setting criteria[].importance to should_have or nice_to_have.
+- Always keep clarifying questions separate from criteria in company_questions.
+- never use questions as a substitute for criteria.
+- preserve explicit criteria even when clarification is needed.
+- surface ambiguity as a question in addition to preserved criteria.
 - Explicit requirements must remain criteria even when a recruiter/company clarification question is also needed.
 - Clarifying questions must not replace, suppress, delete, or downgrade explicit criteria.
 - If evidence, validation, scope, or precision is unclear, keep the explicit criterion and ask a separate recruiter/company clarification question.
 - Ambiguity becomes a question, not deletion of the explicit requirement.
 - Do not remove explicit requirements.
+- Do not delete explicit requirements.
 - Do not downgrade a must-have to a question only.
 - Do not invent missing requirements.
 - Explicit hard or near-hard cues such as required, must, essential, fundamental, no less than, minimum, mandatory, obligatory, excluyente, imprescindible, obligatorio, requerido, no menos de, minimo, and minimo de are AI-owned semantic signals for must-have criteria.
