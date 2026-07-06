@@ -551,6 +551,20 @@ def test_valid_request_calls_public_pipeline_once_with_exact_inputs_and_injected
     assert_pipeline_called_once_with_exact_inputs(pipeline, provider)
 
 
+def test_endpoint_accepts_auto_source_language_as_explicit_ai_owned_value(monkeypatch: pytest.MonkeyPatch):
+    client, pipeline, provider = create_test_client(monkeypatch)
+
+    response = client.post(
+        ENDPOINT_PATH,
+        json={"source_text": SOURCE_TEXT, "source_language": "auto"},
+        headers=auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == public_success_response()
+    assert_pipeline_called_once_with_exact_inputs(pipeline, provider, source_language="auto")
+
+
 def test_endpoint_returns_public_success_envelope_unchanged(monkeypatch: pytest.MonkeyPatch):
     expected = public_success_response()
     expected["metadata"]["request_id"] = "req_endpoint_external_safe"

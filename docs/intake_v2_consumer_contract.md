@@ -9,7 +9,7 @@ This document is operational and contractual only. It does not authorize WordPre
 Consumers use only these CVBrain Intake API V2 endpoints:
 
 - `GET /intake/v2/status`
-- `POST /intake/v2/analyze` accepts JSON with non-empty `source_text`; `source_language` must be explicit, and the consumer must not infer source_language in PHP. The consumer must not classify, normalize, map, or reinterpret job/domain content before sending.
+- `POST /intake/v2/analyze` accepts JSON with non-empty `source_text`; `source_language` must be explicit. The explicit value may be a known language code/name or `auto`. When `source_language` is `auto`, CVBrain AI determines the source language from `source_text`; the consumer must not infer source_language in PHP. The consumer must not correct grammar in PHP and must not classify, normalize, map, or reinterpret job/domain content before sending.
 
 Consumers send V2 authentication with:
 
@@ -32,7 +32,7 @@ Each legacy or Bearer auth option above is listed only to say it must not be use
 - `source_text`
 - `source_language`
 
-`source_text` must be non-empty. `source_language` must be explicit. The consumer must not infer source_language in PHP. The consumer must not classify, normalize, map, or reinterpret job/domain content before sending.
+`source_text` must be non-empty. `source_language` must be explicit. Consumers may send `source_language` as `auto` so CVBrain AI determines the source language from `source_text`. The consumer must not infer source_language in PHP. The consumer must not correct grammar, spelling, punctuation, accents, typos, titles, licenses, credentials, locations, numbers, or domain wording in PHP. The consumer must not classify, normalize, map, or reinterpret job/domain content before sending.
 
 The consumer passes the recruiter input as source text, represented only by a placeholder such as `<source text from recruiter input>` in documentation. Do not include real job descriptions, CV data, recruiter data, company names, email addresses, phone numbers, addresses, live CMS data, real site data, production records, private operational content, or semantic expected outputs.
 
@@ -84,6 +84,7 @@ Forbidden consumer behavior:
 - No blocker interpretation in WordPress/PHP.
 - No required/preferred/nice-to-have interpretation in WordPress/PHP.
 - No source_language inference in WordPress/PHP.
+- No grammar correction in WordPress/PHP.
 - No domain phrase mapping in WordPress/PHP.
 - No hardcoded title/role dictionaries in WordPress/PHP.
 - No fallback semantic logic in WordPress/PHP.
@@ -112,7 +113,7 @@ This doc does not authorize WordPress implementation. WordPress adapter work req
 
 WordPress must call CVBrain API server-side only. WordPress must render response safely. WordPress must not contain AI/domain interpretation. WordPress must not call OpenAI directly.
 
-WordPress adapter work must not add role/title interpretation, license interpretation, credential interpretation, blocker interpretation, required/preferred/nice-to-have interpretation, source_language inference, domain phrase mapping, hardcoded title/role dictionaries, fallback semantic logic, direct OpenAI calls, or provider execution logic.
+WordPress adapter work must not add role/title interpretation, license interpretation, credential interpretation, blocker interpretation, required/preferred/nice-to-have interpretation, source_language inference, grammar correction, domain phrase mapping, hardcoded title/role dictionaries, fallback semantic logic, direct OpenAI calls, or provider execution logic.
 
 ## Staging And Live Smoke Separation
 

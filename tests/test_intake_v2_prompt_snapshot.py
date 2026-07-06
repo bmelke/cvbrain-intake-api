@@ -100,3 +100,20 @@ def test_v2_prompt_uses_v2_schema_names_without_adding_outputs():
     assert "clarification_question_ref" in prompt
     assert "The AI returns" not in prompt
     assert "Do not return flat_compatibility, display_plan" in prompt
+
+
+def test_v2_prompt_makes_ai_own_auto_language_and_light_meaning_preserving_correction():
+    extraction_prompt = prompts.build_extraction_prompt("auto")
+    repair_prompt = prompts.build_repair_prompt("auto")
+
+    for prompt in (extraction_prompt, repair_prompt):
+        assert "Source text language detected as: auto." in prompt
+        assert "If source_language is \"auto\", determine the source language from source_text" in prompt
+        assert "Apply only light correction of obvious grammar, spelling, accent, punctuation, or typo errors" in prompt
+        assert "before semantic interpretation" in prompt
+        assert "Preserve original meaning" in prompt
+        assert "Do not invent missing details" in prompt
+        assert "Do not rewrite domain-specific facts" in prompt
+        assert "titles, seniority, locations, tools, technologies, numbers, licenses, or credentials" in prompt
+        assert "If a correction would be ambiguous, surface a question or missing-information item" in prompt
+        assert "Do not output a full corrected source text" in prompt

@@ -245,6 +245,41 @@ def test_display_plan_and_flat_duplicate_arrays_are_absent_from_provider_schema(
     assert not ({"must_have", "should_have", "nice_to_have", "blockers", "credentials"} & top_level_keys)
 
 
+def test_v2_runtime_does_not_infer_language_or_correct_source_text_in_python():
+    runtime_paths = [
+        ROOT / "app" / "intake_v2" / "api.py",
+        ROOT / "app" / "intake_v2" / "pipeline.py",
+        ROOT / "app" / "intake_v2" / "service.py",
+        ROOT / "app" / "intake_v2" / "provider.py",
+    ]
+    combined_source = "\n".join(path.read_text(encoding="utf-8") for path in runtime_paths).lower()
+
+    forbidden_runtime_tokens = (
+        "detect_language",
+        "language_detect",
+        "infer_language",
+        "inferred_source_language",
+        "language_detector",
+        "langdetect",
+        "source_language_map",
+        "language_map",
+        "normalize_source_language",
+        "normalise_source_language",
+        "correct_grammar",
+        "grammar_correction",
+        "spellcheck",
+        "spell_check",
+        "typo_correction",
+        "corrected_source_text",
+        "rewritten_source_text",
+        "normalized_source_text",
+        "normalised_source_text",
+    )
+
+    for token in forbidden_runtime_tokens:
+        assert token not in combined_source
+
+
 def test_v1_models_and_runtime_files_remain_unchanged():
     v1_paths = [
         "app/extractors/openai_structured.py",

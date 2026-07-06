@@ -90,8 +90,10 @@ def test_consumer_contract_documents_request_body_and_no_php_inference():
     for field in REQUIRED_BODY_FIELDS:
         assert field in text
     assert_terms_near(text, "source_text", "non-empty")
-    assert_terms_near(text, "source_language", "explicit", "must not infer", "php")
+    assert_terms_near(text, "source_language", "explicit", "auto", "must not infer", "php")
+    assert_terms_near(text, "source_language", "auto", "cvbrain", "ai", "determine")
     assert_terms_near(text, ANALYZE_PATH, "must not", "classify", "normalize", "job", "domain", "before sending")
+    assert_terms_near(text, "grammar", "must not", "correct", "php")
 
 
 def test_consumer_contract_documents_request_limits_and_413_handling():
@@ -153,6 +155,7 @@ def test_consumer_contract_locks_semantic_ownership_boundary():
         "blocker interpretation",
         "required/preferred/nice-to-have interpretation",
         "source_language inference",
+        "grammar correction",
         "domain phrase mapping",
         "hardcoded title/role dictionaries",
         "fallback semantic logic",

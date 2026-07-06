@@ -32,10 +32,25 @@ def _apply_schema_alignment_changes(text: str, target: str) -> str:
 V2_EXTRACTION_CONTRACT = _apply_schema_alignment_changes(PRESERVED_EXTRACTION_CONTRACT, "extraction")
 V2_LANGUAGE_CONTRACT = PRESERVED_LANGUAGE_CONTRACT
 V2_PUBLIC_OUTPUT_CONTRACT = _apply_schema_alignment_changes(PRESERVED_PUBLIC_OUTPUT_CONTRACT, "public")
+V2_AI_LANGUAGE_AND_CORRECTION_CONTRACT = """AI-owned language and light correction contract:
+- If source_language is "auto", determine the source language from source_text before semantic interpretation.
+- If source_language is not "auto", treat it as the consumer-declared source language while preserving source_text evidence.
+- Apply only light correction of obvious grammar, spelling, accent, punctuation, or typo errors before semantic interpretation.
+- Preserve original meaning.
+- Do not invent missing details.
+- Do not rewrite domain-specific facts.
+- Do not change titles, seniority, locations, tools, technologies, numbers, licenses, or credentials unless the correction is obvious and meaning-preserving.
+- If a correction would be ambiguous, surface a question or missing-information item instead of guessing.
+- Do not output a full corrected source text unless a future contract explicitly asks for it.
+"""
 
 
 def language_contract_for_source_language(source_language: str) -> str:
-    return V2_LANGUAGE_CONTRACT.format(source_language=source_language)
+    return (
+        V2_LANGUAGE_CONTRACT.rstrip()
+        + "\n\n"
+        + V2_AI_LANGUAGE_AND_CORRECTION_CONTRACT.strip()
+    ).format(source_language=source_language)
 
 
 def build_extraction_prompt(source_language: str) -> str:
