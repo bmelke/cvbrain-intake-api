@@ -44,6 +44,20 @@ V2_AI_LANGUAGE_AND_CORRECTION_CONTRACT = """AI-owned language and light correcti
 - Do not output a full corrected source text unless a future contract explicitly asks for it.
 """
 
+V2_EXPLICIT_CRITERIA_QUESTIONS_CONTRACT = """Explicit criteria and recruiter questions contract:
+- Explicit requirements must remain criteria even when a recruiter/company clarification question is also needed.
+- Clarifying questions must not replace, suppress, delete, or downgrade explicit criteria.
+- If evidence, validation, scope, or precision is unclear, keep the explicit criterion and ask a separate recruiter/company clarification question.
+- Ambiguity becomes a question, not deletion of the explicit requirement.
+- Do not remove explicit requirements.
+- Do not downgrade a must-have to a question only.
+- Do not invent missing requirements.
+- Explicit hard or near-hard cues such as required, must, essential, fundamental, no less than, minimum, mandatory, obligatory, excluyente, imprescindible, obligatorio, requerido, no menos de, minimo, and minimo de are AI-owned semantic signals for must-have criteria.
+- Explicit soft cues such as appreciated, preferred, nice to have, desirable, valorado, se valorara, se valorará, deseable, plus, and suma are AI-owned semantic signals for preferred or nice-to-have criteria.
+- Python, WordPress, and consumers must not classify requirement importance, infer must/preferred/nice-to-have meaning, or move criteria into questions.
+- Questions may be generated in addition to criteria, but never instead of the explicit criteria from source_text.
+"""
+
 
 def language_contract_for_source_language(source_language: str) -> str:
     return (
@@ -58,6 +72,8 @@ def build_extraction_prompt(source_language: str) -> str:
         V2_EXTRACTION_CONTRACT.rstrip()
         + "\n\n"
         + language_contract_for_source_language(source_language).strip()
+        + "\n\n"
+        + V2_EXPLICIT_CRITERIA_QUESTIONS_CONTRACT.strip()
         + "\n\n"
         + V2_PUBLIC_OUTPUT_CONTRACT.strip()
         + "\n"
@@ -74,6 +90,8 @@ def build_repair_prompt(source_language: str) -> str:
         "Do not invent facts, deterministic fallbacks, display_plan, flat compatibility output, "
         "canonical IDs, projections, or search execution output.\n\n"
         + language_contract_for_source_language(source_language).strip()
+        + "\n\n"
+        + V2_EXPLICIT_CRITERIA_QUESTIONS_CONTRACT.strip()
         + "\n\n"
         + V2_PUBLIC_OUTPUT_CONTRACT.strip()
         + "\n"

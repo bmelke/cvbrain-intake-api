@@ -117,3 +117,28 @@ def test_v2_prompt_makes_ai_own_auto_language_and_light_meaning_preserving_corre
         assert "titles, seniority, locations, tools, technologies, numbers, licenses, or credentials" in prompt
         assert "If a correction would be ambiguous, surface a question or missing-information item" in prompt
         assert "Do not output a full corrected source text" in prompt
+
+
+def test_v2_prompt_keeps_explicit_criteria_separate_from_clarifying_questions():
+    extraction_prompt = prompts.build_extraction_prompt("auto")
+    repair_prompt = prompts.build_repair_prompt("auto")
+
+    for prompt in (extraction_prompt, repair_prompt):
+        assert "Explicit criteria and recruiter questions contract:" in prompt
+        assert "Clarifying questions must not replace, suppress, delete, or downgrade explicit criteria" in prompt
+        assert "If evidence, validation, scope, or precision is unclear, keep the explicit criterion" in prompt
+        assert "ask a separate recruiter/company clarification question" in prompt
+        assert "Ambiguity becomes a question, not deletion of the explicit requirement" in prompt
+        assert "Do not remove explicit requirements" in prompt
+        assert "Do not downgrade a must-have to a question only" in prompt
+        assert "Do not invent missing requirements" in prompt
+        assert "no less than" in prompt
+        assert "fundamental" in prompt
+        assert "essential" in prompt
+        assert "required" in prompt
+        assert "must" in prompt
+        assert "appreciated" in prompt
+        assert "preferred" in prompt
+        assert "nice to have" in prompt
+        assert "AI-owned semantic signals" in prompt
+        assert "Python, WordPress, and consumers must not classify" in prompt
