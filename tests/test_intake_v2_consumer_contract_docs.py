@@ -132,6 +132,9 @@ def test_consumer_contract_documents_public_response_envelope_without_reinterpre
     assert_terms_near(text, "questions_for_recruiter", "must not", "generate", "missing criteria")
     assert_terms_near(text, "search_readiness", "render", "search", "recommended")
     assert_terms_near(text, "recommended_next_steps", "render", "next", "steps")
+    assert "recommendation_summary" in text
+    assert_terms_near(text, "recommendation_summary", "AI-owned", "human-readable", "recruiter-facing", "render")
+    assert_terms_near(text, "recommended_next_steps", "AI-owned", "human-readable", "recruiter-facing", "render")
     assert_terms_near(text, "search_readiness", "must not", "generate", "themselves")
     assert_terms_near(text, "recommended_next_steps", "must not", "generate", "themselves")
 

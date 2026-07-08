@@ -162,6 +162,8 @@ def test_v2_prompt_makes_search_readiness_ai_owned_and_separate_from_consumer_lo
         assert "search is possible but should be clarified" in prompt
         assert "search is not recommended yet because key information is missing" in prompt
         assert "Populate search_readiness from the recruiter source and extracted criteria/questions" in prompt
+        assert "Populate search_readiness.recommendation_summary with human-readable recruiter-facing text" in prompt
+        assert "Populate search_readiness.recommended_next_steps with human-readable recruiter-facing next steps" in prompt
         assert "recommended_next_steps" in prompt
         assert "Python, WordPress, and consumers must not decide search readiness" in prompt
         assert "must only render the AI-owned search_readiness values" in prompt

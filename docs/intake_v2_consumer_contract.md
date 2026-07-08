@@ -68,12 +68,12 @@ Consumers should render safe response and display fields from `display_plan` and
 - `nice_to_have_criteria`: preferred or appreciated items preserved by CVBrain.
 - `questions_for_recruiter`: recruiter/company questions kept separate from criteria.
 - `missing_information_or_blockers`: missing information or blocker signals.
-- `search_readiness`: search recommendation/readiness values from CVBrain.
-- `recommended_next_steps`: safe next-step guidance from CVBrain-owned readiness data.
+- `search_readiness`: search recommendation/readiness values from CVBrain, including the AI-owned `recommendation_summary` human-readable recruiter-facing text.
+- `recommended_next_steps`: safe next-step guidance from CVBrain-owned readiness data, rendered from the AI-owned `recommended_next_steps` human-readable recruiter-facing list.
 
 Consumers must render criteria and questions separately. Consumers must not infer must-have or nice-to-have criteria from `questions_for_recruiter`, must not generate missing criteria themselves, and must not move questions into criteria. CVBrain owns semantic interpretation.
 
-Consumers may render `search_readiness` to show whether search is recommended with the current information, possible but should be clarified, or not recommended yet because key information is missing. Consumers may render `recommended_next_steps` as CVBrain-owned next steps. Consumers must not generate search readiness or recommended next steps themselves.
+Consumers may render `search_readiness` to show whether search is recommended with the current information, possible but should be clarified, or not recommended yet because key information is missing. Consumers render `recommendation_summary` as AI-owned human-readable recruiter-facing readiness text and may render `recommended_next_steps` as AI-owned human-readable recruiter-facing next steps. Consumers must not generate search readiness, recommendation summaries, or recommended next steps themselves.
 
 ## Safe Error And Unavailable Handling
 

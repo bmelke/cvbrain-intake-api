@@ -111,6 +111,11 @@ def valid_payload() -> dict[str, Any]:
             "recommended_action": "ask_company",
             "recruiter_decision_required": True,
             "continued_with_missing_information": True,
+            "recommendation_summary": "La búsqueda puede iniciarse, pero conviene aclarar puntos clave antes de comparar CVs.",
+            "recommended_next_steps": [
+                "Responder las preguntas de precisión antes de avanzar.",
+                "Usar estos criterios como brief inicial de búsqueda.",
+            ],
         },
         "quality_control": {
             "warnings": [],
@@ -180,6 +185,25 @@ def test_application_model_and_provider_schema_stay_in_parity():
     assert set(provider_schema["$defs"]["CompanyQuestionDraftV2"]["properties"]) == set(
         model_schema["$defs"]["CompanyQuestionDraftV2"]["properties"]
     )
+
+
+def test_search_readiness_schema_includes_human_readable_public_fields():
+    schema = job_intelligence_v2_response_schema()
+    readiness_properties = schema["$defs"]["SearchReadinessDraftV2"]["properties"]
+
+    assert "recommendation_summary" in readiness_properties
+    assert "recommended_next_steps" in readiness_properties
+    assert readiness_properties["recommendation_summary"]["type"] == "string"
+    assert readiness_properties["recommended_next_steps"]["type"] == "array"
+
+
+def test_search_readiness_human_readable_public_fields_are_strictly_accepted():
+    payload = valid_payload()
+    validated = validate_job_intelligence_draft_v2(payload)
+
+    readiness = validated["search_readiness"]
+    assert readiness["recommendation_summary"] == payload["search_readiness"]["recommendation_summary"]
+    assert readiness["recommended_next_steps"] == payload["search_readiness"]["recommended_next_steps"]
 
 
 @pytest.mark.parametrize(

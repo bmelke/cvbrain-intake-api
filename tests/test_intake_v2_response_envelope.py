@@ -269,6 +269,11 @@ def valid_draft(*, phrase: str = "papeles en regla") -> dict[str, Any]:
                 "recommended_action": "ask_company",
                 "recruiter_decision_required": True,
                 "continued_with_missing_information": True,
+                "recommendation_summary": "La busqueda puede iniciar con advertencias y requiere aclarar puntos antes de comparar CVs.",
+                "recommended_next_steps": [
+                    "Responder las preguntas del brief antes de contactar candidatos.",
+                    "Usar los criterios explicitos como base inicial de busqueda.",
+                ],
             },
             "quality_control": {
                 "warnings": ["required and nice to have are copied AI-owned text"],
@@ -547,6 +552,20 @@ def test_public_response_preserves_stable_search_brief_sections():
         "Search recommendation",
         "Recommended next steps",
     }
+
+
+def test_public_response_preserves_schema_backed_human_readiness_text():
+    service_result = service_success_result()
+    display_result = display_plan_result(service_result)
+    response = build_public_response_v2(service_result, display_plan=display_result)
+    rendered = safe_json(response["display_plan"])
+
+    readiness = service_result["document"]["search_readiness"]
+    assert readiness["recommendation_summary"] in rendered
+    for step in readiness["recommended_next_steps"]:
+        assert step in rendered
+    assert "usable_with_warnings" not in rendered
+    assert "answer_clarifying_questions" not in rendered
 
 
 def test_phrase_changes_do_not_change_response_envelope_metadata_or_shape_except_copied_values():

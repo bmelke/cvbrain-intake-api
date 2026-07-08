@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Mapping, Optional, Type
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.intake_v2.errors import IntakeV2ContractError
 
@@ -150,6 +150,8 @@ class SearchReadinessDraftV2(StrictDraftV2Model):
     recommended_action: RecommendedActionV2
     recruiter_decision_required: bool
     continued_with_missing_information: bool
+    recommendation_summary: str = ""
+    recommended_next_steps: List[str] = Field(default_factory=list)
 
 
 class QualityControlDraftV2(StrictDraftV2Model):

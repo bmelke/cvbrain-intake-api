@@ -44,15 +44,10 @@ COMPARISON_BASIS_FIELDS = [
 ]
 
 SEARCH_READINESS_FIELDS = [
-    ("status", "Status"),
-    ("proceed_allowed", "Proceed allowed"),
-    ("recruiter_decision_required", "Recruiter decision required"),
-    ("continued_with_missing_information", "Continued with missing information"),
     ("recommendation_summary", "Recommendation summary"),
 ]
 
 RECOMMENDED_NEXT_STEP_FIELDS = [
-    ("recommended_action", "Recommended action"),
     ("recommended_next_steps", "Recommended next steps"),
 ]
 

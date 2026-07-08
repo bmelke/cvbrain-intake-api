@@ -246,6 +246,11 @@ def valid_draft(*, phrase: str = "papeles en regla") -> dict[str, Any]:
                 "recommended_action": "ask_company",
                 "recruiter_decision_required": True,
                 "continued_with_missing_information": True,
+                "recommendation_summary": "La busqueda puede iniciar con advertencias y requiere aclarar puntos antes de comparar CVs.",
+                "recommended_next_steps": [
+                    "Responder las preguntas del brief antes de contactar candidatos.",
+                    "Usar los criterios explicitos como base inicial de busqueda.",
+                ],
             },
             "quality_control": {
                 "warnings": ["required and nice to have are source words only"],
@@ -515,12 +520,12 @@ def test_display_plan_preserves_criteria_questions_readiness_and_next_steps_in_s
     draft["criteria"][1]["importance"] = "nice_to_have"
     draft["criteria"][1]["clarification_question_ref"] = "company_q_beta"
     draft["company_questions"][0]["question"] = recruiter_question
+    draft["search_readiness"]["recommendation_summary"] = search_recommendation
+    draft["search_readiness"]["recommended_next_steps"] = [next_step]
     result = {
         **service_success_result(),
         **internalize_draft_v2(draft),
     }
-    result["document"]["search_readiness"]["recommendation_summary"] = search_recommendation
-    result["document"]["search_readiness"]["recommended_next_steps"] = [next_step]
 
     plan = display_plan_from(result)
     must_have_text = safe_json(section_by_code(plan, "must_have_criteria"))
@@ -545,6 +550,31 @@ def test_display_plan_preserves_criteria_questions_readiness_and_next_steps_in_s
     assert next_step not in nice_to_have_text
     assert "provider_payload" not in full_plan
     assert "raw_output" not in full_plan
+
+
+def test_display_plan_readiness_public_sections_use_schema_backed_human_text_not_machine_enums():
+    result = service_success_result()
+    readiness = result["document"]["search_readiness"]
+
+    assert readiness["recommendation_summary"]
+    assert readiness["recommended_next_steps"]
+
+    plan = display_plan_from(result)
+    readiness_text = safe_json(section_by_code(plan, "search_readiness"))
+    next_steps_text = safe_json(section_by_code(plan, "recommended_next_steps"))
+
+    assert readiness["recommendation_summary"] in readiness_text
+    for step in readiness["recommended_next_steps"]:
+        assert step in next_steps_text
+    for machine_value in (
+        readiness["status"],
+        str(readiness["proceed_allowed"]).lower(),
+        readiness["recommended_action"],
+        str(readiness["recruiter_decision_required"]).lower(),
+        str(readiness["continued_with_missing_information"]).lower(),
+    ):
+        assert machine_value not in readiness_text
+        assert machine_value not in next_steps_text
 
 
 def test_display_plan_preserves_ai_owned_text_exactly():
