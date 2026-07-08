@@ -535,6 +535,7 @@ def test_public_response_preserves_stable_search_brief_sections():
         "nice_to_have_criteria",
         "questions_for_recruiter",
         "missing_information_or_blockers",
+        "search_readiness",
         "recommended_next_steps",
     ]
     assert {section["label"] for section in sections} >= {
@@ -543,6 +544,7 @@ def test_public_response_preserves_stable_search_brief_sections():
         "Nice-to-have criteria",
         "Questions for the recruiter",
         "Missing information / blockers",
+        "Search recommendation",
         "Recommended next steps",
     }
 

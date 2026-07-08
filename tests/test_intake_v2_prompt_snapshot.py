@@ -149,3 +149,19 @@ def test_v2_prompt_keeps_explicit_criteria_separate_from_clarifying_questions():
         assert "nice to have" in prompt
         assert "AI-owned semantic signals" in prompt
         assert "Python, WordPress, and consumers must not classify" in prompt
+
+
+def test_v2_prompt_makes_search_readiness_ai_owned_and_separate_from_consumer_logic():
+    extraction_prompt = prompts.build_extraction_prompt("auto")
+    repair_prompt = prompts.build_repair_prompt("auto")
+
+    for prompt in (extraction_prompt, repair_prompt):
+        assert "AI-owned search readiness contract:" in prompt
+        assert "determine whether the current information is enough to recommend starting a CV search" in prompt
+        assert "search is recommended with current information" in prompt
+        assert "search is possible but should be clarified" in prompt
+        assert "search is not recommended yet because key information is missing" in prompt
+        assert "Populate search_readiness from the recruiter source and extracted criteria/questions" in prompt
+        assert "recommended_next_steps" in prompt
+        assert "Python, WordPress, and consumers must not decide search readiness" in prompt
+        assert "must only render the AI-owned search_readiness values" in prompt

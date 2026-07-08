@@ -45,6 +45,7 @@ EXPECTED_SECTION_CODES = [
     "nice_to_have_criteria",
     "questions_for_recruiter",
     "missing_information_or_blockers",
+    "search_readiness",
     "recommended_next_steps",
 ]
 ALLOWED_TOP_LEVEL_KEYS = {"display_plan"}
@@ -494,13 +495,16 @@ def test_display_plan_exposes_stable_search_brief_sections_without_ui_inference(
     assert section_by_code(plan, "nice_to_have_criteria")["label"] == "Nice-to-have criteria"
     assert section_by_code(plan, "questions_for_recruiter")["label"] == "Questions for the recruiter"
     assert section_by_code(plan, "missing_information_or_blockers")["label"] == "Missing information / blockers"
+    assert section_by_code(plan, "search_readiness")["label"] == "Search recommendation"
     assert section_by_code(plan, "recommended_next_steps")["label"] == "Recommended next steps"
 
 
-def test_display_plan_preserves_criteria_and_questions_in_separate_stable_sections():
+def test_display_plan_preserves_criteria_questions_readiness_and_next_steps_in_stable_sections():
     hard_req = "HARD_REQ_SENTINEL"
     preferred_req = "PREF_REQ_SENTINEL"
     recruiter_question = "QUESTION_SENTINEL"
+    search_recommendation = "SEARCH_RECOMMENDATION_SENTINEL"
+    next_step = "NEXT_STEP_SENTINEL"
     draft = valid_draft(phrase=hard_req)
     draft["criteria"][0]["text"] = hard_req
     draft["criteria"][0]["source_evidence"] = hard_req
@@ -515,20 +519,30 @@ def test_display_plan_preserves_criteria_and_questions_in_separate_stable_sectio
         **service_success_result(),
         **internalize_draft_v2(draft),
     }
+    result["document"]["search_readiness"]["recommendation_summary"] = search_recommendation
+    result["document"]["search_readiness"]["recommended_next_steps"] = [next_step]
 
     plan = display_plan_from(result)
     must_have_text = safe_json(section_by_code(plan, "must_have_criteria"))
     nice_to_have_text = safe_json(section_by_code(plan, "nice_to_have_criteria"))
     question_text = safe_json(section_by_code(plan, "questions_for_recruiter"))
+    search_readiness_text = safe_json(section_by_code(plan, "search_readiness"))
+    next_steps_text = safe_json(section_by_code(plan, "recommended_next_steps"))
     full_plan = safe_json(plan)
 
     assert hard_req in must_have_text
     assert preferred_req in nice_to_have_text
     assert recruiter_question in question_text
+    assert search_recommendation in search_readiness_text
+    assert next_step in next_steps_text
     assert hard_req in full_plan
     assert preferred_req in full_plan
     assert recruiter_question not in must_have_text
     assert recruiter_question not in nice_to_have_text
+    assert search_recommendation not in must_have_text
+    assert search_recommendation not in nice_to_have_text
+    assert next_step not in must_have_text
+    assert next_step not in nice_to_have_text
     assert "provider_payload" not in full_plan
     assert "raw_output" not in full_plan
 

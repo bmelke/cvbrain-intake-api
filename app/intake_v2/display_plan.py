@@ -17,6 +17,7 @@ SECTION_DEFINITIONS = [
     ("nice_to_have_criteria", "Nice-to-have criteria"),
     ("questions_for_recruiter", "Questions for the recruiter"),
     ("missing_information_or_blockers", "Missing information / blockers"),
+    ("search_readiness", "Search recommendation"),
     ("recommended_next_steps", "Recommended next steps"),
 ]
 
@@ -42,12 +43,17 @@ COMPARISON_BASIS_FIELDS = [
     ("negative_terms", "Negative terms"),
 ]
 
-READINESS_FIELDS = [
+SEARCH_READINESS_FIELDS = [
     ("status", "Status"),
     ("proceed_allowed", "Proceed allowed"),
-    ("recommended_action", "Recommended action"),
     ("recruiter_decision_required", "Recruiter decision required"),
     ("continued_with_missing_information", "Continued with missing information"),
+    ("recommendation_summary", "Recommendation summary"),
+]
+
+RECOMMENDED_NEXT_STEP_FIELDS = [
+    ("recommended_action", "Recommended action"),
+    ("recommended_next_steps", "Recommended next steps"),
 ]
 
 QUALITY_CONTROL_FIELDS = [
@@ -123,8 +129,10 @@ def _items_for_section(section_order: int, code: str, document: Mapping[str, Any
         return _question_items(section_order, "company_question", _list_section(document, "company_questions"))
     if code == "missing_information_or_blockers":
         return _missing_information_or_blocker_items(section_order, document)
+    if code == "search_readiness":
+        return _mapping_field_items(section_order, _mapping_section(document, "search_readiness"), SEARCH_READINESS_FIELDS)
     if code == "recommended_next_steps":
-        return _mapping_field_items(section_order, _mapping_section(document, "search_readiness"), READINESS_FIELDS)
+        return _mapping_field_items(section_order, _mapping_section(document, "search_readiness"), RECOMMENDED_NEXT_STEP_FIELDS)
     return []
 
 

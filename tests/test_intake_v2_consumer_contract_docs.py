@@ -121,6 +121,7 @@ def test_consumer_contract_documents_public_response_envelope_without_reinterpre
         "nice_to_have_criteria",
         "questions_for_recruiter",
         "missing_information_or_blockers",
+        "search_readiness",
         "recommended_next_steps",
     ):
         assert section in text
@@ -129,6 +130,10 @@ def test_consumer_contract_documents_public_response_envelope_without_reinterpre
     assert_terms_near(text, "questions_for_recruiter", "separate", "criteria")
     assert_terms_near(text, "questions_for_recruiter", "must not", "infer", "must-have", "nice-to-have")
     assert_terms_near(text, "questions_for_recruiter", "must not", "generate", "missing criteria")
+    assert_terms_near(text, "search_readiness", "render", "search", "recommended")
+    assert_terms_near(text, "recommended_next_steps", "render", "next", "steps")
+    assert_terms_near(text, "search_readiness", "must not", "generate", "themselves")
+    assert_terms_near(text, "recommended_next_steps", "must not", "generate", "themselves")
 
 
 def test_consumer_contract_documents_safe_error_and_unavailable_handling():
