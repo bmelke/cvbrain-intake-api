@@ -710,3 +710,56 @@ def test_response_logs_are_absent_or_metadata_allowlisted(caplog: pytest.LogCapt
     assert_semantic_sentinels_absent(caplog.text)
     for payload in response_log_payloads(caplog):
         assert set(payload) <= ALLOWED_LOG_KEYS
+
+def test_public_response_preserves_global_experience_questions_separate_from_criteria():
+    draft = valid_draft(phrase="experiencia previa")
+    draft["criteria"] = [
+        {
+            "local_ref": "crit_response_experience",
+            "criterion_kind": "experience",
+            "text": "experiencia en contextos similares",
+            "source_evidence": "experiencia previa",
+            "importance": "must_have",
+            "explicit": True,
+            "precision_status": "needs_clarification",
+            "missing_dimensions": ["duration", "scope", "evidence"],
+            "clarification_question_ref": "company_q_response_experience",
+        }
+    ]
+    draft["company_questions"] = [
+        {
+            "local_ref": "company_q_response_experience",
+            "question": "Que duracion, contexto similar y evidencia espera para la experiencia previa?",
+            "audience": "hiring_company",
+            "category": "search_precision",
+            "criterion_refs": ["crit_response_experience"],
+            "missing_dimensions": ["duration", "scope", "evidence"],
+            "blocking_level": "important",
+        },
+        {
+            "local_ref": "company_q_response_business",
+            "question": "Que salario, contrato, horario, modalidad/ubicacion y fecha de inicio aplican?",
+            "audience": "hiring_company",
+            "category": "job_configuration",
+            "criterion_refs": [],
+            "missing_dimensions": [],
+            "blocking_level": "important",
+        },
+    ]
+    draft["candidate_screening_questions"] = []
+    service_result = {
+        **service_success_result(),
+        **internalize_draft_v2(draft),
+    }
+    display_result = display_plan_result(service_result)
+
+    response = build_public_response_v2(service_result, display_plan=display_result)
+    sections = {section["code"]: section for section in response["display_plan"]["sections"]}
+    must_have_text = safe_json(sections["must_have_criteria"])
+    question_text = safe_json(sections["questions_for_recruiter"])
+
+    assert "experiencia en contextos similares" in must_have_text
+    assert "Que duracion, contexto similar" in question_text
+    assert "Que salario, contrato" in question_text
+    assert "Que duracion, contexto similar" not in must_have_text
+    assert "Que salario, contrato" not in must_have_text

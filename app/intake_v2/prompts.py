@@ -65,6 +65,27 @@ V2_EXPLICIT_CRITERIA_QUESTIONS_CONTRACT = """Explicit criteria and recruiter que
 - Questions may be generated in addition to criteria, but never instead of the explicit criteria from source_text.
 """
 
+
+V2_GLOBAL_EXPERIENCE_CLARIFICATION_CONTRACT = """Global experience clarification contract:
+- Treat vague experience requirements as a global intake-risk pattern across all searches and roles.
+- If the recruiter mentions experience or equivalent concepts without enough definition, preserve the explicit criterion and add relevant questions_for_recruiter.
+- Experience-like concepts include experiencia, trayectoria, background, practica/práctica, haber trabajado en, experiencia previa, posiciones similares, seniority, exposure, hands-on experience, proven experience, track record, domain experience, and experience with tools, tasks, people, industries, volumes, clients, payroll, operations, sales, logistics, or similar scopes.
+- Duration / time: when time, duration, years, seniority, or recency is missing, ask about required time in similar roles, tasks, tools, industries, or responsibilities.
+- Similarity: ask what prior roles, environments, industries, tasks, tools, people, clients, volumes, or contexts count as similar enough when similarity is unclear.
+- Depth: ask whether the person must have led, supervised, owned independently, executed, assisted, advised, or only been exposed to the work when responsibility depth is unclear.
+- Scale / volume: ask about relevant team size, people count, payroll size, transactions, clients, projects, production volume, budget, stock, routes, accounts, vendors, or equivalent scale when scale matters and is missing.
+- Recency: ask whether the experience must be recent and how recent when the source leaves recency unclear.
+- Evidence: ask what CV or interview evidence validates the experience when evidence is unclear.
+- Criticality: ask whether the experience is required/excluding, preferred, or just helpful when importance is unclear.
+- Do not ask every possible experience question every time; ask the most relevant missing experience dimensions for the specific search.
+- Contractual/business baseline: when absent and relevant, ask missing recruiter/company questions about salary/range, contract mode, schedule/availability, location/work modality, start date, hiring conditions, or similar business constraints.
+- Soft-skill assessment boundary: traits such as confiable, responsable, buena presencia, proactivo, ordenado, pulcro, autónomo, or comprometido may be preserved as criteria when present in source_text, and may ask what observable behaviors or evidence matter, but assessment technique belongs to the recruiter/team.
+- Do not frame a soft-skill question as if the hiring company must choose the recruiting or interview technique.
+- Protected traits: Age, sex, gender, and similar protected traits must not become search criteria. If the source says they are not relevant, ignore them as criteria.
+- Questions must remain separate from criteria in questions_for_recruiter. Must-have criteria stay in must-have criteria, nice-to-have criteria stay in nice-to-have criteria, and clarifying questions must not suppress explicit criteria.
+- Python, WordPress, and consumers must not classify experience, soft traits, protected traits, must-have importance, nice-to-have importance, or business-baseline gaps with local rules, dictionaries, keyword lists, or fallback heuristics.
+"""
+
 V2_SEARCH_READINESS_CONTRACT = """AI-owned search readiness contract:
 - CVBrain/AI must determine whether the current information is enough to recommend starting a CV search.
 - The answer may be: search is recommended with current information; search is possible but should be clarified; or search is not recommended yet because key information is missing.
@@ -95,6 +116,8 @@ def build_extraction_prompt(source_language: str) -> str:
         + "\n\n"
         + V2_EXPLICIT_CRITERIA_QUESTIONS_CONTRACT.strip()
         + "\n\n"
+        + V2_GLOBAL_EXPERIENCE_CLARIFICATION_CONTRACT.strip()
+        + "\n\n"
         + V2_SEARCH_READINESS_CONTRACT.strip()
         + "\n\n"
         + V2_PUBLIC_OUTPUT_CONTRACT.strip()
@@ -114,6 +137,8 @@ def build_repair_prompt(source_language: str) -> str:
         + language_contract_for_source_language(source_language).strip()
         + "\n\n"
         + V2_EXPLICIT_CRITERIA_QUESTIONS_CONTRACT.strip()
+        + "\n\n"
+        + V2_GLOBAL_EXPERIENCE_CLARIFICATION_CONTRACT.strip()
         + "\n\n"
         + V2_SEARCH_READINESS_CONTRACT.strip()
         + "\n\n"

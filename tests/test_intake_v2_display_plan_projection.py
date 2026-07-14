@@ -733,3 +733,79 @@ def test_display_plan_logs_are_metadata_only_if_logs_are_emitted(caplog: pytest.
     assert_semantic_sentinels_absent(caplog.text)
     for payload in display_log_payloads(caplog):
         assert set(payload) <= ALLOWED_LOG_KEYS
+
+def test_display_plan_keeps_global_experience_clarifications_as_questions_not_criteria():
+    draft = valid_draft(phrase="experiencia previa")
+    draft["criteria"] = [
+        {
+            "local_ref": "crit_experience_scope",
+            "criterion_kind": "experience",
+            "text": "experiencia en roles similares",
+            "source_evidence": "tenga experiencia",
+            "importance": "must_have",
+            "explicit": True,
+            "precision_status": "needs_clarification",
+            "missing_dimensions": ["duration", "scope", "evidence"],
+            "clarification_question_ref": "company_q_experience_duration",
+        },
+        {
+            "local_ref": "crit_confiable",
+            "criterion_kind": "soft_competency",
+            "text": "confiable",
+            "source_evidence": "sea confiable",
+            "importance": "must_have",
+            "explicit": True,
+            "precision_status": "needs_clarification",
+            "missing_dimensions": ["evidence"],
+            "clarification_question_ref": "company_q_soft_evidence",
+        },
+    ]
+    draft["company_questions"] = [
+        {
+            "local_ref": "company_q_experience_duration",
+            "question": "Cuanto tiempo de experiencia en roles similares se espera?",
+            "audience": "hiring_company",
+            "category": "search_precision",
+            "criterion_refs": ["crit_experience_scope"],
+            "missing_dimensions": ["duration"],
+            "blocking_level": "important",
+        },
+        {
+            "local_ref": "company_q_soft_evidence",
+            "question": "Que comportamientos observables evidencian que la persona es confiable?",
+            "audience": "hiring_company",
+            "category": "search_precision",
+            "criterion_refs": ["crit_confiable"],
+            "missing_dimensions": ["evidence"],
+            "blocking_level": "advisory",
+        },
+        {
+            "local_ref": "company_q_business_baseline",
+            "question": "Cual es el salario, modalidad de contrato, horario, disponibilidad, ubicacion/modalidad y fecha de inicio?",
+            "audience": "hiring_company",
+            "category": "job_configuration",
+            "criterion_refs": [],
+            "missing_dimensions": [],
+            "blocking_level": "important",
+        },
+    ]
+    draft["candidate_screening_questions"] = []
+    result = {
+        **service_success_result(),
+        **internalize_draft_v2(draft),
+    }
+
+    plan = display_plan_from(result)
+    must_have_text = safe_json(section_by_code(plan, "must_have_criteria"))
+    question_text = safe_json(section_by_code(plan, "questions_for_recruiter"))
+    full_plan = safe_json(plan)
+
+    assert "experiencia en roles similares" in must_have_text
+    assert "confiable" in must_have_text
+    assert "Cuanto tiempo de experiencia" in question_text
+    assert "comportamientos observables" in question_text
+    assert "salario, modalidad de contrato, horario" in question_text
+    assert "Cuanto tiempo de experiencia" not in must_have_text
+    assert "salario, modalidad de contrato" not in must_have_text
+    assert "edad" not in full_plan.lower()
+    assert "sexo" not in full_plan.lower()

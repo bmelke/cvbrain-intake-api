@@ -433,3 +433,69 @@ def _call_name(node: ast.AST) -> str:
             return f"{parent}.{node.attr}"
         return node.attr
     return ""
+
+def test_schema_accepts_global_experience_and_business_clarification_questions():
+    payload = valid_payload()
+    payload["criteria"][0].update(
+        {
+            "criterion_kind": "experience",
+            "text": "experiencia en roles similares",
+            "source_evidence": "experiencia previa",
+            "importance": "must_have",
+            "precision_status": "needs_clarification",
+            "missing_dimensions": ["duration", "scope", "level", "evidence", "importance"],
+            "clarification_question_ref": "q_1",
+        }
+    )
+    payload["company_questions"] = [
+        {
+            "local_ref": "q_1",
+            "question": "¿Cuánto tiempo, qué contexto similar, qué nivel de responsabilidad y qué evidencia validan la experiencia?",
+            "audience": "hiring_company",
+            "category": "search_precision",
+            "criterion_refs": ["crit_1"],
+            "missing_dimensions": ["duration", "scope", "level", "evidence", "importance"],
+            "blocking_level": "important",
+        },
+        {
+            "local_ref": "q_business_baseline",
+            "question": "¿Qué salario, contrato, horario, disponibilidad, modalidad, ubicación y fecha de inicio aplican?",
+            "audience": "hiring_company",
+            "category": "job_configuration",
+            "criterion_refs": [],
+            "missing_dimensions": ["modality", "geography"],
+            "blocking_level": "important",
+        },
+    ]
+
+    validated = validate_job_intelligence_draft_v2(payload)
+
+    assert validated["criteria"][0]["missing_dimensions"] == ["duration", "scope", "level", "evidence", "importance"]
+    assert validated["company_questions"][1]["category"] == "job_configuration"
+    assert validated["company_questions"][1]["criterion_refs"] == []
+
+
+def test_v2_runtime_does_not_add_global_experience_or_trait_keyword_classifiers():
+    runtime_paths = [
+        ROOT / "app" / "intake_v2" / "api.py",
+        ROOT / "app" / "intake_v2" / "pipeline.py",
+        ROOT / "app" / "intake_v2" / "service.py",
+        ROOT / "app" / "intake_v2" / "provider.py",
+        ROOT / "app" / "intake_v2" / "display_plan.py",
+        ROOT / "app" / "intake_v2" / "response.py",
+    ]
+    combined_source = "\n".join(path.read_text(encoding="utf-8") for path in runtime_paths).lower()
+
+    forbidden_runtime_tokens = (
+        "classify_experience",
+        "experience_keyword",
+        "experience_terms",
+        "soft_skill_terms",
+        "protected_trait_terms",
+        "confiable",
+        "responsable",
+        "pulcro",
+        "age_sex_gender",
+    )
+    for token in forbidden_runtime_tokens:
+        assert token not in combined_source

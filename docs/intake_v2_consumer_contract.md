@@ -66,7 +66,7 @@ Consumers should render safe response and display fields from `display_plan` and
 - `comparison_basis`: what CVBrain will use to compare CVs.
 - `must_have_criteria`: explicit hard requirements preserved by CVBrain.
 - `nice_to_have_criteria`: preferred or appreciated items preserved by CVBrain.
-- `questions_for_recruiter`: recruiter/company questions kept separate from criteria.
+- `questions_for_recruiter`: recruiter/company questions, including experience clarification for the most relevant missing dimensions and not every possible question, kept separate from criteria; consumers must not infer must-have or nice-to-have criteria, must not generate missing criteria, and PHP/WordPress must not classify experience from these questions.
 - `missing_information_or_blockers`: missing information or blocker signals.
 - `search_readiness`: search recommendation/readiness values from CVBrain, including the AI-owned `recommendation_summary` human-readable recruiter-facing text.
 - `recommended_next_steps`: safe next-step guidance from CVBrain-owned readiness data, rendered from the AI-owned `recommended_next_steps` human-readable recruiter-facing list.
@@ -74,6 +74,21 @@ Consumers should render safe response and display fields from `display_plan` and
 Consumers must render criteria and questions separately. Consumers must not infer must-have or nice-to-have criteria from `questions_for_recruiter`, must not generate missing criteria themselves, and must not move questions into criteria. CVBrain owns semantic interpretation.
 
 Consumers may render `search_readiness` to show whether search is recommended with the current information, possible but should be clarified, or not recommended yet because key information is missing. Consumers render `recommendation_summary` as AI-owned human-readable recruiter-facing readiness text and may render `recommended_next_steps` as AI-owned human-readable recruiter-facing next steps. Consumers must not generate search readiness, recommendation summaries, or recommended next steps themselves.
+
+
+## Global Vague-Experience Clarification
+
+Experience clarification is AI-owned by CVBrain. Vague experience requirements are a global intake-risk pattern, not a role-specific exception. When source text mentions experience, background, track record, prior similar roles, hands-on work, domain exposure, or experience with tools, tasks, people, industries, volumes, clients, payroll, operations, sales, logistics, or other work scopes without enough definition, CVBrain should ask the most relevant missing clarification questions and not every possible question.
+
+The global vague-experience clarification dimensions are duration/time, similarity, depth, scale/volume, recency, evidence, and criticality. CVBrain may ask how much time is expected, what roles/tasks/industries/contexts count as similar, whether the candidate must lead/supervise/own/execute/assist/advise, what scale or volume matters, whether the experience must be recent, what evidence validates it, and whether it is required, excluding, preferred, or helpful.
+
+Consumers render those CVBrain-owned questions in `questions_for_recruiter`. Consumers must keep experience questions separate from criteria, must not move questions into must-have or nice-to-have criteria, and must not generate criteria from missing experience details. Experience clarification must not be classified in PHP, WordPress, or other consumers; consumers must not classify experience, infer duration, infer similarity, infer depth, infer scale, infer recency, infer evidence, infer criticality, or add keyword dictionaries/fallback semantic logic.
+
+Soft-skill assessment boundary: traits such as confiable, responsable, pulcro, proactivo, ordenado, autónomo, or comprometido may be rendered if CVBrain includes them, and CVBrain may ask what observable behaviors or evidence matter. The recruiter/team owns assessment technique; consumers must not invent interview technique or make the hiring company choose a technique.
+
+Protected traits: age, sex, gender, and similar protected traits must not become criteria. If source text says those traits are not relevant, consumers should render only CVBrain's safe public output and must not create protected-trait criteria.
+
+Contractual/business baseline: when absent and relevant, CVBrain may ask recruiter/company questions about salary, contract mode, schedule, availability, location/work modality, start date, and similar business conditions. Consumers render those questions only; they must not answer or infer them.
 
 ## Safe Error And Unavailable Handling
 

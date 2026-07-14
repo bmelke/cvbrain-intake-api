@@ -167,3 +167,53 @@ def test_v2_prompt_makes_search_readiness_ai_owned_and_separate_from_consumer_lo
         assert "recommended_next_steps" in prompt
         assert "Python, WordPress, and consumers must not decide search readiness" in prompt
         assert "must only render the AI-owned search_readiness values" in prompt
+
+def test_v2_prompt_requires_global_vague_experience_clarification_contract():
+    extraction_prompt = prompts.build_extraction_prompt("auto")
+    repair_prompt = prompts.build_repair_prompt("auto")
+
+    for prompt in (extraction_prompt, repair_prompt):
+        assert "Global experience clarification contract:" in prompt
+        assert "vague experience requirements" in prompt
+        assert "across all searches and roles" in prompt
+        for experience_signal in (
+            "experiencia",
+            "trayectoria",
+            "background",
+            "practica",
+            "haber trabajado en",
+            "experiencia previa",
+            "posiciones similares",
+            "seniority",
+            "hands-on experience",
+            "track record",
+            "domain experience",
+        ):
+            assert experience_signal in prompt
+        for dimension in (
+            "Duration / time",
+            "Similarity",
+            "Depth",
+            "Scale / volume",
+            "Recency",
+            "Evidence",
+            "Criticality",
+        ):
+            assert dimension in prompt
+        assert "Do not ask every possible experience question every time" in prompt
+        assert "most relevant missing experience dimensions" in prompt
+        assert "ask about required time in similar roles, tasks, tools, industries, or responsibilities" in prompt
+        assert "observable behaviors or evidence" in prompt
+        assert "assessment technique belongs to the recruiter/team" in prompt
+        assert "Age, sex, gender" in prompt
+        assert "must not become search criteria" in prompt
+        assert "salary/range" in prompt
+        assert "contract mode" in prompt
+        assert "schedule/availability" in prompt
+        assert "location/work modality" in prompt
+        assert "start date" in prompt
+        assert "questions_for_recruiter" in prompt
+        assert "Questions must remain separate from criteria" in prompt
+        assert "Python, WordPress, and consumers must not classify experience" in prompt
+        assert "Responsable administrativo" not in prompt
+        assert "liquidar los sueldos de unas 90 personas" not in prompt

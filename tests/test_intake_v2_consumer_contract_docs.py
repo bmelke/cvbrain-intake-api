@@ -257,3 +257,33 @@ def test_consumer_contract_contains_no_literal_secrets_tokens_or_real_data_examp
     )
     for term in forbidden_semantic_fixture_terms:
         assert term not in lower
+
+def test_consumer_contract_documents_global_experience_questions_without_consumer_inference():
+    text = consumer_doc_text()
+
+    assert_terms_near(
+        text,
+        "global vague-experience clarification",
+        "duration/time",
+        "similarity",
+        "depth",
+        "scale/volume",
+        "recency",
+        "evidence",
+        "criticality",
+    )
+    assert_terms_near(text, "experience clarification", "most relevant", "missing", "not", "every")
+    assert_terms_near(text, "questions_for_recruiter", "experience", "separate", "criteria")
+    assert_terms_near(text, "soft-skill assessment boundary", "observable behaviors", "recruiter/team", "assessment technique")
+    assert_terms_near(text, "protected traits", "age", "sex", "gender", "must not", "criteria")
+    assert_terms_near(
+        text,
+        "contractual/business baseline",
+        "salary",
+        "contract mode",
+        "schedule",
+        "availability",
+        "location/work modality",
+        "start date",
+    )
+    assert_terms_near(text, "experience clarification", "must not", "php", "classify")
