@@ -274,7 +274,8 @@ def test_consumer_contract_documents_global_experience_questions_without_consume
     )
     assert_terms_near(text, "experience clarification", "most relevant", "missing", "not", "every")
     assert_terms_near(text, "questions_for_recruiter", "experience", "separate", "criteria")
-    assert_terms_near(text, "soft-skill assessment boundary", "observable behaviors", "recruiter/team", "assessment technique")
+    assert_terms_near(text, "soft-skill assessment boundary", "observable behaviors or evidence", "observable work behaviors", "attendance", "reliability evidence", "collaboration examples")
+    assert_terms_near(text, "soft-skill assessment boundary", "recruiter/team", "assessment technique")
     assert_terms_near(text, "protected traits", "age", "sex", "gender", "must not", "criteria")
     assert_terms_near(
         text,
@@ -289,8 +290,12 @@ def test_consumer_contract_documents_global_experience_questions_without_consume
         "location/work modality",
         "start date/urgency",
     )
-    assert_terms_near(text, "contractual/business baseline", "one compact grouped question", "acceptable")
-    assert_terms_near(text, "contractual/business baseline", "not", "candidate criteria")
-    assert_terms_near(text, "contractual_baseline_questions", "render", "cvbrain", "must not", "generate")
+    assert_terms_near(text, "contractual/business baseline", "canonical place", "contractual/business baseline gaps")
+    assert_terms_near(text, "contractual_baseline_questions", "should not repeat", "equivalent baseline questions", "company_questions")
+    assert_terms_near(text, "contractual_baseline_questions", "should not emit both", "grouped baseline question", "separate repeated baseline questions")
+    assert_terms_near(text, "contractual/business baseline", "one compact grouped question", "acceptable", after=1000)
+    assert_terms_near(text, "contractual/business baseline", "not", "candidate criteria", after=1200)
+    assert_terms_near(text, "contractual_baseline_questions", "render", "cvbrain", "must not", "generate", after=1500)
+    assert_terms_near(text, "contractual_baseline_questions", "must not", "deduplicate", "semantically", after=1500)
     assert "when absent and relevant" not in folded(text)
     assert_terms_near(text, "experience clarification", "must not", "php", "classify")

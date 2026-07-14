@@ -220,10 +220,19 @@ def test_v2_prompt_requires_global_vague_experience_clarification_contract():
         assert "ask concise recruiter-facing missing-information questions" in prompt
         assert "Do not convert contractual/business baseline questions into candidate criteria" in prompt
         assert "These are intake questions, not candidate criteria" in prompt
-        assert "one compact grouped question is acceptable" in prompt
+        assert "contractual_baseline_questions is the canonical place for contractual/business baseline gaps" in prompt
+        assert "do not repeat equivalent baseline questions in company_questions" in prompt
+        assert "do not duplicate them in company_questions" in prompt
+        assert "emit both a grouped baseline question and separate repeated baseline questions" in prompt
+        assert "One compact grouped question is acceptable" in prompt
         assert "questions_for_recruiter" in prompt
+        assert "observable work behaviors" in prompt
+        assert "attendance/reliability evidence" in prompt
+        assert "collaboration examples" in prompt
+        assert "prior-role evidence" in prompt
         assert "Questions must remain separate from criteria" in prompt
         assert "Python, WordPress, and consumers must not classify experience" in prompt
+        assert "must choose the recruiting or interview technique" in prompt
         assert "when absent and relevant" not in prompt
         assert "Responsable administrativo" not in prompt
         assert "liquidar los sueldos de unas 90 personas" not in prompt

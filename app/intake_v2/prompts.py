@@ -82,11 +82,12 @@ V2_GLOBAL_EXPERIENCE_CLARIFICATION_CONTRACT = """Global experience clarification
 - Always check whether the source includes the contractual/business baseline needed to start a recruiter search: hiring mode/contract type, salary/range, schedule/availability, work modality such as onsite, remote, hybrid, location/zone, and start date/urgency.
 - Populate search_readiness.contractual_baseline_questions to ask concise recruiter-facing missing-information questions when any contractual/business baseline fields are missing.
 - contractual_baseline_questions must cover missing hiring mode/contract type, salary/range, schedule/availability, work modality such as onsite, remote, hybrid, location/zone, and start date/urgency.
-- The display_plan will render contractual_baseline_questions under questions_for_recruiter; do not duplicate them unnecessarily in company_questions.
-- one compact grouped question is acceptable if it covers multiple missing contractual/business baseline fields without duplicating questions.
+- contractual_baseline_questions is the canonical place for contractual/business baseline gaps; do not repeat equivalent baseline questions in company_questions.
+- The display_plan will render contractual_baseline_questions under questions_for_recruiter; do not duplicate them in company_questions or emit both a grouped baseline question and separate repeated baseline questions for the same missing fields.
+- One compact grouped question is acceptable if it covers multiple missing contractual/business baseline fields without duplicating questions.
 - These are intake questions, not candidate criteria.
 - Do not convert contractual/business baseline questions into candidate criteria unless the source explicitly states them as candidate criteria.
-- Soft-skill assessment boundary: traits such as confiable, responsable, buena presencia, proactivo, ordenado, pulcro, autónomo, or comprometido may be preserved as criteria when present in source_text, and may ask what observable behaviors or evidence matter, but assessment technique belongs to the recruiter/team.
+- Soft-skill assessment boundary: traits such as confiable, responsable, buena presencia, proactivo, ordenado, pulcro, autónomo, or comprometido may be preserved as criteria when present in source_text, and may ask what observable behaviors or evidence matter, such as observable work behaviors, references, attendance/reliability evidence, collaboration examples, or prior-role evidence, but assessment technique belongs to the recruiter/team.
 - Do not frame a soft-skill question as if the hiring company must choose the recruiting or interview technique.
 - Protected traits: Age, sex, gender, and similar protected traits must not become search criteria. If the source says they are not relevant, ignore them as criteria.
 - Questions must remain separate from criteria in questions_for_recruiter. Must-have criteria stay in must-have criteria, nice-to-have criteria stay in nice-to-have criteria, and clarifying questions must not suppress explicit criteria.
