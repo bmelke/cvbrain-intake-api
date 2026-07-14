@@ -738,7 +738,7 @@ def test_public_response_preserves_global_experience_questions_separate_from_cri
         },
         {
             "local_ref": "company_q_response_business",
-            "question": "Que salario, contrato, horario, modalidad/ubicacion y fecha de inicio aplican?",
+            "question": "Que tipo de contrato/modalidad de contratacion, salario o rango, horario/disponibilidad, presencial/remoto/hibrido, ubicacion/zona y fecha de inicio/urgencia aplican?",
             "audience": "hiring_company",
             "category": "job_configuration",
             "criterion_refs": [],
@@ -760,6 +760,12 @@ def test_public_response_preserves_global_experience_questions_separate_from_cri
 
     assert "experiencia en contextos similares" in must_have_text
     assert "Que duracion, contexto similar" in question_text
-    assert "Que salario, contrato" in question_text
+    assert "tipo de contrato/modalidad de contratacion" in question_text
+    assert "salario o rango" in question_text
+    assert "horario/disponibilidad" in question_text
+    assert "presencial/remoto/hibrido" in question_text
+    assert "ubicacion/zona" in question_text
+    assert "fecha de inicio/urgencia" in question_text
     assert "Que duracion, contexto similar" not in must_have_text
-    assert "Que salario, contrato" not in must_have_text
+    assert "tipo de contrato/modalidad de contratacion" not in must_have_text
+    assert "salario o rango" not in must_have_text

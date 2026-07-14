@@ -459,7 +459,7 @@ def test_schema_accepts_global_experience_and_business_clarification_questions()
         },
         {
             "local_ref": "q_business_baseline",
-            "question": "¿Qué salario, contrato, horario, disponibilidad, modalidad, ubicación y fecha de inicio aplican?",
+            "question": "¿Qué tipo de contrato/modalidad de contratación, salario o rango, horario/disponibilidad, presencial/remoto/híbrido, ubicación/zona y fecha de inicio/urgencia aplican?",
             "audience": "hiring_company",
             "category": "job_configuration",
             "criterion_refs": [],

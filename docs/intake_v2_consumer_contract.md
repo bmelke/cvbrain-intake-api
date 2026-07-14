@@ -88,7 +88,7 @@ Soft-skill assessment boundary: traits such as confiable, responsable, pulcro, p
 
 Protected traits: age, sex, gender, and similar protected traits must not become criteria. If source text says those traits are not relevant, consumers should render only CVBrain's safe public output and must not create protected-trait criteria.
 
-Contractual/business baseline: when absent and relevant, CVBrain may ask recruiter/company questions about salary, contract mode, schedule, availability, location/work modality, start date, and similar business conditions. Consumers render those questions only; they must not answer or infer them.
+Contractual/business baseline is mandatory intake coverage for CVBrain Search Brief completeness. CVBrain should always check whether the source includes hiring mode or contract type, salary or salary range, schedule, availability, location/work modality, onsite/remote/hybrid modality, zone, and start date/urgency. If any are missing, CVBrain should ask concise recruiter/company missing-information questions. One compact grouped question is acceptable if it covers multiple missing contractual fields without duplicating questions. These are intake-completeness questions, not candidate criteria, unless the source explicitly states them as candidate criteria. Consumers render those questions only; they must not answer or infer them.
 
 ## Safe Error And Unavailable Handling
 

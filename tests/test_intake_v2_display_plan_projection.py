@@ -781,7 +781,7 @@ def test_display_plan_keeps_global_experience_clarifications_as_questions_not_cr
         },
         {
             "local_ref": "company_q_business_baseline",
-            "question": "Cual es el salario, modalidad de contrato, horario, disponibilidad, ubicacion/modalidad y fecha de inicio?",
+            "question": "Cual es el tipo de contrato/modalidad de contratacion, salario o rango, horario/disponibilidad, presencial/remoto/hibrido, ubicacion/zona y fecha de inicio/urgencia?",
             "audience": "hiring_company",
             "category": "job_configuration",
             "criterion_refs": [],
@@ -804,8 +804,15 @@ def test_display_plan_keeps_global_experience_clarifications_as_questions_not_cr
     assert "confiable" in must_have_text
     assert "Cuanto tiempo de experiencia" in question_text
     assert "comportamientos observables" in question_text
-    assert "salario, modalidad de contrato, horario" in question_text
+    assert "tipo de contrato/modalidad de contratacion" in question_text
+    assert "salario o rango" in question_text
+    assert "horario/disponibilidad" in question_text
+    assert "presencial/remoto/hibrido" in question_text
+    assert "ubicacion/zona" in question_text
+    assert "fecha de inicio/urgencia" in question_text
     assert "Cuanto tiempo de experiencia" not in must_have_text
-    assert "salario, modalidad de contrato" not in must_have_text
+    assert "tipo de contrato/modalidad de contratacion" not in must_have_text
+    assert "salario o rango" not in must_have_text
+    assert "presencial/remoto/hibrido" not in must_have_text
     assert "edad" not in full_plan.lower()
     assert "sexo" not in full_plan.lower()

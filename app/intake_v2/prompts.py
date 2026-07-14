@@ -78,7 +78,11 @@ V2_GLOBAL_EXPERIENCE_CLARIFICATION_CONTRACT = """Global experience clarification
 - Evidence: ask what CV or interview evidence validates the experience when evidence is unclear.
 - Criticality: ask whether the experience is required/excluding, preferred, or just helpful when importance is unclear.
 - Do not ask every possible experience question every time; ask the most relevant missing experience dimensions for the specific search.
-- Contractual/business baseline: when absent and relevant, ask missing recruiter/company questions about salary/range, contract mode, schedule/availability, location/work modality, start date, hiring conditions, or similar business constraints.
+- Contractual/business baseline is mandatory intake coverage for Search Brief completeness, not optional relevance-based guidance.
+- Always check whether the source includes the contractual/business baseline needed to start a recruiter search: hiring mode/contract type, salary/range, schedule/availability, work modality such as onsite, remote, hybrid, location/zone, and start date/urgency.
+- If any contractual/business baseline fields are missing, ask concise recruiter-facing missing-information questions in questions_for_recruiter.
+- one compact grouped question is acceptable if it covers multiple missing contractual/business baseline fields without duplicating questions.
+- Do not convert contractual/business baseline questions into candidate criteria unless the source explicitly states them as candidate criteria.
 - Soft-skill assessment boundary: traits such as confiable, responsable, buena presencia, proactivo, ordenado, pulcro, autónomo, or comprometido may be preserved as criteria when present in source_text, and may ask what observable behaviors or evidence matter, but assessment technique belongs to the recruiter/team.
 - Do not frame a soft-skill question as if the hiring company must choose the recruiting or interview technique.
 - Protected traits: Age, sex, gender, and similar protected traits must not become search criteria. If the source says they are not relevant, ignore them as criteria.

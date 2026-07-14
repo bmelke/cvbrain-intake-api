@@ -207,13 +207,20 @@ def test_v2_prompt_requires_global_vague_experience_clarification_contract():
         assert "assessment technique belongs to the recruiter/team" in prompt
         assert "Age, sex, gender" in prompt
         assert "must not become search criteria" in prompt
+        assert "mandatory intake coverage" in prompt
+        assert "Always check whether the source includes the contractual/business baseline" in prompt
         assert "salary/range" in prompt
-        assert "contract mode" in prompt
+        assert "hiring mode/contract type" in prompt
         assert "schedule/availability" in prompt
-        assert "location/work modality" in prompt
-        assert "start date" in prompt
+        assert "onsite, remote, hybrid" in prompt
+        assert "location/zone" in prompt
+        assert "start date/urgency" in prompt
+        assert "ask concise recruiter-facing missing-information questions" in prompt
+        assert "Do not convert contractual/business baseline questions into candidate criteria" in prompt
+        assert "one compact grouped question is acceptable" in prompt
         assert "questions_for_recruiter" in prompt
         assert "Questions must remain separate from criteria" in prompt
         assert "Python, WordPress, and consumers must not classify experience" in prompt
+        assert "when absent and relevant" not in prompt
         assert "Responsable administrativo" not in prompt
         assert "liquidar los sueldos de unas 90 personas" not in prompt
