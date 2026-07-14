@@ -193,17 +193,29 @@ def test_search_readiness_schema_includes_human_readable_public_fields():
 
     assert "recommendation_summary" in readiness_properties
     assert "recommended_next_steps" in readiness_properties
+    assert "contractual_baseline_questions" in readiness_properties
     assert readiness_properties["recommendation_summary"]["type"] == "string"
     assert readiness_properties["recommended_next_steps"]["type"] == "array"
+    assert readiness_properties["contractual_baseline_questions"]["type"] == "array"
 
 
 def test_search_readiness_human_readable_public_fields_are_strictly_accepted():
     payload = valid_payload()
+    contractual_questions = [
+        "CONTRACTUAL_Q_CONTRACT_TYPE_SENTINEL",
+        "CONTRACTUAL_Q_SALARY_SENTINEL",
+        "CONTRACTUAL_Q_SCHEDULE_SENTINEL",
+        "CONTRACTUAL_Q_WORK_MODALITY_SENTINEL",
+        "CONTRACTUAL_Q_LOCATION_SENTINEL",
+        "CONTRACTUAL_Q_START_DATE_SENTINEL",
+    ]
+    payload["search_readiness"]["contractual_baseline_questions"] = contractual_questions
     validated = validate_job_intelligence_draft_v2(payload)
 
     readiness = validated["search_readiness"]
     assert readiness["recommendation_summary"] == payload["search_readiness"]["recommendation_summary"]
     assert readiness["recommended_next_steps"] == payload["search_readiness"]["recommended_next_steps"]
+    assert readiness["contractual_baseline_questions"] == contractual_questions
 
 
 @pytest.mark.parametrize(
@@ -436,6 +448,14 @@ def _call_name(node: ast.AST) -> str:
 
 def test_schema_accepts_global_experience_and_business_clarification_questions():
     payload = valid_payload()
+    payload["search_readiness"]["contractual_baseline_questions"] = [
+        "CONTRACTUAL_Q_CONTRACT_TYPE_SENTINEL",
+        "CONTRACTUAL_Q_SALARY_SENTINEL",
+        "CONTRACTUAL_Q_SCHEDULE_SENTINEL",
+        "CONTRACTUAL_Q_WORK_MODALITY_SENTINEL",
+        "CONTRACTUAL_Q_LOCATION_SENTINEL",
+        "CONTRACTUAL_Q_START_DATE_SENTINEL",
+    ]
     payload["criteria"][0].update(
         {
             "criterion_kind": "experience",
@@ -473,6 +493,7 @@ def test_schema_accepts_global_experience_and_business_clarification_questions()
     assert validated["criteria"][0]["missing_dimensions"] == ["duration", "scope", "level", "evidence", "importance"]
     assert validated["company_questions"][1]["category"] == "job_configuration"
     assert validated["company_questions"][1]["criterion_refs"] == []
+    assert validated["search_readiness"]["contractual_baseline_questions"] == payload["search_readiness"]["contractual_baseline_questions"]
 
 
 def test_v2_runtime_does_not_add_global_experience_or_trait_keyword_classifiers():

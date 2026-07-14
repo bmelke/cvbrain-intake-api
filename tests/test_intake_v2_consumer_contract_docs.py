@@ -279,6 +279,7 @@ def test_consumer_contract_documents_global_experience_questions_without_consume
     assert_terms_near(
         text,
         "contractual/business baseline",
+        "contractual_baseline_questions",
         "mandatory intake coverage",
         "salary",
         "hiring mode",
@@ -290,5 +291,6 @@ def test_consumer_contract_documents_global_experience_questions_without_consume
     )
     assert_terms_near(text, "contractual/business baseline", "one compact grouped question", "acceptable")
     assert_terms_near(text, "contractual/business baseline", "not", "candidate criteria")
+    assert_terms_near(text, "contractual_baseline_questions", "render", "cvbrain", "must not", "generate")
     assert "when absent and relevant" not in folded(text)
     assert_terms_near(text, "experience clarification", "must not", "php", "classify")

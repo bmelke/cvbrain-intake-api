@@ -747,6 +747,14 @@ def test_public_response_preserves_global_experience_questions_separate_from_cri
         },
     ]
     draft["candidate_screening_questions"] = []
+    draft["search_readiness"]["contractual_baseline_questions"] = [
+        "CONTRACTUAL_Q_CONTRACT_TYPE_SENTINEL",
+        "CONTRACTUAL_Q_SALARY_SENTINEL",
+        "CONTRACTUAL_Q_SCHEDULE_SENTINEL",
+        "CONTRACTUAL_Q_WORK_MODALITY_SENTINEL",
+        "CONTRACTUAL_Q_LOCATION_SENTINEL",
+        "CONTRACTUAL_Q_START_DATE_SENTINEL",
+    ]
     service_result = {
         **service_success_result(),
         **internalize_draft_v2(draft),
@@ -766,6 +774,9 @@ def test_public_response_preserves_global_experience_questions_separate_from_cri
     assert "presencial/remoto/hibrido" in question_text
     assert "ubicacion/zona" in question_text
     assert "fecha de inicio/urgencia" in question_text
+    for sentinel in draft["search_readiness"]["contractual_baseline_questions"]:
+        assert sentinel in question_text
+        assert sentinel not in must_have_text
     assert "Que duracion, contexto similar" not in must_have_text
     assert "tipo de contrato/modalidad de contratacion" not in must_have_text
     assert "salario o rango" not in must_have_text

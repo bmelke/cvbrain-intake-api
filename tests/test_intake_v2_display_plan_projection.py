@@ -790,6 +790,14 @@ def test_display_plan_keeps_global_experience_clarifications_as_questions_not_cr
         },
     ]
     draft["candidate_screening_questions"] = []
+    draft["search_readiness"]["contractual_baseline_questions"] = [
+        "CONTRACTUAL_Q_CONTRACT_TYPE_SENTINEL",
+        "CONTRACTUAL_Q_SALARY_SENTINEL",
+        "CONTRACTUAL_Q_SCHEDULE_SENTINEL",
+        "CONTRACTUAL_Q_WORK_MODALITY_SENTINEL",
+        "CONTRACTUAL_Q_LOCATION_SENTINEL",
+        "CONTRACTUAL_Q_START_DATE_SENTINEL",
+    ]
     result = {
         **service_success_result(),
         **internalize_draft_v2(draft),
@@ -810,9 +818,40 @@ def test_display_plan_keeps_global_experience_clarifications_as_questions_not_cr
     assert "presencial/remoto/hibrido" in question_text
     assert "ubicacion/zona" in question_text
     assert "fecha de inicio/urgencia" in question_text
+    for sentinel in draft["search_readiness"]["contractual_baseline_questions"]:
+        assert sentinel in question_text
+        assert sentinel not in must_have_text
     assert "Cuanto tiempo de experiencia" not in must_have_text
     assert "tipo de contrato/modalidad de contratacion" not in must_have_text
     assert "salario o rango" not in must_have_text
     assert "presencial/remoto/hibrido" not in must_have_text
     assert "edad" not in full_plan.lower()
     assert "sexo" not in full_plan.lower()
+
+
+def test_display_plan_exposes_schema_backed_contractual_baseline_questions_without_python_inference():
+    draft = valid_draft(phrase="experiencia previa")
+    draft["company_questions"] = []
+    for criterion in draft["criteria"]:
+        criterion["clarification_question_ref"] = None
+    draft["search_readiness"]["contractual_baseline_questions"] = [
+        "CONTRACTUAL_Q_CONTRACT_TYPE_SENTINEL",
+        "CONTRACTUAL_Q_SALARY_SENTINEL",
+        "CONTRACTUAL_Q_SCHEDULE_SENTINEL",
+        "CONTRACTUAL_Q_WORK_MODALITY_SENTINEL",
+        "CONTRACTUAL_Q_LOCATION_SENTINEL",
+        "CONTRACTUAL_Q_START_DATE_SENTINEL",
+    ]
+    result = {
+        **service_success_result(),
+        **internalize_draft_v2(draft),
+    }
+
+    plan = display_plan_from(result)
+    question_text = safe_json(section_by_code(plan, "questions_for_recruiter"))
+    must_have_text = safe_json(section_by_code(plan, "must_have_criteria"))
+
+    for sentinel in draft["search_readiness"]["contractual_baseline_questions"]:
+        assert sentinel in question_text
+        assert sentinel not in must_have_text
+    assert "source_text" not in question_text

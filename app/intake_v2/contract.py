@@ -152,6 +152,7 @@ class SearchReadinessDraftV2(StrictDraftV2Model):
     continued_with_missing_information: bool
     recommendation_summary: str = ""
     recommended_next_steps: List[str] = Field(default_factory=list)
+    contractual_baseline_questions: List[str] = Field(default_factory=list)
 
 
 class QualityControlDraftV2(StrictDraftV2Model):

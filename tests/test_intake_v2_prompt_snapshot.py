@@ -208,6 +208,8 @@ def test_v2_prompt_requires_global_vague_experience_clarification_contract():
         assert "Age, sex, gender" in prompt
         assert "must not become search criteria" in prompt
         assert "mandatory intake coverage" in prompt
+        assert "contractual_baseline_questions" in prompt
+        assert "Populate search_readiness.contractual_baseline_questions" in prompt
         assert "Always check whether the source includes the contractual/business baseline" in prompt
         assert "salary/range" in prompt
         assert "hiring mode/contract type" in prompt
@@ -217,6 +219,7 @@ def test_v2_prompt_requires_global_vague_experience_clarification_contract():
         assert "start date/urgency" in prompt
         assert "ask concise recruiter-facing missing-information questions" in prompt
         assert "Do not convert contractual/business baseline questions into candidate criteria" in prompt
+        assert "These are intake questions, not candidate criteria" in prompt
         assert "one compact grouped question is acceptable" in prompt
         assert "questions_for_recruiter" in prompt
         assert "Questions must remain separate from criteria" in prompt

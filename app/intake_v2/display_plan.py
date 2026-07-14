@@ -121,7 +121,12 @@ def _items_for_section(section_order: int, code: str, document: Mapping[str, Any
     if code == "nice_to_have_criteria":
         return _criteria_items(section_order, _criteria_by_importance(document, {"should_have", "nice_to_have"}))
     if code == "questions_for_recruiter":
-        return _question_items(section_order, "company_question", _list_section(document, "company_questions"))
+        company_items = _question_items(section_order, "company_question", _list_section(document, "company_questions"))
+        return company_items + _contractual_baseline_question_items(
+            section_order,
+            _mapping_section(document, "search_readiness"),
+            offset=len(company_items),
+        )
     if code == "missing_information_or_blockers":
         return _missing_information_or_blocker_items(section_order, document)
     if code == "search_readiness":
@@ -223,6 +228,27 @@ def _question_items(section_order: int, kind: str, questions: list[Any]) -> List
             item["internal_id"] = internal_id
         item["items"] = _nested_field_items(section_order, order, question, QUESTION_DETAIL_FIELDS)
         items.append(item)
+    return items
+
+
+def _contractual_baseline_question_items(section_order: int, search_readiness: Mapping[str, Any], *, offset: int) -> List[Dict[str, Any]]:
+    values = search_readiness.get("contractual_baseline_questions")
+    if not isinstance(values, list):
+        return []
+    items: List[Dict[str, Any]] = []
+    for order, question in enumerate(values):
+        if not isinstance(question, str) or not question.strip():
+            continue
+        items.append(
+            _display_item(
+                section_order=section_order,
+                order=offset + order,
+                code=f"contractual_baseline_question_{order}",
+                kind="contractual_baseline_question",
+                label=f"Contractual baseline question {order + 1}",
+                copied_text=question,
+            )
+        )
     return items
 
 
