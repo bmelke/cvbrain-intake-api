@@ -66,6 +66,38 @@ RecommendedActionV2 = Literal[
     "use_manual_search",
     "cancel",
 ]
+CriterionScopeV1 = Literal[
+    "candidate_filter",
+    "ranking_signal",
+    "interview_only",
+    "context_only",
+    "exclusion",
+    "prohibited",
+    "unresolved",
+]
+CriterionOperatorV1 = Literal[
+    "equals",
+    "not_equals",
+    "contains",
+    "in",
+    "greater_than_or_equal",
+    "less_than_or_equal",
+    "between",
+    "present",
+    "unresolved",
+]
+EvidenceRequirementV1 = Literal[
+    "cv_evidence",
+    "official_document",
+    "portfolio",
+    "reference_check",
+    "interview_verification",
+    "none",
+    "unresolved",
+]
+TravelRelocationRequirementV1 = Literal["required", "preferred", "not_required", "unresolved"]
+SourceLanguageModeV1 = Literal["ai_resolved", "consumer_declared", "unresolved"]
+SearchContractStateV1 = Literal["safe", "blocked", "unresolved"]
 
 
 class StrictDraftV2Model(BaseModel):
@@ -90,6 +122,22 @@ class CriterionDraftV2(StrictDraftV2Model):
     precision_status: PrecisionStatusV2
     missing_dimensions: List[MissingDimensionV2]
     clarification_question_ref: Optional[str]
+    criterion_id: Optional[str] = None
+    scope: CriterionScopeV1 = "unresolved"
+    operator: CriterionOperatorV1 = "unresolved"
+    operand: Optional[str] = None
+    unit: Optional[str] = None
+    evidence_requirement: EvidenceRequirementV1 = "unresolved"
+    experience_domain: Optional[str] = None
+    minimum_value: Optional[float] = None
+    maximum_value: Optional[float] = None
+    recency_requirement: Optional[str] = None
+    scale_or_scope: Optional[str] = None
+    credential_name: Optional[str] = None
+    credential_issuer: Optional[str] = None
+    license_name: Optional[str] = None
+    license_category: Optional[str] = None
+    license_jurisdictions: List[str] = Field(default_factory=list)
 
 
 class CompanyQuestionDraftV2(StrictDraftV2Model):
@@ -135,6 +183,11 @@ class LocationModalityDraftV2(StrictDraftV2Model):
     remote_allowed: Optional[bool]
     hybrid_allowed: Optional[bool]
     onsite_required: Optional[bool]
+    countries: List[str] = Field(default_factory=list)
+    regions: List[str] = Field(default_factory=list)
+    cities: List[str] = Field(default_factory=list)
+    travel_requirement: TravelRelocationRequirementV1 = "unresolved"
+    relocation_requirement: TravelRelocationRequirementV1 = "unresolved"
 
 
 class SearchStrategyDraftV2(StrictDraftV2Model):
@@ -142,6 +195,14 @@ class SearchStrategyDraftV2(StrictDraftV2Model):
     search_terms: List[str]
     semantic_terms: List[str]
     negative_terms: List[str]
+    source_language_mode: SourceLanguageModeV1 = "unresolved"
+    resolved_source_language: Optional[str] = None
+    must_have_criterion_refs: List[str] = Field(default_factory=list)
+    preferred_criterion_refs: List[str] = Field(default_factory=list)
+    exclusion_criterion_refs: List[str] = Field(default_factory=list)
+    unresolved_criterion_refs: List[str] = Field(default_factory=list)
+    protected_traits_excluded: bool = True
+    contract_state: SearchContractStateV1 = "unresolved"
 
 
 class SearchReadinessDraftV2(StrictDraftV2Model):

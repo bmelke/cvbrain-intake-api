@@ -199,6 +199,45 @@ def test_search_readiness_schema_includes_human_readable_public_fields():
     assert readiness_properties["contractual_baseline_questions"]["type"] == "array"
 
 
+def test_provider_schema_requires_ai_owned_search_execution_fields():
+    schema = job_intelligence_v2_response_schema()
+    criterion = schema["$defs"]["CriterionDraftV2"]
+    location = schema["$defs"]["LocationModalityDraftV2"]
+    strategy = schema["$defs"]["SearchStrategyDraftV2"]
+
+    for field in {
+        "criterion_id",
+        "scope",
+        "operator",
+        "operand",
+        "unit",
+        "evidence_requirement",
+        "experience_domain",
+        "minimum_value",
+        "maximum_value",
+        "recency_requirement",
+        "scale_or_scope",
+        "credential_name",
+        "license_name",
+        "license_category",
+        "license_jurisdictions",
+    }:
+        assert field in criterion["required"]
+    for field in {"countries", "regions", "cities", "travel_requirement", "relocation_requirement"}:
+        assert field in location["required"]
+    for field in {
+        "source_language_mode",
+        "resolved_source_language",
+        "must_have_criterion_refs",
+        "preferred_criterion_refs",
+        "exclusion_criterion_refs",
+        "unresolved_criterion_refs",
+        "protected_traits_excluded",
+        "contract_state",
+    }:
+        assert field in strategy["required"]
+
+
 def test_search_readiness_human_readable_public_fields_are_strictly_accepted():
     payload = valid_payload()
     contractual_questions = [

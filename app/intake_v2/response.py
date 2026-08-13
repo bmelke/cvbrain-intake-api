@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any, Dict
 
 from app.intake_v2.errors import V2PublicResponseError
+from app.intake_v2.search_execution_contract import build_search_execution_contract_v1
 
 
 PUBLIC_RESPONSE_SCHEMA_VERSION = "cvbrain_intake_v2_public_response"
@@ -75,11 +76,13 @@ def build_public_response_v2(service_result: Mapping[str, Any], *, display_plan:
         _raise_response_error(code="invalid_service_status", paths=["service_result.status"])
 
     plan = _display_plan_from(display_plan)
+    search_execution_contract = build_search_execution_contract_v1(service_result)
     response: Dict[str, Any] = {
         "ok": True,
         "status": "success",
         "schema_version": PUBLIC_RESPONSE_SCHEMA_VERSION,
         "display_plan": copy.deepcopy(plan),
+        "search_execution_contract": search_execution_contract,
         "metadata": _metadata(service_result, plan),
     }
     _reject_forbidden_keys(response, path="response")

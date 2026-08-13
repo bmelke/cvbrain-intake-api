@@ -41,6 +41,7 @@ ALLOWED_SUCCESS_KEYS = {
     "schema_version",
     "response_version",
     "display_plan",
+    "search_execution_contract",
     "metadata",
     "request_id",
 }

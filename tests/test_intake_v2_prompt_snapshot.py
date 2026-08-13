@@ -168,6 +168,17 @@ def test_v2_prompt_makes_search_readiness_ai_owned_and_separate_from_consumer_lo
         assert "Python, WordPress, and consumers must not decide search readiness" in prompt
         assert "must only render the AI-owned search_readiness values" in prompt
 
+
+def test_prompt_requires_ai_owned_typed_search_execution_fields_without_candidate_actions():
+    extraction_prompt = prompts.build_extraction_prompt("auto")
+    repair_prompt = prompts.build_repair_prompt("auto")
+
+    for prompt in (extraction_prompt, repair_prompt):
+        assert "stable criterion_id, scope, operator, operand, unit, and evidence_requirement" in prompt
+        assert "Search-strategy criterion reference lists must use criteria[].criterion_id" in prompt
+        assert "Do not search, rank, score, select, or compare candidates." in prompt
+        assert "Python and consumers may validate and mechanically project" in prompt
+
 def test_v2_prompt_requires_global_vague_experience_clarification_contract():
     extraction_prompt = prompts.build_extraction_prompt("auto")
     repair_prompt = prompts.build_repair_prompt("auto")

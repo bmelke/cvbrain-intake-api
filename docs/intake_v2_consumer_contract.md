@@ -73,6 +73,16 @@ Consumers should render safe response and display fields from `display_plan` and
 
 Consumers must render criteria and questions separately. Consumers must not infer must-have or nice-to-have criteria from `questions_for_recruiter`, must not generate missing criteria themselves, and must not move questions into criteria. CVBrain owns semantic interpretation.
 
+## Confirmed Search Execution Contract
+
+Successful responses also include `search_execution_contract` with schema version `cvbrain_confirmed_search_contract_v1`. This server-side machine contract is separate from `display_plan`; consumers must not build it from recruiter-facing wording or parse its statements to recover missing typed values.
+
+The contract contains AI-owned source-language resolution, readiness, role profile, location and work arrangement, typed criteria, structured experience/credential/license requirements, exclusions, reference-based search strategy, and safety state. It contains no candidate results, scores, rankings, or selections. Candidate filtering, scoring, ranking, and comparison remain responsibilities of a separately approved search engine boundary.
+
+Consumers must validate the strict schema, all criterion and clarification-question references, `contract_digest`, and the confirmed brief version/integrity binding before future execution. `contract_digest` is deterministic SHA-256 over canonical sorted-key JSON excluding the digest itself. Error responses never include the contract.
+
+WordPress must submit only a confirmed brief reference through a later authenticated handoff. It must retrieve the stored contract server-side and pass typed fields mechanically. It must not accept browser-submitted criteria, reuse V1 semantic mappers, call a provider, or recompute the contract from prose.
+
 Consumers may render `search_readiness` to show whether search is recommended with the current information, possible but should be clarified, or not recommended yet because key information is missing. Consumers render `recommendation_summary` as AI-owned human-readable recruiter-facing readiness text and may render `recommended_next_steps` as AI-owned human-readable recruiter-facing next steps. Consumers must not generate search readiness, recommendation summaries, or recommended next steps themselves.
 
 

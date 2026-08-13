@@ -43,6 +43,12 @@ from app.intake_v2.response import (
     PUBLIC_RESPONSE_SCHEMA_VERSION,
     build_public_response_v2,
 )
+from app.intake_v2.search_execution_contract import (
+    SearchExecutionContractV1,
+    build_search_execution_contract_v1,
+    canonicalize_search_execution_contract_v1,
+    compute_search_execution_contract_digest,
+)
 from app.intake_v2.service import (
     SERVICE_SCHEMA_VERSION,
     IntakeServiceRequestV2,
@@ -63,6 +69,7 @@ __all__ = [
     "ProviderValidationFailureV2",
     "SCHEMA_VERSION_V2",
     "SERVICE_SCHEMA_VERSION",
+    "SearchExecutionContractV1",
     "V2ConfigurationError",
     "V2DisplayPlanProjectionError",
     "V2DraftContractError",
@@ -80,6 +87,9 @@ __all__ = [
     "V2ShapeRecoveryError",
     "build_display_plan_v2",
     "build_public_response_v2",
+    "build_search_execution_contract_v1",
+    "canonicalize_search_execution_contract_v1",
+    "compute_search_execution_contract_digest",
     "internalize_draft_v2",
     "job_intelligence_v2_response_schema",
     "run_intake_v2",

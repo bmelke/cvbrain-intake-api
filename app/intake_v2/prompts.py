@@ -107,6 +107,20 @@ V2_SEARCH_READINESS_CONTRACT = """AI-owned search readiness contract:
 - Python, WordPress, and consumers must only render the AI-owned search_readiness values and must not generate missing readiness or next-step text themselves.
 """
 
+V2_SEARCH_EXECUTION_FIELDS_CONTRACT = """AI-owned confirmed search execution fields contract:
+- Populate the strict execution fields in JobIntelligenceDraftV2 during the original extraction call.
+- Set search_strategy.source_language_mode and resolved_source_language from the AI-owned language decision; Python must not detect language.
+- For every criterion, populate a stable criterion_id, scope, operator, operand, unit, and evidence_requirement.
+- For experience criteria, populate experience_domain, minimum_value, maximum_value, recency_requirement, and scale_or_scope only when supported; otherwise use null and needs_clarification.
+- For credential and license criteria, populate their typed name, issuer, category, and jurisdiction fields only when supported; otherwise use null and needs_clarification.
+- Populate location countries, regions, cities, travel_requirement, and relocation_requirement without inventing missing details.
+- Search-strategy criterion reference lists must use criteria[].criterion_id and must resolve exactly.
+- Protected traits must use prohibited scope, must not appear in search-strategy reference lists, and protected_traits_excluded must be true.
+- The contract describes recruiter intent only. Do not search, rank, score, select, or compare candidates.
+- Do not include candidate data, candidate IDs, employer names, raw source text, provider payloads, or secrets.
+- Python and consumers may validate and mechanically project these fields but must not recover them from prose.
+"""
+
 
 def language_contract_for_source_language(source_language: str) -> str:
     return (
@@ -127,6 +141,8 @@ def build_extraction_prompt(source_language: str) -> str:
         + V2_GLOBAL_EXPERIENCE_CLARIFICATION_CONTRACT.strip()
         + "\n\n"
         + V2_SEARCH_READINESS_CONTRACT.strip()
+        + "\n\n"
+        + V2_SEARCH_EXECUTION_FIELDS_CONTRACT.strip()
         + "\n\n"
         + V2_PUBLIC_OUTPUT_CONTRACT.strip()
         + "\n"
@@ -149,6 +165,8 @@ def build_repair_prompt(source_language: str) -> str:
         + V2_GLOBAL_EXPERIENCE_CLARIFICATION_CONTRACT.strip()
         + "\n\n"
         + V2_SEARCH_READINESS_CONTRACT.strip()
+        + "\n\n"
+        + V2_SEARCH_EXECUTION_FIELDS_CONTRACT.strip()
         + "\n\n"
         + V2_PUBLIC_OUTPUT_CONTRACT.strip()
         + "\n"

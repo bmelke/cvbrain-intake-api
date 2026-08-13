@@ -28,6 +28,7 @@ APPROVED_PUBLIC_EXPORTS = {
     "PUBLIC_RESPONSE_SCHEMA_VERSION",
     "SCHEMA_VERSION_V2",
     "SERVICE_SCHEMA_VERSION",
+    "SearchExecutionContractV1",
     "V2ConfigurationError",
     "V2DisplayPlanProjectionError",
     "V2DraftContractError",
@@ -45,6 +46,9 @@ APPROVED_PUBLIC_EXPORTS = {
     "V2ShapeRecoveryError",
     "build_display_plan_v2",
     "build_public_response_v2",
+    "build_search_execution_contract_v1",
+    "canonicalize_search_execution_contract_v1",
+    "compute_search_execution_contract_digest",
     "internalize_draft_v2",
     "job_intelligence_v2_response_schema",
     "run_intake_v2",
@@ -102,6 +106,12 @@ APPROVED_EXPORT_MODULES = {
         "V2PublicResponseError",
         "build_public_response_v2",
     },
+    "app.intake_v2.search_execution_contract": {
+        "SearchExecutionContractV1",
+        "build_search_execution_contract_v1",
+        "canonicalize_search_execution_contract_v1",
+        "compute_search_execution_contract_digest",
+    },
     "app.intake_v2.service": {
         "IntakeServiceRequestV2",
         "SERVICE_SCHEMA_VERSION",
@@ -134,7 +144,10 @@ FORBIDDEN_EXPORT_PATTERNS = (
     "wordpress",
 )
 FORBIDDEN_EXPORT_PATTERN_EXCEPTIONS = {
+    "SearchExecutionContractV1",
     "V2ConfigurationError",
+    "build_search_execution_contract_v1",
+    "canonicalize_search_execution_contract_v1",
 }
 FORBIDDEN_IMPORT_PREFIXES = (
     "app.extractors",

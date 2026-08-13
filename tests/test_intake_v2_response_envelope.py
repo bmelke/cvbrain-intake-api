@@ -39,6 +39,7 @@ ALLOWED_SUCCESS_KEYS = {
     "schema_version",
     "response_version",
     "display_plan",
+    "search_execution_contract",
     "metadata",
     "request_id",
 }
@@ -451,7 +452,9 @@ def response_shape_signature(value: Any) -> Any:
     if isinstance(value, Mapping):
         stripped: dict[str, Any] = {}
         for key, child in value.items():
-            if key in {"value", "values", "text"}:
+            if key == "search_execution_contract":
+                stripped[str(key)] = contract_shape_signature(child)
+            elif key in {"value", "values", "text"}:
                 stripped[str(key)] = "<copied-value>"
             else:
                 stripped[str(key)] = response_shape_signature(child)
@@ -459,6 +462,14 @@ def response_shape_signature(value: Any) -> Any:
     if isinstance(value, list):
         return [response_shape_signature(child) for child in value]
     return value
+
+
+def contract_shape_signature(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): contract_shape_signature(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [contract_shape_signature(child) for child in value]
+    return type(value).__name__
 
 
 def response_log_payloads(caplog: pytest.LogCaptureFixture) -> list[dict[str, Any]]:
