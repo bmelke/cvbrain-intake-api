@@ -19,7 +19,7 @@ class StrictExecutionModel(BaseModel):
 
 
 class SourceLanguageV1(StrictExecutionModel):
-    source_language_mode: Literal["ai_resolved", "consumer_declared", "unresolved"]
+    source_language_mode: Literal["auto", "explicit"]
     resolved_source_language: Optional[str]
 
 
@@ -282,7 +282,11 @@ class SearchExecutionContractV1(SearchExecutionContractBodyV1):
         return self
 
 
-def build_search_execution_contract_v1(service_result: Mapping[str, Any]) -> Dict[str, Any]:
+def build_search_execution_contract_v1(
+    service_result: Mapping[str, Any],
+    *,
+    source_language: Any,
+) -> Dict[str, Any]:
     """Mechanically project a validated internal V2 document."""
 
     document = _mapping(service_result.get("document"), "document")
@@ -311,7 +315,7 @@ def build_search_execution_contract_v1(service_result: Mapping[str, Any]) -> Dic
     payload: Dict[str, Any] = {
         "schema_version": CONTRACT_SCHEMA_VERSION,
         "source_language": {
-            "source_language_mode": strategy.get("source_language_mode", "unresolved"),
+            "source_language_mode": _source_language_mode(source_language),
             "resolved_source_language": strategy.get("resolved_source_language"),
         },
         "readiness": {
@@ -375,6 +379,12 @@ def build_search_execution_contract_v1(service_result: Mapping[str, Any]) -> Dic
     canonical = SearchExecutionContractBodyV1.model_validate(payload).model_dump(mode="json")
     canonical["contract_digest"] = compute_search_execution_contract_digest(canonical)
     return SearchExecutionContractV1.model_validate(canonical).model_dump(mode="json")
+
+
+def _source_language_mode(source_language: Any) -> Literal["auto", "explicit"]:
+    if not str(source_language or "").strip():
+        raise ValueError("source_language request provenance is required")
+    return "auto" if source_language == "auto" else "explicit"
 
 
 def canonicalize_search_execution_contract_v1(value: Mapping[str, Any]) -> Dict[str, Any]:

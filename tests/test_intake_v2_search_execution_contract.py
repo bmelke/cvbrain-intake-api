@@ -7,6 +7,7 @@ import re
 import pytest
 from pydantic import ValidationError
 
+from app.intake_v2.contract import JobIntelligenceDraftV2
 from app.intake_v2.integrity import internalize_draft_v2
 from app.intake_v2.display_plan import build_display_plan_v2
 from app.intake_v2.response import build_public_response_v2
@@ -197,7 +198,6 @@ def draft() -> dict:
             "search_terms": ["medical devices", "key accounts"],
             "semantic_terms": ["healthcare commercial"],
             "negative_terms": [],
-            "source_language_mode": "ai_resolved",
             "resolved_source_language": "es",
             "must_have_criterion_refs": ["criterion_experience", "criterion_license"],
             "preferred_criterion_refs": ["criterion_credential"],
@@ -236,8 +236,8 @@ def service_result(payload: dict | None = None) -> dict:
     }
 
 
-def built_contract(payload: dict | None = None) -> dict:
-    return build_search_execution_contract_v1(service_result(payload))
+def built_contract(payload: dict | None = None, *, source_language: str = "auto") -> dict:
+    return build_search_execution_contract_v1(service_result(payload), source_language=source_language)
 
 
 def test_contract_is_strict_typed_and_contains_required_machine_areas():
@@ -246,7 +246,7 @@ def test_contract_is_strict_typed_and_contains_required_machine_areas():
     assert contract["schema_version"] == CONTRACT_SCHEMA_VERSION == "cvbrain_confirmed_search_contract_v1"
     assert SearchExecutionContractV1.model_config["extra"] == "forbid"
     assert contract["source_language"] == {
-        "source_language_mode": "ai_resolved",
+        "source_language_mode": "auto",
         "resolved_source_language": "es",
     }
     assert contract["readiness"]["unresolved_question_ids"]
@@ -284,12 +284,33 @@ def test_digest_is_deterministic_excludes_itself_and_changes_with_approved_data(
     changed = built_contract(changed_draft)
     assert changed["contract_digest"] != first["contract_digest"]
 
+    explicit = built_contract(source_language="es")
+    assert explicit["source_language"]["source_language_mode"] == "explicit"
+    assert explicit["source_language"]["resolved_source_language"] == "es"
+    assert explicit["contract_digest"] != first["contract_digest"]
+
     tampered = copy.deepcopy(first)
     tampered["contract_digest"] = "0" * 64
     assert compute_search_execution_contract_digest(tampered) == first["contract_digest"]
     with pytest.raises(ValidationError):
         canonicalize_search_execution_contract_v1(tampered)
     assert canonicalize_search_execution_contract_v1(first) == first
+
+
+@pytest.mark.parametrize("legacy_mode", ["ai_resolved", "consumer_declared", "unresolved"])
+def test_legacy_source_language_modes_are_rejected(legacy_mode: str):
+    contract = built_contract()
+    contract["source_language"]["source_language_mode"] = legacy_mode
+    contract["contract_digest"] = compute_search_execution_contract_digest(contract)
+    with pytest.raises(ValidationError):
+        SearchExecutionContractV1.model_validate(contract)
+
+
+def test_ai_draft_cannot_supply_or_override_request_source_language_mode():
+    payload = draft()
+    payload["search_strategy"]["source_language_mode"] = "explicit"
+    with pytest.raises(ValidationError):
+        JobIntelligenceDraftV2.model_validate(payload)
 
 
 def test_referential_integrity_rejects_duplicate_and_unknown_ids():
@@ -329,7 +350,7 @@ def test_privacy_boundary_excludes_forbidden_data_and_candidate_logic():
             "candidate_scores": [99],
         }
     )
-    contract = build_search_execution_contract_v1(result)
+    contract = build_search_execution_contract_v1(result, source_language="auto")
     rendered = json.dumps(contract, sort_keys=True).lower()
     assert all(key not in rendered for key in FORBIDDEN_KEYS)
 
@@ -337,9 +358,9 @@ def test_privacy_boundary_excludes_forbidden_data_and_candidate_logic():
 def test_display_plan_wording_is_not_an_input_to_contract_or_digest():
     result = service_result()
     result["display_plan"] = {"sections": [{"code": "must_have_criteria", "items": ["wording one"]}]}
-    first = build_search_execution_contract_v1(result)
+    first = build_search_execution_contract_v1(result, source_language="auto")
     result["display_plan"]["sections"][0]["items"] = ["completely different wording"]
-    second = build_search_execution_contract_v1(result)
+    second = build_search_execution_contract_v1(result, source_language="auto")
     assert first == second
 
 
@@ -365,7 +386,7 @@ def test_protected_or_non_filterable_criteria_cannot_enter_strategy_lists():
 def test_success_envelope_keeps_contract_separate_and_errors_exclude_it():
     result = service_result()
     display = build_display_plan_v2(result)
-    response = build_public_response_v2(result, display_plan=display)
+    response = build_public_response_v2(result, display_plan=display, source_language="auto")
 
     assert response["display_plan"] == display["display_plan"]
     assert response["search_execution_contract"] == built_contract()

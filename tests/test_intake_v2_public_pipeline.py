@@ -677,7 +677,10 @@ def test_public_pipeline_success_composes_service_display_and_response_once(monk
     assert service.calls[0]["provider"] is provider
     assert display.calls[0] == service_success_result()
     assert response.calls[0]["service_result"] == service_success_result()
-    assert response.calls[0]["kwargs"] == {"display_plan": display_plan_result()}
+    assert response.calls[0]["kwargs"] == {
+        "display_plan": display_plan_result(),
+        "source_language": "Declared-Spanish",
+    }
     assert provider.direct_extract_calls == 0
 
 
@@ -802,7 +805,10 @@ def test_public_pipeline_response_construction_failure_raises_safe_pipeline_erro
     assert len(display.calls) == 1
     assert len(response.calls) == 1
     assert response.calls[0]["service_result"] == service_success_result()
-    assert response.calls[0]["kwargs"] == {"display_plan": display_plan_result()}
+    assert response.calls[0]["kwargs"] == {
+        "display_plan": display_plan_result(),
+        "source_language": "Declared-Spanish",
+    }
     assert_safe_pipeline_error(exc_info.value, Error)
     rendered_error = safe_json(exc_info.value)
     assert "HostileDependencyError" not in rendered_error

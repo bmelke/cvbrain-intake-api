@@ -102,13 +102,16 @@ def test_v2_prompt_uses_v2_schema_names_without_adding_outputs():
     assert "Do not return flat_compatibility, display_plan" in prompt
 
 
-def test_v2_prompt_makes_ai_own_auto_language_and_light_meaning_preserving_correction():
+def test_v2_prompt_keeps_request_mode_server_owned_and_ai_resolution_owned():
     extraction_prompt = prompts.build_extraction_prompt("auto")
     repair_prompt = prompts.build_repair_prompt("auto")
 
     for prompt in (extraction_prompt, repair_prompt):
         assert "Source text language detected as: auto." in prompt
         assert "If source_language is \"auto\", determine the source language from source_text" in prompt
+        assert "source_language_mode is server-owned request provenance" in prompt
+        assert "Set only search_strategy.resolved_source_language" in prompt
+        assert "Set search_strategy.source_language_mode" not in prompt
         assert "Apply only light correction of obvious grammar, spelling, accent, punctuation, or typo errors" in prompt
         assert "before semantic interpretation" in prompt
         assert "Preserve original meaning" in prompt

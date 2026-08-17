@@ -64,7 +64,12 @@ FORBIDDEN_PUBLIC_KEYS = {
 _OMITTED = object()
 
 
-def build_public_response_v2(service_result: Mapping[str, Any], *, display_plan: Any = _OMITTED) -> Dict[str, Any]:
+def build_public_response_v2(
+    service_result: Mapping[str, Any],
+    *,
+    display_plan: Any = _OMITTED,
+    source_language: Any = _OMITTED,
+) -> Dict[str, Any]:
     """Wrap safe V2 service/display artifacts in a stable public contract."""
 
     if not isinstance(service_result, Mapping):
@@ -74,9 +79,14 @@ def build_public_response_v2(service_result: Mapping[str, Any], *, display_plan:
         return _failure_response(service_result)
     if not _is_success(service_result):
         _raise_response_error(code="invalid_service_status", paths=["service_result.status"])
+    if source_language is _OMITTED or not str(source_language or "").strip():
+        _raise_response_error(code="missing_source_language", paths=["source_language"])
 
     plan = _display_plan_from(display_plan)
-    search_execution_contract = build_search_execution_contract_v1(service_result)
+    search_execution_contract = build_search_execution_contract_v1(
+        service_result,
+        source_language=source_language,
+    )
     response: Dict[str, Any] = {
         "ok": True,
         "status": "success",

@@ -35,6 +35,8 @@ V2_PUBLIC_OUTPUT_CONTRACT = _apply_schema_alignment_changes(PRESERVED_PUBLIC_OUT
 V2_AI_LANGUAGE_AND_CORRECTION_CONTRACT = """AI-owned language and light correction contract:
 - If source_language is "auto", determine the source language from source_text before semantic interpretation.
 - If source_language is not "auto", treat it as the consumer-declared source language while preserving source_text evidence.
+- source_language_mode is server-owned request provenance; do not derive, set, or override it.
+- Set only search_strategy.resolved_source_language from the AI-owned language decision.
 - Apply only light correction of obvious grammar, spelling, accent, punctuation, or typo errors before semantic interpretation.
 - Preserve original meaning.
 - Do not invent missing details.
@@ -109,7 +111,7 @@ V2_SEARCH_READINESS_CONTRACT = """AI-owned search readiness contract:
 
 V2_SEARCH_EXECUTION_FIELDS_CONTRACT = """AI-owned confirmed search execution fields contract:
 - Populate the strict execution fields in JobIntelligenceDraftV2 during the original extraction call.
-- Set search_strategy.source_language_mode and resolved_source_language from the AI-owned language decision; Python must not detect language.
+- Set only search_strategy.resolved_source_language from the AI-owned language decision; Python must not detect language.
 - For every criterion, populate a stable criterion_id, scope, operator, operand, unit, and evidence_requirement.
 - For experience criteria, populate experience_domain, minimum_value, maximum_value, recency_requirement, and scale_or_scope only when supported; otherwise use null and needs_clarification.
 - For credential and license criteria, populate their typed name, issuer, category, and jurisdiction fields only when supported; otherwise use null and needs_clarification.

@@ -157,7 +157,7 @@ def build_public_response_v2(service_result: Mapping[str, Any], *, display_plan:
     if display_plan is _OMITTED:
         result = builder(service_result)
     else:
-        result = builder(service_result, display_plan=display_plan)
+        result = builder(service_result, display_plan=display_plan, source_language="Declared-Spanish")
     assert isinstance(result, Mapping), "build_public_response_v2 must return a mapping"
     return result
 

@@ -61,7 +61,11 @@ def run_public_intake_v2(
 
     response_failed = False
     try:
-        return build_public_response_v2(service_result, display_plan=display_result)
+        return build_public_response_v2(
+            service_result,
+            display_plan=display_result,
+            source_language=source_language,
+        )
     except Exception:
         response_failed = True
     if response_failed:

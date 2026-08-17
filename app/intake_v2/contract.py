@@ -96,7 +96,6 @@ EvidenceRequirementV1 = Literal[
     "unresolved",
 ]
 TravelRelocationRequirementV1 = Literal["required", "preferred", "not_required", "unresolved"]
-SourceLanguageModeV1 = Literal["ai_resolved", "consumer_declared", "unresolved"]
 SearchContractStateV1 = Literal["safe", "blocked", "unresolved"]
 
 
@@ -195,7 +194,6 @@ class SearchStrategyDraftV2(StrictDraftV2Model):
     search_terms: List[str]
     semantic_terms: List[str]
     negative_terms: List[str]
-    source_language_mode: SourceLanguageModeV1 = "unresolved"
     resolved_source_language: Optional[str] = None
     must_have_criterion_refs: List[str] = Field(default_factory=list)
     preferred_criterion_refs: List[str] = Field(default_factory=list)

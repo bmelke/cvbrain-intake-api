@@ -226,7 +226,6 @@ def test_provider_schema_requires_ai_owned_search_execution_fields():
     for field in {"countries", "regions", "cities", "travel_requirement", "relocation_requirement"}:
         assert field in location["required"]
     for field in {
-        "source_language_mode",
         "resolved_source_language",
         "must_have_criterion_refs",
         "preferred_criterion_refs",
@@ -236,6 +235,7 @@ def test_provider_schema_requires_ai_owned_search_execution_fields():
         "contract_state",
     }:
         assert field in strategy["required"]
+    assert "source_language_mode" not in strategy["properties"]
 
 
 def test_search_readiness_human_readable_public_fields_are_strictly_accepted():
